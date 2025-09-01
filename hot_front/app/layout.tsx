@@ -37,15 +37,16 @@ export default function RootLayout({
             <h1>Helpers Of Tommorrow (HOT)</h1>
             <UserButton showName />
           </div>
-
-          <div className="flex items-center justify-center h-screen ">
+          
             <SignedOut>
-              <SignIn routing="hash" />
+              <div className="flex items-center justify-center h-screen ">
+                <SignIn routing="hash" />
+              </div>
             </SignedOut>
+          
             <SignedIn>
               {children}
             </SignedIn>
-          </div>
 
         </body>
       </html>
