@@ -125,7 +125,7 @@ def get_senior(uid: str):
         "physical": random.randint(1, 5),
         "mental": random.randint(1, 5),
         "community": random.randint(1, 5),
-        "last_visit": get_iso_time(days=-random.randint(1, 30))
+        "last_visit": get_iso_time(days=-random.randint(0, 365))
     }
 
 @app.get("/volunteer/{vid}")
@@ -167,7 +167,7 @@ def generate_demo_seniors(count: int = 10):
             "coords": get_sg_coords(),
             "physical": random.randint(1, 5),
             "mental": random.randint(1, 5), 
-            "community": random.randint(1, 5)
+            "community": random.randint(1, 5),
         })
     return {"seniors": seniors}
 
@@ -192,6 +192,8 @@ def generate_demo_volunteers(count: int = 5):
 def health():
     return {"status": "OK", "time": get_iso_time()}
 
+
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)
+    app = FastAPI()
+    uvicorn.run("api:main", host="0.0.0.0", port=8000, reload=True)
