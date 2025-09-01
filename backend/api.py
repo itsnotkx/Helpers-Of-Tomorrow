@@ -3,9 +3,26 @@ from typing import List
 import random
 import math
 from datetime import datetime, timedelta
+from fastapi.middleware.cors import CORSMiddleware
 
 app = FastAPI(title="AIC Senior Care MVP")
 
+origins = [
+    "http://localhost:3000",
+    "http://127.0.0.1:3000",  # include this too if you ever use 127.0.0.1
+]
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=origins,        # never use "*" if you send cookies/Authorization
+    allow_credentials=True,       # set True only if you use cookies/auth headers
+    allow_methods=["*"],          # or list: ["GET","POST","PUT","DELETE","OPTIONS"]
+    allow_headers=["*"],          # or list specific headers you use
+)
+
+origins = [
+    "http://localhost:3000",
+    "http://127.0.0.1:3000",  # include this too if you ever use 127.0.0.1
+]
 # -------------------------------
 # Helper Functions
 # -------------------------------
@@ -196,4 +213,4 @@ def health():
 if __name__ == "__main__":
     import uvicorn
     app = FastAPI()
-    uvicorn.run("api:main", host="0.0.0.0", port=8000, reload=True)
+    uvicorn.run("api:main", host="localhost", port=8000, reload=True)
