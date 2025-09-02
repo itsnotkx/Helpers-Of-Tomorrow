@@ -39,7 +39,7 @@ export default function RootLayout({
           </div>
           
             <SignedOut>
-              <div className="flex items-center justify-center h-screen ">
+              <div className="flex items-center justify-center min-h-screen ">
                 <SignIn routing="hash" />
               </div>
             </SignedOut>
