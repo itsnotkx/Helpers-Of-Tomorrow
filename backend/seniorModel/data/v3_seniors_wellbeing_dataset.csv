@@ -1,4 +1,4 @@
-Age,Physical Health (ADL),Mental Health (1-5),Previous District Leader's Intervention,Received Government Support,Community Engagement,Making Ends Meet,Living Situation,Overall Wellbeing
+age,physical,mental,dl_intervention,rece_gov_sup,community,making_ends_meet,living_situation,overall_wellbeing
 88,5,3,No,Yes,Medium,Manageable,With Family,High
 74,3,2,No,No,Low,Manageable,Assisted Living,Low
 67,5,3,No,Yes,High,Manageable,With Spouse,High

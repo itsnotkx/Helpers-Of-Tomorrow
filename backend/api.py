@@ -10,6 +10,8 @@ import os
 from supabase import create_client
 from dotenv import load_dotenv
 import uvicorn
+import joblib
+import pandas as pd
 
 app = FastAPI(title="AIC Senior Care MVP")
 load_dotenv('.env.local')
@@ -208,6 +210,23 @@ def get_district_data(name: str):
     """Get district overview from DB"""
     response = supabase.table("districts").select("*").eq("name", name).single().execute()
     return response.data
+
+@app.get("/classify-seniors")
+def classify_seniors():
+    current_dir = os.path.dirname(os.path.abspath(__file__))
+    model = joblib.load(os.path.join(current_dir, 'seniorModel', 'training', 'senior_risk_model.pkl'))["model"]
+    print(model)
+    response = supabase.table("seniors").select("*").execute()
+    data = response.data
+    df = pd.DataFrame(data)
+    features = ['age', 'physical', 'mental', 'dl_intervention', 'rece_gov_sup', 'community', 'making_ends_meet', 'living_situation']
+    X = df[features]
+    df["overall_wellbeing"] = model.predict(X)
+
+    for idx, row in df.iterrows():
+        supabase.table("seniors").update({"overall_wellbeing": int(row["overall_wellbeing"])}).eq("uid", row["uid"]).execute()
+
+    return {"status": "success"}
 
 # -------------------------------
 # Demo Data Generator

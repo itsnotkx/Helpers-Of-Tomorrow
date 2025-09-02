@@ -29,8 +29,8 @@ def analyze_dataset(df):
             print(f"  Mean: {df[col].mean():.2f}")
     
     print(f"\nTarget variable distribution:")
-    if 'Overall Wellbeing' in df.columns:
-        print(df['Overall Wellbeing'].value_counts())
+    if 'overall_wellbeing' in df.columns:
+        print(df['overall_wellbeing'].value_counts())
         print()
     return df
 
@@ -51,7 +51,7 @@ def load_and_prepare_data(file_path=None):
         return None
 
     print(f"Dataset shape: {df.shape}")
-    print(f"Target distribution:\n{df['Overall Wellbeing'].value_counts()}")
+    print(f"Target distribution:\n{df['overall_wellbeing'].value_counts()}")
     
     return df
 
@@ -67,9 +67,9 @@ class SeniorRiskAssessment:
     def prepare_features(self, df):
         """Prepare features for training"""
         # Separate features and target
-        feature_cols = [col for col in df.columns if col != 'Overall Wellbeing']
+        feature_cols = [col for col in df.columns if col != 'overall_wellbeing']
         X = df[feature_cols].copy()
-        y = df['Overall Wellbeing'].copy()
+        y = df['overall_wellbeing'].copy()
         
         # Store feature names
         self.feature_names = list(X.columns)
@@ -77,7 +77,7 @@ class SeniorRiskAssessment:
         # Encode target variable (Low=0, Medium=1, High=2 for risk priority)
         # y_encoded = self.label_encoder.fit_transform(y)
 
-        # encoding target value (overall wellbeing)
+        # encoding target value (overall_wellbeing)
         low_high_mapping = {'Low': 0, 'Medium': 1, 'High': 2}
         y_encoded = y.map(low_high_mapping).values
 
@@ -86,13 +86,13 @@ class SeniorRiskAssessment:
         meeting_ends_mapping = {'Struggling': 0, 'Manageable': 1, 'Comfortable': 2}
         living_situation_mapping = {'Alone': 0, 'With Spouse': 1, 'With Family': 2, 'Assisted Living': 3}
         for col in X.select_dtypes(include=['object']).columns:
-            if col == 'Making Ends Meet':
+            if col == 'making_ends_meet':
                 X[col] = X[col].map(meeting_ends_mapping)
-            elif col == 'Living Situation':
+            elif col == 'living_situation':
                 X[col] = X[col].map(living_situation_mapping)
-            elif col == 'Community Engagement':
+            elif col == 'community':
                 X[col] = X[col].map(low_high_mapping)
-            elif col == "Previous District Leader's Intervention" or col == 'Received Government Support':
+            elif col == "dl_intervention" or col == 'rece_gov_sup':
                 X[col] = X[col].map(yes_mapping)
             else:
                 continue
@@ -241,13 +241,13 @@ class SeniorRiskAssessment:
         meeting_ends_mapping = {'Struggling': 0, 'Manageable': 1, 'Comfortable': 2}
         living_situation_mapping = {'Alone': 0, 'With Spouse': 1, 'With Family': 2, 'Assisted Living': 3}
         for col in processed_df.select_dtypes(include=['object']).columns:
-            if col == 'Making Ends Meet':
+            if col == 'making_ends_meet':
                 processed_df[col] = processed_df[col].map(meeting_ends_mapping)
-            elif col == 'Living Situation':
+            elif col == 'living_situation':
                 processed_df[col] = processed_df[col].map(living_situation_mapping)
-            elif col == 'Community Engagement':
+            elif col == 'community':
                 processed_df[col] = processed_df[col].map(low_high_mapping)
-            elif col == "Previous District Leader's Intervention" or col == 'Received Government Support':
+            elif col == "dl_intervention" or col == 'rece_gov_sup':
                 processed_df[col] = processed_df[col].map(yes_mapping)
             else:
                 continue
