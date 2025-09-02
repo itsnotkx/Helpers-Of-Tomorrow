@@ -78,13 +78,13 @@ class SeniorRiskAssessment:
         # y_encoded = self.label_encoder.fit_transform(y)
 
         # encoding target value (overall_wellbeing)
-        low_high_mapping = {'Low': 0, 'Medium': 1, 'High': 2}
+        low_high_mapping = {'Low': 1, 'Medium': 2, 'High': 3}
         y_encoded = y.map(low_high_mapping).values
 
         # encoding categorical variables (features)
         yes_mapping = {'Yes': 1, 'No': 0}
-        meeting_ends_mapping = {'Struggling': 0, 'Manageable': 1, 'Comfortable': 2}
-        living_situation_mapping = {'Alone': 0, 'With Spouse': 1, 'With Family': 2, 'Assisted Living': 3}
+        meeting_ends_mapping = {'Struggling': 1, 'Manageable': 2, 'Comfortable': 3}
+        living_situation_mapping = {'Alone': 1, 'With Spouse': 2, 'With Family': 3, 'Assisted Living': 4}
         for col in X.select_dtypes(include=['object']).columns:
             if col == 'making_ends_meet':
                 X[col] = X[col].map(meeting_ends_mapping)
@@ -177,8 +177,8 @@ class SeniorRiskAssessment:
         prediction = self.model.predict(sample_processed)[0]
         # print("Raw prediction:", prediction)
         prediction_proba = self.model.predict_proba(sample_processed)[0]
-        class_mapping = {0: "Low", 1: "Medium", 2: "High"}
-        predicted_class = class_mapping[prediction]
+        class_mapping = {1: "Low", 2: "Medium", 3: "High"}
+        predicted_class = class_mapping[prediction - 1]
         # predicted_class = self.label_encoder.inverse_transform([prediction])[0]
         
         # Get SHAP values
@@ -204,8 +204,8 @@ class SeniorRiskAssessment:
         for i, feature in enumerate(self.feature_names):
             explanation['feature_importance'][feature] = {
                 'value': float(sample_processed.iloc[0, i]),
-                'shap_value': float(shap_values[i][prediction]),
-                'impact': 'Decrease Risk' if shap_values[i][prediction] > 0 else 'Increase Risk'
+                'shap_value': float(shap_values[i][prediction-1]),
+                'impact': 'Decrease Risk' if shap_values[i][prediction-1] > 0 else 'Increase Risk'
             }
         print("Explanation: ", explanation)
         # Sort by absolute SHAP value
@@ -234,12 +234,12 @@ class SeniorRiskAssessment:
         #print("Before processing\n")
         #print(processed_df)
 
-        low_high_mapping = {'Low': 0, 'Medium': 1, 'High': 2}
+        low_high_mapping = {'Low': 1, 'Medium': 2, 'High': 3}
 
         # encoding categorical variables (features)
         yes_mapping = {'Yes': 1, 'No': 0}
-        meeting_ends_mapping = {'Struggling': 0, 'Manageable': 1, 'Comfortable': 2}
-        living_situation_mapping = {'Alone': 0, 'With Spouse': 1, 'With Family': 2, 'Assisted Living': 3}
+        meeting_ends_mapping = {'Struggling': 1, 'Manageable': 2, 'Comfortable': 3}
+        living_situation_mapping = {'Alone': 1, 'With Spouse': 2, 'With Family': 3, 'Assisted Living': 4}
         for col in processed_df.select_dtypes(include=['object']).columns:
             if col == 'making_ends_meet':
                 processed_df[col] = processed_df[col].map(meeting_ends_mapping)
