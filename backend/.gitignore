@@ -1,0 +1,64 @@
+# ---- Python ----
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.so
+*.egg
+*.egg-info/
+dist/
+build/
+.eggs/
+
+# ---- Virtual environments ----
+.venv/
+venv/
+env/
+ENV/
+
+# ---- FastAPI / Uvicorn ----
+*.log
+*.pid
+
+# ---- Testing ----
+.coverage
+.tox/
+.nox/
+pytest_cache/
+
+# ---- IDEs & Editors ----
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# ---- OS Files ----
+.DS_Store
+Thumbs.db
+
+# ---- Environments ----
+.env
+.env.*
+!.env.example
+
+# ---- Databases ----
+*.sqlite3
+*.db
+
+# ---- Migrations (if using Alembic/SQLAlchemy) ----
+alembic/versions/*.pyc
+alembic/versions/*.py~
+alembic/versions/__pycache__/
+
+# ---- PyInstaller ----
+*.manifest
+*.spec
+
+# ---- MyPy / Type Checking ----
+.mypy_cache/
+.dmypy.json
+dmypy.json
+
+# ---- PyCharm ----
+*.iml
+.idea/

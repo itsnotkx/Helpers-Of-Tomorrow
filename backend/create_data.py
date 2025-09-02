@@ -28,16 +28,21 @@ def create_senior(n):
     """Generate SQL INSERT statements for n seniors."""
     stmts = []
     for _ in range(n):
-        uid = str(uuid.uuid4())
+        # uid = str(uuid.uuid4())
         name = fake_sg_name()
         lat, lng = rand_coords()
         phys = random.randint(1, 5)
         ment = random.randint(1, 5)
         comm = random.randint(1, 5)
+        dl = random.randint(0, 1)
+        rece_gov = random.randint(0, 1)
+        making_ends = random.randint(1, 5)
+        living_sit = random.randint(1, 5)
+        age = random.randint(60, 100)
         last_visit = iso_time(days_offset = -random.randint(0, 365))
         stmt = (
-            f"INSERT INTO seniors (uid, name, coords, physical, mental, community, last_visit) VALUES "
-            f"('{uid}', '{name}', '{{\"lat\": {lat}, \"lng\": {lng}}}', {phys}, {ment}, {comm}, '{last_visit}');"
+            f"INSERT INTO seniors (name, coords, physical, mental, community, last_visit, dl_intervention, rece_gov_sup, making_ends_meet, living_situation, age) VALUES "
+            f"('{name}', '{{\"lat\": {lat}, \"lng\": {lng}}}', {phys}, {ment}, {comm}, '{last_visit}', {dl}, {rece_gov}, {making_ends}, {living_sit}, {age});"
         )
         stmts.append(stmt)
     return "\n".join(stmts)
@@ -63,6 +68,6 @@ def create_volunteer(n):
 # Example usage:
 if __name__ == "__main__":
     print("-- Seniors:")
-    print(create_senior(20))
+    print(create_senior(50))
     # print("\n-- Volunteers:")
     # print(create_volunteer(15))
