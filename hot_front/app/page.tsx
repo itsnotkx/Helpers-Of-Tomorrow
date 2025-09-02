@@ -144,15 +144,18 @@ export default function VolunteerDashboard() {
 
     // Generate demo data
     const [seniorsRes, volunteersRes] = await Promise.all([
-      fetch(`${API_BASE}/demo/seniors?count=50`),
-      fetch(`${API_BASE}/demo/volunteers?count=15`),
+      fetch(`${API_BASE}/seniors`),
+      fetch(`${API_BASE}/volunteers`),
     ])
 
     const seniorsData = await seniorsRes.json()
     const volunteersData = await volunteersRes.json()
 
-    setSeniors(seniorsData.seniors)
-    setVolunteers(volunteersData.volunteers)
+    setSeniors(seniorsData.data);
+    setVolunteers(volunteersData.data);
+
+    console.log("Seniors" + seniorsData.seniors);
+    console.log("Volunteers" + volunteersData.volunteers);
 
     // Assess seniors
     const assessRes = await fetch(`${API_BASE}/assess`, {

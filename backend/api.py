@@ -4,8 +4,16 @@ import random
 import math
 from datetime import datetime, timedelta
 from fastapi.middleware.cors import CORSMiddleware
+import os
+from supabase import create_client
 
 app = FastAPI(title="AIC Senior Care MVP")
+url = os.getenv("SUPABASE_URL")
+key = os.getenv("SUPABASE_KEY")
+print(url)
+print(key)
+supabase = create_client(url, key)
+
 
 origins = [
     "http://localhost:3000",
@@ -132,43 +140,31 @@ def create_schedule(data: dict):
 # Data Endpoints
 # -------------------------------
 
+@app.get("/seniors")
+def get_senior():
+    return supabase.table("seniors").select("*").execute()
+
+@app.get("/volunteers")
+def get_volunteers():
+    return supabase.table("volunteers").select("*").execute()
+
 @app.get("/senior/{uid}")
 def get_senior(uid: str):
-    """Get senior details"""
-    return {
-        "uid": uid,
-        "name": "Ah Gong",
-        "coords": get_sg_coords(),
-        "physical": random.randint(1, 5),
-        "mental": random.randint(1, 5),
-        "community": random.randint(1, 5),
-        "last_visit": get_iso_time(days=-random.randint(0, 365))
-    }
+    """Get senior details from DB"""
+    response = supabase.table("seniors").select("*").eq("uid", uid).single().execute()
+    return response.data
 
 @app.get("/volunteer/{vid}")
 def get_volunteer(vid: str):
-    """Get volunteer details"""
-    return {
-        "vid": vid,
-        "name": "Sarah",
-        "coords": get_sg_coords(),
-        "skill": random.randint(1, 3),
-        "available": [get_iso_time(days=i) for i in range(1, 8)]
-    }
+    """Get volunteer details from DB"""
+    response = supabase.table("volunteers").select("*").eq("vid", vid).single().execute()
+    return response.data
 
 @app.get("/district/{name}")
 def get_district_data(name: str):
-    """Get district overview"""
-    senior_count = random.randint(50, 200)
-    vol_count = random.randint(10, 50)
-    
-    return {
-        "district": name,
-        "seniors": senior_count,
-        "volunteers": vol_count,
-        "high_risk": random.randint(5, 30),
-        "coords": get_sg_coords()
-    }
+    """Get district overview from DB"""
+    response = supabase.table("districts").select("*").eq("name", name).single().execute()
+    return response.data
 
 # -------------------------------
 # Demo Data Generator
@@ -208,9 +204,3 @@ def generate_demo_volunteers(count: int = 5):
 @app.get("/")
 def health():
     return {"status": "OK", "time": get_iso_time()}
-
-
-if __name__ == "__main__":
-    import uvicorn
-    app = FastAPI()
-    uvicorn.run("api:main", host="localhost", port=8000, reload=True)
