@@ -3,10 +3,10 @@
 import { useState, useEffect } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { Button } from "@/components/ui/button"
 import { MapPin, Users, Calendar, AlertTriangle, Activity } from "lucide-react"
 import { InteractiveMap } from "@/components/interactive-map"
 import { ScheduleInterface } from "@/components/schedule-interface"
+import { DashboardHeader } from "@/components/dashboard-header"
 import { useOrganization } from "@clerk/nextjs"
 
 // TypeScript interfaces for API data
@@ -58,7 +58,7 @@ export default function VolunteerDashboard() {
   const [selectedDistrict, setSelectedDistrict] = useState("Central Singapore")
   const [usingMockData, setUsingMockData] = useState(true)
 
-  const { membership, isLoaded } = useOrganization();
+  const { membership, isLoaded } = useOrganization()
 
   const generateMockData = () => {
     // Generate mock seniors
@@ -271,7 +271,7 @@ export default function VolunteerDashboard() {
       </div>
     )
   }
-  
+
   if (membership.role === "org:member") {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
@@ -280,42 +280,17 @@ export default function VolunteerDashboard() {
     )
   } else {
     // console.log("membership.role:", membership.role);
-      return (
+    return (
       <div className="min-h-screen bg-background">
-        {/* Header */}
-        <header className="border-b bg-card">
-          <div className="container mx-auto px-6 py-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <h1 className="text-2xl font-bold text-foreground">Senior Care Volunteer Dashboard</h1>
-                <p className="text-muted-foreground">Managing care for {selectedDistrict}</p>
-                {usingMockData && (
-                  <Badge variant="outline" className="mt-2 text-xs">
-                    <AlertTriangle className="h-3 w-3 mr-1" />
-                    Demo Mode - Using sample data
-                  </Badge>
-                )}
-              </div>
-              <div className="flex items-center gap-4">
-                <Badge variant="outline" className="text-sm">
-                  <MapPin className="h-3 w-3 mr-1" />
-                  {selectedDistrict}
-                </Badge>
-                {usingMockData ? (
-                  <Button onClick={tryConnectToApi} variant="outline" size="sm">
-                    <Activity className="h-4 w-4 mr-2" />
-                    Try Connect API
-                  </Button>
-                ) : (
-                  <Button onClick={loadDashboardData} variant="outline" size="sm">
-                    <Activity className="h-4 w-4 mr-2" />
-                    Refresh
-                  </Button>
-                )}
-              </div>
-            </div>
-          </div>
-        </header>
+        {/* Dashboard Header */}
+        <DashboardHeader
+          title="Senior Care Volunteer Dashboard"
+          subtitle={`Managing care for ${selectedDistrict}`}
+          selectedDistrict={selectedDistrict}
+          usingMockData={usingMockData}
+          onTryConnectApi={tryConnectToApi}
+          onRefresh={loadDashboardData}
+        />
 
         <div className="container mx-auto px-6 py-6">
           {usingMockData && (
@@ -326,8 +301,8 @@ export default function VolunteerDashboard() {
                   <div>
                     <h3 className="font-medium text-blue-900 dark:text-blue-100">Demo Mode Active</h3>
                     <p className="text-sm text-blue-700 dark:text-blue-200 mt-1">
-                      The dashboard is currently using realistic sample data for demonstration. To connect to your FastAPI
-                      backend:
+                      The dashboard is currently using realistic sample data for demonstration. To connect to your
+                      FastAPI backend:
                     </p>
                     <ul className="text-sm text-blue-700 dark:text-blue-200 mt-2 ml-4 list-disc space-y-1">
                       <li>
@@ -469,7 +444,9 @@ export default function VolunteerDashboard() {
                       <h4 className="font-medium">{assignment.volunteer}</h4>
                       <Badge variant="secondary">{assignment.cluster}</Badge>
                     </div>
-                    <p className="text-sm text-muted-foreground">Distance: {(assignment.distance * 100).toFixed(1)}km</p>
+                    <p className="text-sm text-muted-foreground">
+                      Distance: {(assignment.distance * 100).toFixed(1)}km
+                    </p>
                   </div>
                 ))}
               </div>

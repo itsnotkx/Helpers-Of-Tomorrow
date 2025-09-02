@@ -8,6 +8,8 @@ import {
   UserButton,
 } from '@clerk/nextjs'
 import "./globals.css";
+import Image from "next/image";
+
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -30,14 +32,13 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <ClerkProvider>
-      <html lang="en">
+    <ClerkProvider
+      appearance=
+      {{
+        cssLayerName: 'clerk',
+      }}>
+      <html lang="en">  
         <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
-          <div className='flex justify-between p-4'> 
-            <h1>Helpers Of Tommorrow (HOT)</h1>
-            <UserButton showName />
-          </div>
-          
             <SignedOut>
               <div className="flex items-center justify-center min-h-screen ">
                 <SignIn routing="hash" />
