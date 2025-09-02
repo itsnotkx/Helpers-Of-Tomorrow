@@ -1,368 +1,323 @@
 "use client"
 
-import { useState, useMemo } from "react"
-import { Card, CardContent } from "@/components/ui/card"
-import { Badge } from "@/components/ui/badge"
-import { Button } from "@/components/ui/button"
-import { ZoomIn, ZoomOut, RotateCcw } from "lucide-react"
+import { useState, useEffect, useRef } from "react"
+import mapboxgl from "mapbox-gl"
+import "mapbox-gl/dist/mapbox-gl.css"
 
-interface MapProps {
-  seniors: Array<{
-    uid: string
-    name: string
-    coords: { lat: number; lng: number }
-    last_visit: string
-  }>
-  volunteers: Array<{
-    vid: string
-    name: string
-    coords: { lat: number; lng: number }
-    available: boolean | string[]
-  }>
-  assignments: Array<{
-    volunteer: string
-    cluster: string
-    distance: number
-  }>
-  schedules: Array<{
-    volunteer: string
-    cluster: string
-    datetime: string
-    duration: number
-  }>
+// TypeScript interfaces matching the dashboard data
+interface Senior {
+  uid: string
+  name: string
+  coords: { lat: number; lng: number }
+  physical: number
+  mental: number
+  community: number
+  last_visit: string
 }
 
-export function InteractiveMap({ seniors, volunteers, assignments, schedules }: MapProps) {
-  const [zoom, setZoom] = useState(1)
-  const [pan, setPan] = useState({ x: 0, y: 0 })
-  const [selectedCluster, setSelectedCluster] = useState<string | null>(null)
+interface Volunteer {
+  vid: string
+  name: string
+  coords: { lat: number; lng: number }
+  skill: number
+  available: boolean | string[]
+}
 
-  // Singapore bounds
-  const SINGAPORE_BOUNDS = {
-    minLat: 1.16,
-    maxLat: 1.47,
-    minLng: 103.6,
-    maxLng: 104.0,
-  }
+interface Assessment {
+  uid: string
+  risk: number
+  priority: "HIGH" | "MEDIUM" | "LOW"
+  needscare: boolean
+}
 
-  // Convert lat/lng to SVG coordinates
-  const coordsToSVG = (lat: number, lng: number) => {
-    const x = ((lng - SINGAPORE_BOUNDS.minLng) / (SINGAPORE_BOUNDS.maxLng - SINGAPORE_BOUNDS.minLng)) * 800
-    const y = ((SINGAPORE_BOUNDS.maxLat - lat) / (SINGAPORE_BOUNDS.maxLat - SINGAPORE_BOUNDS.minLat)) * 600
-    return { x, y }
-  }
+interface Assignment {
+  volunteer: string
+  cluster: string
+  distance: number
+}
 
-  // Group seniors by clusters (simplified clustering)
-  const clusters = useMemo(() => {
-    const clusterMap = new Map<
-      string,
-      {
-        id: string
-        center: { lat: number; lng: number }
-        seniors: typeof seniors
-        volunteers: typeof volunteers
-        activeSchedules: number
+interface Schedule {
+  volunteer: string
+  cluster: string
+  datetime: string
+  duration: number
+}
+
+interface InteractiveMapProps {
+  seniors: Senior[]
+  volunteers: Volunteer[]
+  assignments: Assignment[]
+  schedules: Schedule[]
+}
+
+const priorityColors = {
+  HIGH: "bg-red-500",
+  MEDIUM: "bg-yellow-500",
+  LOW: "bg-green-500",
+}
+
+export function InteractiveMap({ seniors, volunteers, assignments, schedules }: InteractiveMapProps) {
+  const mapContainer = useRef<HTMLDivElement>(null)
+  const map = useRef<mapboxgl.Map | null>(null)
+  const [mapLoaded, setMapLoaded] = useState(false)
+  const [mapError, setMapError] = useState<string | null>(null)
+  const markersRef = useRef<mapboxgl.Marker[]>([])
+  const popupRef = useRef<mapboxgl.Popup | null>(null)
+
+  // Calculate assessments based on senior data
+  const assessments: Assessment[] = seniors.map((senior) => {
+    const totalScore = senior.physical + senior.mental + senior.community
+    const risk = totalScore / 15 // Normalize to 0-1
+    const priority = risk > 0.7 ? "HIGH" : risk > 0.4 ? "MEDIUM" : "LOW"
+
+    return {
+      uid: senior.uid,
+      risk,
+      priority,
+      needscare: risk > 0.6,
+    }
+  })
+
+  useEffect(() => {
+    if (!mapContainer.current) return
+
+    const mapboxToken =
+      process.env.NEXT_PUBLIC_MAPBOX_TOKEN
+
+    mapboxgl.accessToken = mapboxToken
+
+    try {
+      map.current = new mapboxgl.Map({
+        container: mapContainer.current,
+        style: "mapbox://styles/mapbox/streets-v12",
+        center: [103.8198, 1.3521],
+        zoom: 11,
+      })
+
+      map.current.on("load", () => {
+        console.log("[v0] Map loaded successfully")
+        setMapLoaded(true)
+        addMarkers()
+      })
+
+      map.current.on("error", (error) => {
+        console.error("[v0] Map error:", error)
+        setMapError(error.message || "Failed to load map")
+      })
+    } catch (error) {
+      console.error("[v0] Map initialization error:", error)
+      setMapError("Failed to initialize map")
+    }
+
+    return () => {
+      if (map.current) {
+        map.current.remove()
       }
-    >()
+    }
+  }, [])
 
-    // Create clusters based on assignments
-    assignments.forEach((assignment) => {
-      if (!clusterMap.has(assignment.cluster)) {
-        clusterMap.set(assignment.cluster, {
-          id: assignment.cluster,
-          center: { lat: 1.3, lng: 103.8 }, // Default center
-          seniors: [],
-          volunteers: [],
-          activeSchedules: 0,
-        })
-      }
-    })
+  useEffect(() => {
+    if (mapLoaded) {
+      addMarkers()
+    }
+  }, [seniors, volunteers, mapLoaded])
 
-    // Assign seniors to nearest clusters
+  const addMarkers = () => {
+    if (!map.current) return
+
+    // Clear existing markers
+    markersRef.current.forEach((marker) => marker.remove())
+    markersRef.current = []
+
+    // Add senior markers
     seniors.forEach((senior) => {
-      const nearestCluster = Array.from(clusterMap.keys())[Math.floor(Math.random() * clusterMap.size)]
-      if (nearestCluster) {
-        const cluster = clusterMap.get(nearestCluster)!
-        cluster.seniors.push(senior)
+      const assessment = assessments.find((a) => a.uid === senior.uid)
+      const priority = assessment?.priority || "LOW"
+      const colorClass = priorityColors[priority]
 
-        // Update cluster center based on seniors
-        if (cluster.seniors.length === 1) {
-          cluster.center = senior.coords
-        } else {
-          cluster.center = {
-            lat: (cluster.center.lat + senior.coords.lat) / 2,
-            lng: (cluster.center.lng + senior.coords.lng) / 2,
-          }
-        }
-      }
+      const markerEl = document.createElement("div")
+      markerEl.className = `relative cursor-pointer shadow-lg`
+      markerEl.style.width = "30px"
+      markerEl.style.height = "40px"
+
+      // Create the pin shape with CSS
+      markerEl.innerHTML = `
+        <div class="absolute inset-0">
+          <div class="w-6 h-6 ${colorClass} rounded-full border-2 border-white shadow-md flex items-center justify-center text-white text-xs font-bold relative mx-auto">
+            👤
+          </div>
+          <div class="w-0 h-0 border-l-[6px] border-r-[6px] border-t-[12px] ${colorClass.replace("bg-", "border-t-")} border-l-transparent border-r-transparent mx-auto"></div>
+        </div>
+      `
+
+      // Create marker
+      const marker = new mapboxgl.Marker(markerEl).setLngLat([senior.coords.lng, senior.coords.lat]).addTo(map.current!)
+
+      // Add click handler
+      markerEl.addEventListener("click", () => {
+        showSeniorPopup(senior, assessment)
+        map.current?.flyTo({
+          center: [senior.coords.lng, senior.coords.lat],
+          zoom: 15,
+        })
+      })
+
+      markersRef.current.push(marker)
     })
 
-    // Assign volunteers to clusters
+    // Add volunteer markers
     volunteers.forEach((volunteer) => {
-      const assignment = assignments.find((a) => a.volunteer === volunteer.vid)
-      if (assignment) {
-        const cluster = clusterMap.get(assignment.cluster)
-        if (cluster) {
-          cluster.volunteers.push(volunteer)
-        }
-      }
+      const markerEl = document.createElement("div")
+      markerEl.className = `relative cursor-pointer shadow-lg`
+      markerEl.style.width = "24px"
+      markerEl.style.height = "24px"
+
+      markerEl.innerHTML = `
+        <div class="w-6 h-6 bg-blue-500 rounded-full border-2 border-white shadow-md flex items-center justify-center text-white text-xs font-bold">
+          🙋
+        </div>
+      `
+
+      const marker = new mapboxgl.Marker(markerEl)
+        .setLngLat([volunteer.coords.lng, volunteer.coords.lat])
+        .addTo(map.current!)
+
+      markerEl.addEventListener("click", () => {
+        showVolunteerPopup(volunteer)
+        map.current?.flyTo({
+          center: [volunteer.coords.lng, volunteer.coords.lat],
+          zoom: 15,
+        })
+      })
+
+      markersRef.current.push(marker)
     })
-
-    // Count active schedules
-    schedules.forEach((schedule) => {
-      const today = new Date().toDateString()
-      const scheduleDate = new Date(schedule.datetime).toDateString()
-      if (scheduleDate === today) {
-        const cluster = clusterMap.get(schedule.cluster)
-        if (cluster) {
-          cluster.activeSchedules++
-        }
-      }
-    })
-
-    return Array.from(clusterMap.values())
-  }, [seniors, volunteers, assignments, schedules])
-
-  // Calculate heatmap intensity based on unvisited seniors
-  const getHeatmapIntensity = (senior: (typeof seniors)[0]) => {
-    const lastVisit = new Date(senior.last_visit)
-    const now = new Date()
-    const daysSinceVisit = Math.floor((now.getTime() - lastVisit.getTime()) / (1000 * 60 * 60 * 24))
-
-    if (daysSinceVisit > 365) return 1 // High intensity - not visited in a year
-    if (daysSinceVisit > 180) return 0.7 // Medium-high intensity
-    if (daysSinceVisit > 90) return 0.4 // Medium intensity
-    return 0.1 // Low intensity
   }
 
-  const handleZoomIn = () => setZoom((prev) => Math.min(prev * 1.2, 3))
-  const handleZoomOut = () => setZoom((prev) => Math.max(prev / 1.2, 0.5))
-  const handleReset = () => {
-    setZoom(1)
-    setPan({ x: 0, y: 0 })
-    setSelectedCluster(null)
+  const showSeniorPopup = (senior: Senior, assessment?: Assessment) => {
+    if (!map.current) return
+
+    if (popupRef.current) {
+      popupRef.current.remove()
+    }
+
+    const lastVisitDate = new Date(senior.last_visit).toLocaleDateString()
+    const priority = assessment?.priority || "LOW"
+
+    const popupContent = `
+      <div class="p-3 min-w-[200px]">
+        <h3 class="font-semibold text-sm mb-1">${senior.name}</h3>
+        <div class="space-y-1 mb-2">
+          <div class="flex items-center gap-1">
+            <span class="text-xs">🏥</span>
+            <span class="text-xs">Physical: ${senior.physical}/5</span>
+          </div>
+          <div class="flex items-center gap-1">
+            <span class="text-xs">🧠</span>
+            <span class="text-xs">Mental: ${senior.mental}/5</span>
+          </div>
+          <div class="flex items-center gap-1">
+            <span class="text-xs">👥</span>
+            <span class="text-xs">Community: ${senior.community}/5</span>
+          </div>
+          <div class="flex items-center gap-1">
+            <span class="text-xs">📅</span>
+            <span class="text-xs">Last visit: ${lastVisitDate}</span>
+          </div>
+        </div>
+        <div class="flex items-center justify-between">
+          <span class="px-2 py-1 bg-gray-100 rounded text-xs capitalize">${priority.toLowerCase()} priority</span>
+        </div>
+      </div>
+    `
+
+    popupRef.current = new mapboxgl.Popup({ closeOnClick: true })
+      .setLngLat([senior.coords.lng, senior.coords.lat])
+      .setHTML(popupContent)
+      .addTo(map.current)
+  }
+
+  const showVolunteerPopup = (volunteer: Volunteer) => {
+    if (!map.current) return
+
+    if (popupRef.current) {
+      popupRef.current.remove()
+    }
+
+    const assignment = assignments.find((a) => a.volunteer === volunteer.vid)
+    const isAvailable = typeof volunteer.available === "boolean" ? volunteer.available : volunteer.available.length > 0
+
+    const popupContent = `
+      <div class="p-3 min-w-[200px]">
+        <h3 class="font-semibold text-sm mb-1">${volunteer.name}</h3>
+        <div class="space-y-1 mb-2">
+          <div class="flex items-center gap-1">
+            <span class="text-xs">⭐</span>
+            <span class="text-xs">Skill Level: ${volunteer.skill}/3</span>
+          </div>
+          <div class="flex items-center gap-1">
+            <span class="text-xs">${isAvailable ? "✅" : "❌"}</span>
+            <span class="text-xs">${isAvailable ? "Available" : "Unavailable"}</span>
+          </div>
+          ${
+            assignment
+              ? `
+            <div class="flex items-center gap-1">
+              <span class="text-xs">📍</span>
+              <span class="text-xs">Assigned: ${assignment.cluster}</span>
+            </div>
+          `
+              : ""
+          }
+        </div>
+      </div>
+    `
+
+    popupRef.current = new mapboxgl.Popup({ closeOnClick: true })
+      .setLngLat([volunteer.coords.lng, volunteer.coords.lat])
+      .setHTML(popupContent)
+      .addTo(map.current)
   }
 
   return (
-    <div className="relative">
-      {/* Map Controls */}
-      <div className="absolute top-4 right-4 z-10 flex flex-col gap-2">
-        <Button size="sm" variant="outline" onClick={handleZoomIn}>
-          <ZoomIn className="h-4 w-4" />
-        </Button>
-        <Button size="sm" variant="outline" onClick={handleZoomOut}>
-          <ZoomOut className="h-4 w-4" />
-        </Button>
-        <Button size="sm" variant="outline" onClick={handleReset}>
-          <RotateCcw className="h-4 w-4" />
-        </Button>
-      </div>
-
-      {/* Map Container */}
-      <div className="relative overflow-hidden rounded-lg border bg-muted/20">
-        <svg
-          width="100%"
-          height="400"
-          viewBox="0 0 800 600"
-          className="cursor-move"
-          style={{
-            transform: `scale(${zoom}) translate(${pan.x}px, ${pan.y}px)`,
-            transformOrigin: "center",
-          }}
-        >
-          {/* Background */}
-          <rect width="800" height="600" fill="hsl(var(--muted))" />
-
-          {/* Singapore outline (simplified) */}
-          <path
-            d="M100 300 Q200 250 400 280 Q600 300 700 320 Q650 400 500 450 Q300 480 150 420 Q80 380 100 300"
-            fill="hsl(var(--background))"
-            stroke="hsl(var(--border))"
-            strokeWidth="2"
-          />
-
-          {/* Heatmap - Unvisited seniors */}
-          {seniors.map((senior, index) => {
-            const { x, y } = coordsToSVG(senior.coords.lat, senior.coords.lng)
-            const intensity = getHeatmapIntensity(senior)
-            return (
-              <circle
-                key={`heatmap-${index}`}
-                cx={x}
-                cy={y}
-                r={8 + intensity * 12}
-                fill={`rgba(239, 68, 68, ${intensity * 0.6})`}
-                className="pointer-events-none"
-              />
-            )
-          })}
-
-          {/* Senior locations */}
-          {seniors.map((senior, index) => {
-            const { x, y } = coordsToSVG(senior.coords.lat, senior.coords.lng)
-            return (
-              <circle
-                key={`senior-${index}`}
-                cx={x}
-                cy={y}
-                r="3"
-                fill="hsl(var(--chart-1))"
-                stroke="white"
-                strokeWidth="1"
-                className="cursor-pointer hover:r-4 transition-all"
-                title={`Senior: ${senior.name}`}
-              />
-            )
-          })}
-
-          {/* Cluster centers */}
-          {clusters.map((cluster, index) => {
-            const { x, y } = coordsToSVG(cluster.center.lat, cluster.center.lng)
-            const isSelected = selectedCluster === cluster.id
-            return (
-              <g key={`cluster-${index}`}>
-                {/* Cluster area */}
-                <circle
-                  cx={x}
-                  cy={y}
-                  r="40"
-                  fill={isSelected ? "hsl(var(--primary))" : "hsl(var(--chart-2))"}
-                  fillOpacity="0.2"
-                  stroke={isSelected ? "hsl(var(--primary))" : "hsl(var(--chart-2))"}
-                  strokeWidth="2"
-                  strokeDasharray="5,5"
-                  className="cursor-pointer"
-                  onClick={() => setSelectedCluster(isSelected ? null : cluster.id)}
-                />
-
-                {/* Cluster center marker */}
-                <circle
-                  cx={x}
-                  cy={y}
-                  r="8"
-                  fill={isSelected ? "hsl(var(--primary))" : "hsl(var(--chart-2))"}
-                  stroke="white"
-                  strokeWidth="2"
-                  className="cursor-pointer"
-                  onClick={() => setSelectedCluster(isSelected ? null : cluster.id)}
-                />
-
-                {/* Cluster label */}
-                <text
-                  x={x}
-                  y={y - 50}
-                  textAnchor="middle"
-                  className="fill-foreground text-xs font-medium"
-                  style={{ fontSize: "12px" }}
-                >
-                  {cluster.id}
-                </text>
-
-                {/* Stats */}
-                <text
-                  x={x}
-                  y={y + 60}
-                  textAnchor="middle"
-                  className="fill-muted-foreground text-xs"
-                  style={{ fontSize: "10px" }}
-                >
-                  {cluster.seniors.length} seniors, {cluster.volunteers.length} volunteers
-                </text>
-              </g>
-            )
-          })}
-
-          {/* Active volunteer locations */}
-          {volunteers
-            .filter((v) => v.available)
-            .map((volunteer, index) => {
-              const { x, y } = coordsToSVG(volunteer.coords.lat, volunteer.coords.lng)
-              return (
-                <g key={`volunteer-${index}`}>
-                  <circle
-                    cx={x}
-                    cy={y}
-                    r="6"
-                    fill="hsl(var(--chart-4))"
-                    stroke="white"
-                    strokeWidth="2"
-                    className="cursor-pointer"
-                    title={`Volunteer: ${volunteer.name}`}
-                  />
-                  {/* Activity indicator */}
-                  <circle cx={x + 8} cy={y - 8} r="3" fill="hsl(var(--chart-5))" className="animate-pulse" />
-                </g>
-              )
-            })}
-        </svg>
-      </div>
+    <div className="w-full h-[400px] relative">
+      {mapError && (
+        <div className="absolute inset-0 flex items-center justify-center bg-muted z-10">
+          <div className="text-center p-4">
+            <p className="text-destructive font-medium">Map Error:</p>
+            <p className="text-sm text-muted-foreground">{mapError}</p>
+          </div>
+        </div>
+      )}
+      {!mapLoaded && !mapError && (
+        <div className="absolute inset-0 flex items-center justify-center bg-muted z-10">
+          <p className="text-muted-foreground">Loading map...</p>
+        </div>
+      )}
+      <div ref={mapContainer} className="w-full h-full rounded-lg" />
 
       {/* Legend */}
-      <div className="mt-4 flex flex-wrap gap-4 text-sm">
-        <div className="flex items-center gap-2">
-          <div className="w-3 h-3 rounded-full bg-chart-1"></div>
-          <span>Seniors</span>
-        </div>
-        <div className="flex items-center gap-2">
-          <div className="w-3 h-3 rounded-full bg-chart-4"></div>
-          <span>Active Volunteers</span>
-        </div>
-        <div className="flex items-center gap-2">
-          <div className="w-3 h-3 rounded-full bg-chart-2 opacity-50"></div>
-          <span>Volunteer Clusters</span>
-        </div>
-        <div className="flex items-center gap-2">
-          <div className="w-3 h-3 rounded-full bg-red-500 opacity-60"></div>
-          <span>Unvisited Areas (Heatmap)</span>
+      <div className="absolute bottom-4 left-4 bg-white p-3 rounded-lg shadow-lg z-10">
+        <h4 className="text-xs font-medium mb-2">Legend</h4>
+        <div className="space-y-1">
+          <div className="flex items-center gap-2">
+            <div className="w-4 h-4 bg-red-500 rounded-full"></div>
+            <span className="text-xs">High Priority Senior</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <div className="w-4 h-4 bg-yellow-500 rounded-full"></div>
+            <span className="text-xs">Medium Priority Senior</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <div className="w-4 h-4 bg-green-500 rounded-full"></div>
+            <span className="text-xs">Low Priority Senior</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <div className="w-4 h-4 bg-blue-500 rounded-full"></div>
+            <span className="text-xs">Volunteer</span>
+          </div>
         </div>
       </div>
-
-      {/* Cluster Details Panel */}
-      {selectedCluster && (
-        <Card className="mt-4">
-          <CardContent className="pt-4">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="font-semibold">Cluster: {selectedCluster}</h3>
-              <Button variant="ghost" size="sm" onClick={() => setSelectedCluster(null)}>
-                ×
-              </Button>
-            </div>
-            {clusters
-              .filter((c) => c.id === selectedCluster)
-              .map((cluster) => (
-                <div key={cluster.id} className="space-y-3">
-                  <div className="grid grid-cols-3 gap-4 text-sm">
-                    <div>
-                      <p className="font-medium">{cluster.seniors.length}</p>
-                      <p className="text-muted-foreground">Seniors</p>
-                    </div>
-                    <div>
-                      <p className="font-medium">{cluster.volunteers.length}</p>
-                      <p className="text-muted-foreground">Volunteers</p>
-                    </div>
-                    <div>
-                      <p className="font-medium">{cluster.activeSchedules}</p>
-                      <p className="text-muted-foreground">Today's Visits</p>
-                    </div>
-                  </div>
-
-                  {cluster.volunteers.length > 0 && (
-                    <div>
-                      <p className="font-medium mb-2">Assigned Volunteers:</p>
-                      <div className="flex flex-wrap gap-2">
-                        {cluster.volunteers.map((vol, idx) => (
-                          <Badge key={idx} variant="secondary">
-                            {vol.name || vol.vid}
-                          </Badge>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                </div>
-              ))}
-          </CardContent>
-        </Card>
-      )}
     </div>
   )
 }

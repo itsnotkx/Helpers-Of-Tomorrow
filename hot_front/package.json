@@ -19,8 +19,9 @@
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "lucide-react": "^0.542.0",
+    "mapbox-gl": "^3.14.0",
     "next": "15.5.2",
-    "react": "19.1.0",
+    "react": "^19.1.0",
     "react-dom": "19.1.0",
     "tailwind-merge": "^3.3.1"
   },

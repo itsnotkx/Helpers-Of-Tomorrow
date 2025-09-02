@@ -3,11 +3,11 @@
 import { useState, useEffect } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { MapPin, Users, Calendar, AlertTriangle, Activity } from "lucide-react"
+import { Button } from "@/components/ui/button"
+import { MapPin, Users, Calendar, AlertTriangle, Activity, ChevronDown, ChevronUp } from "lucide-react"
 import { InteractiveMap } from "@/components/interactive-map"
 import { ScheduleInterface } from "@/components/schedule-interface"
 import { DashboardHeader } from "@/components/dashboard-header"
-import { useOrganization } from "@clerk/nextjs"
 
 // TypeScript interfaces for API data
 interface Senior {
@@ -57,8 +57,8 @@ export default function VolunteerDashboard() {
   const [loading, setLoading] = useState(true)
   const [selectedDistrict, setSelectedDistrict] = useState("Central Singapore")
   const [usingMockData, setUsingMockData] = useState(true)
-
-  const { membership, isLoaded } = useOrganization()
+  const [isMapCollapsed, setIsMapCollapsed] = useState(false)
+  const [isAssignmentsCollapsed, setIsAssignmentsCollapsed] = useState(false)
 
   const generateMockData = () => {
     // Generate mock seniors
@@ -151,11 +151,11 @@ export default function VolunteerDashboard() {
     const seniorsData = await seniorsRes.json()
     const volunteersData = await volunteersRes.json()
 
-    setSeniors(seniorsData.data);
-    setVolunteers(volunteersData.data);
+    setSeniors(seniorsData.data)
+    setVolunteers(volunteersData.data)
 
-    console.log("Seniors" + seniorsData.seniors);
-    console.log("Volunteers" + volunteersData.volunteers);
+    console.log("Seniors" + seniorsData.seniors)
+    console.log("Volunteers" + volunteersData.volunteers)
 
     // Assess seniors
     const assessRes = await fetch(`${API_BASE}/assess`, {
@@ -253,133 +253,117 @@ export default function VolunteerDashboard() {
     return scheduleDate === today
   })
 
-  if (!isLoaded) {
-    return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <div className="text-center">
-          <Activity className="h-8 w-8 animate-spin mx-auto mb-4" />
-          <p className="text-muted-foreground">Loading dashboard...</p>
-        </div>
-      </div>
-    )
-  }
+  return (
+    <div className="min-h-screen bg-background">
+      {/* Dashboard Header */}
+      <DashboardHeader
+        title="Senior Care Volunteer Dashboard"
+        subtitle={`Managing care for ${selectedDistrict}`}
+        selectedDistrict={selectedDistrict}
+        usingMockData={usingMockData}
+        onTryConnectApi={tryConnectToApi}
+        onRefresh={loadDashboardData}
+      />
 
-  if (!membership) {
-    return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <p className="text-muted-foreground">You are not a member of any organization.</p>
-      </div>
-    )
-  }
-
-  if (membership.role === "org:member") {
-    return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <p className="text-muted-foreground">You are a member.</p>
-      </div>
-    )
-  } else {
-    // console.log("membership.role:", membership.role);
-    return (
-      <div className="min-h-screen bg-background">
-        {/* Dashboard Header */}
-        <DashboardHeader
-          title="Senior Care Volunteer Dashboard"
-          subtitle={`Managing care for ${selectedDistrict}`}
-          selectedDistrict={selectedDistrict}
-          usingMockData={usingMockData}
-          onTryConnectApi={tryConnectToApi}
-          onRefresh={loadDashboardData}
-        />
-
-        <div className="container mx-auto px-6 py-6">
-          {usingMockData && (
-            <Card className="mb-6 border-blue-200 bg-blue-50 dark:border-blue-800 dark:bg-blue-950">
-              <CardContent className="pt-4">
-                <div className="flex items-start gap-3">
-                  <AlertTriangle className="h-5 w-5 text-blue-600 mt-0.5" />
-                  <div>
-                    <h3 className="font-medium text-blue-900 dark:text-blue-100">Demo Mode Active</h3>
-                    <p className="text-sm text-blue-700 dark:text-blue-200 mt-1">
-                      The dashboard is currently using realistic sample data for demonstration. To connect to your
-                      FastAPI backend:
-                    </p>
-                    <ul className="text-sm text-blue-700 dark:text-blue-200 mt-2 ml-4 list-disc space-y-1">
-                      <li>
-                        Start your FastAPI server:{" "}
-                        <code className="bg-blue-100 dark:bg-blue-900 px-1 rounded">
-                          uvicorn main:app --reload --host 0.0.0.0
-                        </code>
-                      </li>
-                      <li>
-                        Set the <code className="bg-blue-100 dark:bg-blue-900 px-1 rounded">NEXT_PUBLIC_API_URL</code>{" "}
-                        environment variable in Project Settings
-                      </li>
-                      <li>Click "Try Connect API" to attempt connection</li>
-                    </ul>
-                  </div>
+      <div className="container mx-auto px-6 py-6">
+        {usingMockData && (
+          <Card className="mb-6 border-blue-200 bg-blue-50 dark:border-blue-800 dark:bg-blue-950">
+            <CardContent className="pt-4">
+              <div className="flex items-start gap-3">
+                <AlertTriangle className="h-5 w-5 text-blue-600 mt-0.5" />
+                <div>
+                  <h3 className="font-medium text-blue-900 dark:text-blue-100">Demo Mode Active</h3>
+                  <p className="text-sm text-blue-700 dark:text-blue-200 mt-1">
+                    The dashboard is currently using realistic sample data for demonstration. To connect to your FastAPI
+                    backend:
+                  </p>
+                  <ul className="text-sm text-blue-700 dark:text-blue-200 mt-2 ml-4 list-disc space-y-1">
+                    <li>
+                      Start your FastAPI server:{" "}
+                      <code className="bg-blue-100 dark:bg-blue-900 px-1 rounded">
+                        uvicorn main:app --reload --host 0.0.0.0
+                      </code>
+                    </li>
+                    <li>
+                      Set the <code className="bg-blue-100 dark:bg-blue-900 px-1 rounded">NEXT_PUBLIC_API_URL</code>{" "}
+                      environment variable in Project Settings
+                    </li>
+                    <li>Click "Try Connect API" to attempt connection</li>
+                  </ul>
                 </div>
-              </CardContent>
-            </Card>
-          )}
+              </div>
+            </CardContent>
+          </Card>
+        )}
 
-          {/* Statistics Cards */}
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Total Seniors</CardTitle>
-                <Users className="h-4 w-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">{seniors.length}</div>
-                <p className="text-xs text-muted-foreground">{highRiskCount} high risk</p>
-              </CardContent>
-            </Card>
+        {/* Statistics Cards */}
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Total Seniors</CardTitle>
+              <Users className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{seniors.length}</div>
+              <p className="text-xs text-muted-foreground">{highRiskCount} high risk</p>
+            </CardContent>
+          </Card>
 
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Active Volunteers</CardTitle>
-                <Activity className="h-4 w-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">{activeVolunteers}</div>
-                <p className="text-xs text-muted-foreground">of {volunteers.length} total</p>
-              </CardContent>
-            </Card>
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Active Volunteers</CardTitle>
+              <Activity className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{activeVolunteers}</div>
+              <p className="text-xs text-muted-foreground">of {volunteers.length} total</p>
+            </CardContent>
+          </Card>
 
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Today's Visits</CardTitle>
-                <Calendar className="h-4 w-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">{todaySchedules.length}</div>
-                <p className="text-xs text-muted-foreground">scheduled visits</p>
-              </CardContent>
-            </Card>
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Today's Visits</CardTitle>
+              <Calendar className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{todaySchedules.length}</div>
+              <p className="text-xs text-muted-foreground">scheduled visits</p>
+            </CardContent>
+          </Card>
 
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">High Priority</CardTitle>
-                <AlertTriangle className="h-4 w-4 text-destructive" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold text-destructive">{highRiskCount}</div>
-                <p className="text-xs text-muted-foreground">need immediate care</p>
-              </CardContent>
-            </Card>
-          </div>
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">High Priority</CardTitle>
+              <AlertTriangle className="h-4 w-4 text-destructive" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-destructive">{highRiskCount}</div>
+              <p className="text-xs text-muted-foreground">need immediate care</p>
+            </CardContent>
+          </Card>
+        </div>
 
-          {/* Main Dashboard Grid */}
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            {/* Map Section */}
-            <Card className="lg:col-span-2">
-              <CardHeader>
+        {/* Main Dashboard Grid */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {/* Map Section */}
+          <Card className="lg:col-span-2">
+            <CardHeader>
+              <div className="flex items-center justify-between">
                 <CardTitle className="flex items-center gap-2">
                   <MapPin className="h-5 w-5" />
                   District Map & Clusters
                 </CardTitle>
-              </CardHeader>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setIsMapCollapsed(!isMapCollapsed)}
+                  className="h-8 w-8 p-0"
+                >
+                  {isMapCollapsed ? <ChevronDown className="h-4 w-4" /> : <ChevronUp className="h-4 w-4" />}
+                </Button>
+              </div>
+            </CardHeader>
+            {!isMapCollapsed && (
               <CardContent>
                 <InteractiveMap
                   seniors={seniors}
@@ -388,54 +372,31 @@ export default function VolunteerDashboard() {
                   schedules={schedules}
                 />
               </CardContent>
-            </Card>
+            )}
+          </Card>
+        </div>
 
-            {/* Quick Schedule Section */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Calendar className="h-5 w-5" />
-                  Today's Schedule
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-4 max-h-96 overflow-y-auto">
-                  {todaySchedules.length === 0 ? (
-                    <p className="text-muted-foreground text-center py-8">No visits scheduled for today</p>
-                  ) : (
-                    todaySchedules.map((schedule, index) => (
-                      <div key={index} className="flex items-center justify-between p-3 bg-muted rounded-lg">
-                        <div>
-                          <p className="font-medium">{schedule.volunteer}</p>
-                          <p className="text-sm text-muted-foreground">{schedule.cluster}</p>
-                        </div>
-                        <div className="text-right">
-                          <p className="text-sm font-medium">
-                            {new Date(schedule.datetime).toLocaleTimeString("en-SG", {
-                              hour: "2-digit",
-                              minute: "2-digit",
-                            })}
-                          </p>
-                          <p className="text-xs text-muted-foreground">{schedule.duration}min</p>
-                        </div>
-                      </div>
-                    ))
-                  )}
-                </div>
-              </CardContent>
-            </Card>
-          </div>
+        {/* Detailed Schedule Interface */}
+        <div className="mt-8">
+          <ScheduleInterface schedules={schedules} volunteers={volunteers} assignments={assignments} />
+        </div>
 
-          {/* Detailed Schedule Interface */}
-          <div className="mt-8">
-            <ScheduleInterface schedules={schedules} volunteers={volunteers} assignments={assignments} />
-          </div>
-
-          {/* Assignments Overview */}
-          <Card className="mt-6">
-            <CardHeader>
+        {/* Assignments Overview */}
+        <Card className="mt-6">
+          <CardHeader>
+            <div className="flex items-center justify-between">
               <CardTitle>Volunteer Assignments</CardTitle>
-            </CardHeader>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setIsAssignmentsCollapsed(!isAssignmentsCollapsed)}
+                className="h-8 w-8 p-0"
+              >
+                {isAssignmentsCollapsed ? <ChevronDown className="h-4 w-4" /> : <ChevronUp className="h-4 w-4" />}
+              </Button>
+            </div>
+          </CardHeader>
+          {!isAssignmentsCollapsed && (
             <CardContent>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 {assignments.map((assignment, index) => (
@@ -451,9 +412,9 @@ export default function VolunteerDashboard() {
                 ))}
               </div>
             </CardContent>
-          </Card>
-        </div>
+          )}
+        </Card>
       </div>
-    )
-  }
+    </div>
+  )
 }
