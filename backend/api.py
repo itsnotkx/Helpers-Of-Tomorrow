@@ -8,8 +8,11 @@ from sklearn.cluster import KMeans
 import numpy as np
 import os
 from supabase import create_client
+from dotenv import load_dotenv
+import uvicorn
 
 app = FastAPI(title="AIC Senior Care MVP")
+load_dotenv('.env.local')
 url = os.getenv("SUPABASE_URL")
 key = os.getenv("SUPABASE_KEY")
 print(url)
@@ -241,3 +244,6 @@ def generate_demo_volunteers(count: int = 5):
 @app.get("/")
 def health():
     return {"status": "OK", "time": get_iso_time()}
+
+if __name__ == "__main__":
+    uvicorn.run("api:app", port=8000, reload=True)
