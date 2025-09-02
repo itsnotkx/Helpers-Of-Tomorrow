@@ -4,278 +4,246 @@ import { useState, useEffect, useRef } from "react"
 import mapboxgl from "mapbox-gl"
 import "mapbox-gl/dist/mapbox-gl.css"
 
-// TypeScript interfaces matching the dashboard data
+// --- TypeScript interfaces ---
+interface Coord {
+  lat: number
+  lng: number
+}
+
 interface Senior {
   uid: string
-  name: string
-  coords: { lat: number; lng: number }
+  name?: string
+  coords: Coord
   physical: number
   mental: number
   community: number
-  last_visit: string
+  last_visit?: string
+  cluster?: number
 }
 
 interface Volunteer {
   vid: string
-  name: string
-  coords: { lat: number; lng: number }
+  name?: string
+  coords: Coord
   skill: number
   available: boolean | string[]
 }
 
-interface Assessment {
-  uid: string
-  risk: number
-  priority: "HIGH" | "MEDIUM" | "LOW"
-  needscare: boolean
-}
-
 interface Assignment {
   volunteer: string
-  cluster: string
-  distance: number
+  cluster: number
+  weighted_distance?: number
 }
 
 interface Schedule {
   volunteer: string
-  cluster: string
+  cluster: number
   datetime: string
   duration: number
 }
 
-interface InteractiveMapProps {
+interface Cluster {
+  center: Coord
   seniors: Senior[]
-  volunteers: Volunteer[]
-  assignments: Assignment[]
-  schedules: Schedule[]
 }
 
-const priorityColors = {
+interface ScheduleResponse {
+  schedules: Schedule[]
+  clusters: Cluster[]
+  cluster_density: Record<string, number>
+}
+
+const priorityColors: Record<"HIGH" | "MEDIUM" | "LOW", string> = {
   HIGH: "bg-red-500",
   MEDIUM: "bg-yellow-500",
   LOW: "bg-green-500",
 }
 
-export function InteractiveMap({ seniors, volunteers, assignments, schedules }: InteractiveMapProps) {
+export function InteractiveMap() {
   const mapContainer = useRef<HTMLDivElement>(null)
   const map = useRef<mapboxgl.Map | null>(null)
-  const [mapLoaded, setMapLoaded] = useState(false)
-  const [mapError, setMapError] = useState<string | null>(null)
   const markersRef = useRef<mapboxgl.Marker[]>([])
   const popupRef = useRef<mapboxgl.Popup | null>(null)
 
-  // Calculate assessments based on senior data
-  const assessments: Assessment[] = seniors.map((senior) => {
-    const totalScore = senior.physical + senior.mental + senior.community
-    const risk = totalScore / 15 // Normalize to 0-1
-    const priority = risk > 0.7 ? "HIGH" : risk > 0.4 ? "MEDIUM" : "LOW"
+  const [mapLoaded, setMapLoaded] = useState(false)
+  const [mapError, setMapError] = useState<string | null>(null)
 
-    return {
-      uid: senior.uid,
-      risk,
-      priority,
-      needscare: risk > 0.6,
-    }
-  })
+  const [seniors, setSeniors] = useState<Senior[]>([])
+  const [volunteers, setVolunteers] = useState<Volunteer[]>([])
+  const [assignments, setAssignments] = useState<Assignment[]>([])
+  const [schedules, setSchedules] = useState<Schedule[]>([])
+  const [clusters, setClusters] = useState<Cluster[]>([])
 
+  // --- Fetch all data from backend ---
   useEffect(() => {
-    if (!mapContainer.current) return
+    async function loadData() {
+      try {
+        // /schedules returns schedules + clusters
+        const [sRes, vRes, scRes] = await Promise.all([
+          fetch("http://localhost:8000/seniors"),
+          fetch("http://localhost:8000/volunteers"),
+          fetch("http://localhost:8000/schedules"),
+        ])
 
-    const mapboxToken =
-      process.env.NEXT_PUBLIC_MAPBOX_TOKEN
+        const seniorsData: Senior[] = (await sRes.json()).seniors || []
+        const volunteersData: Volunteer[] = (await vRes.json()).volunteers || []
+        const scheduleData: ScheduleResponse = await scRes.json()
 
-    mapboxgl.accessToken = mapboxToken
-
-    try {
-      map.current = new mapboxgl.Map({
-        container: mapContainer.current,
-        style: "mapbox://styles/mapbox/streets-v12",
-        center: [103.8198, 1.3521],
-        zoom: 11,
-      })
-
-      map.current.on("load", () => {
-        console.log("[v0] Map loaded successfully")
-        setMapLoaded(true)
-        addMarkers()
-      })
-
-      map.current.on("error", (error) => {
-        console.error("[v0] Map error:", error)
-        setMapError(error.message || "Failed to load map")
-      })
-    } catch (error) {
-      console.error("[v0] Map initialization error:", error)
-      setMapError("Failed to initialize map")
-    }
-
-    return () => {
-      if (map.current) {
-        map.current.remove()
+        setSeniors(seniorsData)
+        setVolunteers(volunteersData)
+        setAssignments(scheduleData.schedules.map((s) => ({ volunteer: s.volunteer, cluster: s.cluster })))
+        setSchedules(scheduleData.schedules)
+        setClusters(scheduleData.clusters)
+      } catch (err) {
+        console.error("Failed to fetch data:", err)
+        setMapError("Failed to load map data")
       }
     }
+    loadData()
   }, [])
 
-  useEffect(() => {
-    if (mapLoaded) {
-      addMarkers()
-    }
-  }, [seniors, volunteers, mapLoaded])
+  // --- Compute assessments ---
+  const assessments = seniors.map((s) => {
+    const riskScore = (s.physical + s.mental + s.community) / 15
+    const priority: "HIGH" | "MEDIUM" | "LOW" =
+      riskScore > 0.7 ? "HIGH" : riskScore > 0.4 ? "MEDIUM" : "LOW"
+    return { uid: s.uid, risk: riskScore, priority, needscare: riskScore > 0.6 }
+  })
 
-  const addMarkers = () => {
+  // --- Initialize Mapbox ---
+  useEffect(() => {
+    if (!mapContainer.current) return
+    mapboxgl.accessToken = process.env.NEXT_PUBLIC_MAPBOX_TOKEN!
+
+    map.current = new mapboxgl.Map({
+      container: mapContainer.current,
+      style: "mapbox://styles/mapbox/streets-v12",
+      center: [103.8198, 1.3521],
+      zoom: 11,
+    })
+
+    map.current.on("load", () => {
+      setMapLoaded(true)
+      renderMarkers()
+    })
+
+    map.current.on("error", (e) => {
+      console.error("Map error:", e)
+      setMapError((e as any).message || "Failed to load map")
+    })
+
+    return () => map.current?.remove()
+  }, [])
+
+  // --- Re-render markers when data changes ---
+  useEffect(() => {
+    if (mapLoaded) renderMarkers()
+  }, [seniors, volunteers, clusters, mapLoaded])
+
+  // --- Render all markers ---
+  const renderMarkers = () => {
     if (!map.current) return
 
-    // Clear existing markers
-    markersRef.current.forEach((marker) => marker.remove())
+    markersRef.current.forEach((m) => m.remove())
     markersRef.current = []
 
-    // Add senior markers
-    seniors.forEach((senior) => {
-      const assessment = assessments.find((a) => a.uid === senior.uid)
-      const priority = assessment?.priority || "LOW"
-      const colorClass = priorityColors[priority]
+    // Cluster markers
+    clusters.forEach((cluster, idx) => {
+      const el = document.createElement("div")
+      el.className =
+        "w-10 h-10 bg-purple-500 rounded-full flex items-center justify-center text-white font-bold shadow-lg cursor-pointer"
+      el.innerText = cluster.seniors.length.toString()
 
-      const markerEl = document.createElement("div")
-      markerEl.className = `relative cursor-pointer shadow-lg`
-      markerEl.style.width = "30px"
-      markerEl.style.height = "40px"
+      const marker = new mapboxgl.Marker(el)
+        .setLngLat([cluster.center.lng, cluster.center.lat])
+        .addTo(map.current!)
 
-      // Create the pin shape with CSS
-      markerEl.innerHTML = `
-        <div class="absolute inset-0">
-          <div class="w-6 h-6 ${colorClass} rounded-full border-2 border-white shadow-md flex items-center justify-center text-white text-xs font-bold relative mx-auto">
-            👤
-          </div>
-          <div class="w-0 h-0 border-l-[6px] border-r-[6px] border-t-[12px] ${colorClass.replace("bg-", "border-t-")} border-l-transparent border-r-transparent mx-auto"></div>
-        </div>
-      `
-
-      // Create marker
-      const marker = new mapboxgl.Marker(markerEl).setLngLat([senior.coords.lng, senior.coords.lat]).addTo(map.current!)
-
-      // Add click handler
-      markerEl.addEventListener("click", () => {
-        showSeniorPopup(senior, assessment)
-        map.current?.flyTo({
-          center: [senior.coords.lng, senior.coords.lat],
-          zoom: 15,
-        })
-      })
+      el.addEventListener("click", () =>
+        map.current?.flyTo({ center: [cluster.center.lng, cluster.center.lat], zoom: 14 })
+      )
 
       markersRef.current.push(marker)
     })
 
-    // Add volunteer markers
-    volunteers.forEach((volunteer) => {
-      const markerEl = document.createElement("div")
-      markerEl.className = `relative cursor-pointer shadow-lg`
-      markerEl.style.width = "24px"
-      markerEl.style.height = "24px"
+    // Senior markers
+    seniors.forEach((s) => {
+      if (!s.coords) return
+      const assessment = assessments.find((a) => a.uid === s.uid)
+      const colorClass = priorityColors[assessment?.priority || "LOW"]
 
-      markerEl.innerHTML = `
-        <div class="w-6 h-6 bg-blue-500 rounded-full border-2 border-white shadow-md flex items-center justify-center text-white text-xs font-bold">
-          🙋
-        </div>
-      `
+      const el = document.createElement("div")
+      el.className =
+        `w-6 h-6 ${colorClass} rounded-full border-2 border-white shadow-md cursor-pointer flex items-center justify-center text-xs`
+      el.innerText = "👤"
 
-      const marker = new mapboxgl.Marker(markerEl)
-        .setLngLat([volunteer.coords.lng, volunteer.coords.lat])
+      const marker = new mapboxgl.Marker(el)
+        .setLngLat([s.coords.lng, s.coords.lat])
         .addTo(map.current!)
 
-      markerEl.addEventListener("click", () => {
-        showVolunteerPopup(volunteer)
-        map.current?.flyTo({
-          center: [volunteer.coords.lng, volunteer.coords.lat],
-          zoom: 15,
-        })
-      })
+      el.addEventListener("click", () => showSeniorPopup(s, assessment))
+      markersRef.current.push(marker)
+    })
 
+    // Volunteer markers
+    volunteers.forEach((v) => {
+      if (!v.coords) return
+
+      const el = document.createElement("div")
+      el.className =
+        "w-6 h-6 bg-blue-500 rounded-full border-2 border-white shadow-md flex items-center justify-center text-xs"
+      el.innerText = "🙋"
+
+      const marker = new mapboxgl.Marker(el)
+        .setLngLat([v.coords.lng, v.coords.lat])
+        .addTo(map.current!)
+
+      el.addEventListener("click", () => showVolunteerPopup(v))
       markersRef.current.push(marker)
     })
   }
 
-  const showSeniorPopup = (senior: Senior, assessment?: Assessment) => {
+  // --- Popups ---
+  const showSeniorPopup = (s: Senior, assessment?: { priority: "HIGH" | "MEDIUM" | "LOW" }) => {
     if (!map.current) return
-
-    if (popupRef.current) {
-      popupRef.current.remove()
-    }
-
-    const lastVisitDate = new Date(senior.last_visit).toLocaleDateString()
+    popupRef.current?.remove()
+    const lastVisit = s.last_visit ? new Date(s.last_visit).toLocaleDateString() : "N/A"
     const priority = assessment?.priority || "LOW"
 
-    const popupContent = `
-      <div class="p-3 min-w-[200px]">
-        <h3 class="font-semibold text-sm mb-1">${senior.name}</h3>
-        <div class="space-y-1 mb-2">
-          <div class="flex items-center gap-1">
-            <span class="text-xs">🏥</span>
-            <span class="text-xs">Physical: ${senior.physical}/5</span>
-          </div>
-          <div class="flex items-center gap-1">
-            <span class="text-xs">🧠</span>
-            <span class="text-xs">Mental: ${senior.mental}/5</span>
-          </div>
-          <div class="flex items-center gap-1">
-            <span class="text-xs">👥</span>
-            <span class="text-xs">Community: ${senior.community}/5</span>
-          </div>
-          <div class="flex items-center gap-1">
-            <span class="text-xs">📅</span>
-            <span class="text-xs">Last visit: ${lastVisitDate}</span>
-          </div>
-        </div>
-        <div class="flex items-center justify-between">
-          <span class="px-2 py-1 bg-gray-100 rounded text-xs capitalize">${priority.toLowerCase()} priority</span>
-        </div>
-      </div>
-    `
-
     popupRef.current = new mapboxgl.Popup({ closeOnClick: true })
-      .setLngLat([senior.coords.lng, senior.coords.lat])
-      .setHTML(popupContent)
+      .setLngLat([s.coords.lng, s.coords.lat])
+      .setHTML(`
+        <div class="p-3 min-w-[200px]">
+          <h3 class="font-semibold text-sm mb-1">${s.name || s.uid}</h3>
+          <div class="space-y-1 mb-2">
+            <div>🏥 Physical: ${s.physical}/5</div>
+            <div>🧠 Mental: ${s.mental}/5</div>
+            <div>👥 Community: ${s.community}/5</div>
+            <div>📅 Last Visit: ${lastVisit}</div>
+          </div>
+          <div class="px-2 py-1 bg-gray-100 rounded text-xs">${priority.toLowerCase()} priority</div>
+        </div>
+      `)
       .addTo(map.current)
   }
 
-  const showVolunteerPopup = (volunteer: Volunteer) => {
+  const showVolunteerPopup = (v: Volunteer) => {
     if (!map.current) return
+    popupRef.current?.remove()
 
-    if (popupRef.current) {
-      popupRef.current.remove()
-    }
-
-    const assignment = assignments.find((a) => a.volunteer === volunteer.vid)
-    const isAvailable = typeof volunteer.available === "boolean" ? volunteer.available : volunteer.available.length > 0
-
-    const popupContent = `
-      <div class="p-3 min-w-[200px]">
-        <h3 class="font-semibold text-sm mb-1">${volunteer.name}</h3>
-        <div class="space-y-1 mb-2">
-          <div class="flex items-center gap-1">
-            <span class="text-xs">⭐</span>
-            <span class="text-xs">Skill Level: ${volunteer.skill}/3</span>
-          </div>
-          <div class="flex items-center gap-1">
-            <span class="text-xs">${isAvailable ? "✅" : "❌"}</span>
-            <span class="text-xs">${isAvailable ? "Available" : "Unavailable"}</span>
-          </div>
-          ${
-            assignment
-              ? `
-            <div class="flex items-center gap-1">
-              <span class="text-xs">📍</span>
-              <span class="text-xs">Assigned: ${assignment.cluster}</span>
-            </div>
-          `
-              : ""
-          }
-        </div>
-      </div>
-    `
+    const assignment = assignments.find((a) => a.volunteer === v.vid)
+    const available =
+      typeof v.available === "boolean" ? v.available : v.available.length > 0
 
     popupRef.current = new mapboxgl.Popup({ closeOnClick: true })
-      .setLngLat([volunteer.coords.lng, volunteer.coords.lat])
-      .setHTML(popupContent)
+      .setLngLat([v.coords.lng, v.coords.lat])
+      .setHTML(`
+        <div class="p-3 min-w-[200px]">
+          <h3 class="font-semibold text-sm mb-1">${v.name || v.vid}</h3>
+          <div>⭐ Skill: ${v.skill}/3</div>
+          <div>${available ? "✅ Available" : "❌ Unavailable"}</div>
+          ${assignment ? `<div>📍 Assigned: ${assignment.cluster}</div>` : ""}
+        </div>
+      `)
       .addTo(map.current)
   }
 
@@ -300,24 +268,22 @@ export function InteractiveMap({ seniors, volunteers, assignments, schedules }: 
       <div className="absolute bottom-4 left-4 bg-white p-3 rounded-lg shadow-lg z-10">
         <h4 className="text-xs font-medium mb-2">Legend</h4>
         <div className="space-y-1">
-          <div className="flex items-center gap-2">
-            <div className="w-4 h-4 bg-red-500 rounded-full"></div>
-            <span className="text-xs">High Priority Senior</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <div className="w-4 h-4 bg-yellow-500 rounded-full"></div>
-            <span className="text-xs">Medium Priority Senior</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <div className="w-4 h-4 bg-green-500 rounded-full"></div>
-            <span className="text-xs">Low Priority Senior</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <div className="w-4 h-4 bg-blue-500 rounded-full"></div>
-            <span className="text-xs">Volunteer</span>
-          </div>
+          <LegendItem color="bg-red-500" label="High Priority Senior" />
+          <LegendItem color="bg-yellow-500" label="Medium Priority Senior" />
+          <LegendItem color="bg-green-500" label="Low Priority Senior" />
+          <LegendItem color="bg-blue-500" label="Volunteer" />
+          <LegendItem color="bg-purple-500" label="Cluster" />
         </div>
       </div>
+    </div>
+  )
+}
+
+function LegendItem({ color, label }: { color: string; label: string }) {
+  return (
+    <div className="flex items-center gap-2">
+      <div className={`w-4 h-4 ${color} rounded-full`} />
+      <span className="text-xs">{label}</span>
     </div>
   )
 }

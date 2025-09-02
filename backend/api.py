@@ -95,7 +95,7 @@ def allocate_volunteers(data: dict):
     seniors = data.get("seniors", [])
 
     if len(seniors) == 0:
-        return {"assignments": [], "cluster_density": {}, "seniors": []}
+        return {"assignments": [], "clusters": [], "cluster_density": {}, "seniors": []}
 
     # Step 1: K-means clustering of seniors (~5 per cluster)
     n_clusters = max(1, len(seniors)//5)
@@ -106,7 +106,7 @@ def allocate_volunteers(data: dict):
     # Step 2: Assign seniors to clusters
     clusters = {i: [] for i in range(n_clusters)}
     for idx, senior in enumerate(seniors):
-        cluster_id = int(labels[idx])  # convert NumPy int to Python int
+        cluster_id = int(labels[idx])
         clusters[cluster_id].append(senior)
         senior['cluster'] = cluster_id
 
@@ -140,7 +140,50 @@ def allocate_volunteers(data: dict):
             "weighted_distance": round(min_weighted_dist, 4)
         })
 
-    return {"assignments": assignments, "cluster_density": cluster_density_map, "seniors": seniors}
+    # Step 5: Format clusters for frontend
+    clusters_output = []
+    for cluster_id, cluster_seniors in clusters.items():
+        clusters_output.append({
+            "id": cluster_id,
+            "center": {"lat": float(centroids[cluster_id][0]), "lng": float(centroids[cluster_id][1])},
+            "seniors": cluster_seniors
+        })
+
+    return {
+        "assignments": assignments,
+        "clusters": clusters_output,
+        "cluster_density": cluster_density_map
+    }
+
+
+@app.get("/assignments")
+def get_assignments():
+    """Fetch seniors and volunteers, parse coords, and run clustering"""
+    seniors_resp = supabase.table("seniors").select("*").execute()
+    volunteers_resp = supabase.table("volunteers").select("*").execute()
+
+    seniors = seniors_resp.data
+    volunteers = volunteers_resp.data
+
+    # Safely parse coords
+    for s in seniors:
+        coords = s.get("coords")
+        if isinstance(coords, str):
+            try:
+                s["coords"] = json.loads(coords)
+            except Exception:
+                s["coords"] = None
+
+    for v in volunteers:
+        coords = v.get("coords")
+        if isinstance(coords, str):
+            try:
+                v["coords"] = json.loads(coords)
+            except Exception:
+                v["coords"] = None
+
+    # Call existing clustering & allocation logic
+    return allocate_volunteers({"seniors": seniors, "volunteers": volunteers})
 
 @app.post("/schedule")
 def create_schedule(data: dict):
@@ -187,11 +230,13 @@ def create_schedule(data: dict):
 
 @app.get("/seniors")
 def get_senior():
-    return supabase.table("seniors").select("*").execute()
+    response = supabase.table("seniors").select("*").execute()
+    return {"seniors": response.data}
 
 @app.get("/volunteers")
 def get_volunteers():
-    return supabase.table("volunteers").select("*").execute()
+    response = supabase.table("volunteers").select("*").execute()
+    return {"volunteers": response.data}
 
 @app.get("/senior/{uid}")
 def get_senior(uid: str):
@@ -211,22 +256,118 @@ def get_district_data(name: str):
     response = supabase.table("districts").select("*").eq("name", name).single().execute()
     return response.data
 
+# -------------------------------
+# Refactored Data Handling & ML
+# -------------------------------
+
+import json  # for safer coords parsing
+
 @app.get("/classify-seniors")
 def classify_seniors():
+    """Classify seniors with ML model and update overall_wellbeing"""
     current_dir = os.path.dirname(os.path.abspath(__file__))
-    model = joblib.load(os.path.join(current_dir, 'seniorModel', 'training', 'senior_risk_model.pkl'))["model"]
-    print(model)
+    model_path = os.path.join(current_dir, 'seniorModel', 'training', 'senior_risk_model.pkl')
+    model = joblib.load(model_path)["model"]
+
     response = supabase.table("seniors").select("*").execute()
     data = response.data
     df = pd.DataFrame(data)
-    features = ['age', 'physical', 'mental', 'dl_intervention', 'rece_gov_sup', 'community', 'making_ends_meet', 'living_situation']
+
+    # Features for ML model
+    features = ['age', 'physical', 'mental', 'dl_intervention', 'rece_gov_sup',
+                'community', 'making_ends_meet', 'living_situation']
+
+    # Handle missing features safely
+    for feat in features:
+        if feat not in df.columns:
+            df[feat] = 0  # or some default value
+
     X = df[features]
     df["overall_wellbeing"] = model.predict(X)
 
+    # Update DB safely
     for idx, row in df.iterrows():
-        supabase.table("seniors").update({"overall_wellbeing": int(row["overall_wellbeing"])}).eq("uid", row["uid"]).execute()
+        supabase.table("seniors")\
+            .update({"overall_wellbeing": int(row["overall_wellbeing"])})\
+            .eq("uid", row["uid"]).execute()
 
     return {"status": "success"}
+
+
+@app.get("/assignments")
+def get_assignments():
+    """Fetch seniors and volunteers, parse coords, and run clustering"""
+    seniors_resp = supabase.table("seniors").select("*").execute()
+    volunteers_resp = supabase.table("volunteers").select("*").execute()
+
+    seniors = seniors_resp.data
+    volunteers = volunteers_resp.data
+
+    # Safely parse coords
+    for s in seniors:
+        coords = s.get("coords")
+        if isinstance(coords, str):
+            try:
+                s["coords"] = json.loads(coords)
+            except Exception:
+                s["coords"] = None
+
+    for v in volunteers:
+        coords = v.get("coords")
+        if isinstance(coords, str):
+            try:
+                v["coords"] = json.loads(coords)
+            except Exception:
+                v["coords"] = None
+
+    # Call existing clustering & allocation logic
+    return allocate_volunteers({"seniors": seniors, "volunteers": volunteers})
+
+
+@app.get("/schedules")
+def get_schedules():
+    """Generate schedules based on current assignments and include cluster info"""
+    seniors_resp = supabase.table("seniors").select("*").execute()
+    volunteers_resp = supabase.table("volunteers").select("*").execute()
+
+    seniors = seniors_resp.data
+    volunteers = volunteers_resp.data
+
+    # Safely parse coords
+    for s in seniors:
+        coords = s.get("coords")
+        if isinstance(coords, str):
+            try:
+                s["coords"] = json.loads(coords)
+            except Exception:
+                s["coords"] = None
+
+    for v in volunteers:
+        coords = v.get("coords")
+        if isinstance(coords, str):
+            try:
+                v["coords"] = json.loads(coords)
+            except Exception:
+                v["coords"] = None
+
+    # Get assignments + clusters
+    allocation = allocate_volunteers({"seniors": seniors, "volunteers": volunteers})
+    assignments = allocation["assignments"]
+    clusters = allocation["clusters"]
+    cluster_density_map = allocation["cluster_density"]
+
+    # Generate schedules
+    schedules = create_schedule({
+        "assignments": assignments,
+        "seniors": seniors,
+        "volunteers": volunteers
+    })
+
+    return {
+        "schedules": schedules["schedules"],
+        "clusters": clusters,
+        "cluster_density": cluster_density_map
+    }
 
 # -------------------------------
 # Demo Data Generator
