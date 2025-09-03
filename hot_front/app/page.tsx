@@ -4,6 +4,7 @@ import { useState, useEffect } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 import { MapPin, Users, Calendar, AlertTriangle, Activity, ChevronDown, ChevronUp } from "lucide-react"
 import { InteractiveMap } from "@/components/interactive-map"
 import { ScheduleInterface } from "@/components/schedule-interface"
@@ -18,6 +19,7 @@ interface Senior {
   community?: number
   last_visit?: string
   cluster?: number
+  overall_wellbeing?: 1 | 2 | 3
 }
 
 interface Volunteer {
@@ -60,41 +62,34 @@ export default function VolunteerDashboard() {
   const [isMapCollapsed, setIsMapCollapsed] = useState(false)
   const [isScheduleCollapsed, setIsScheduleCollapsed] = useState(false)
   const [isAssignmentsCollapsed, setIsAssignmentsCollapsed] = useState(false)
+  const [showHighRiskModal, setShowHighRiskModal] = useState(false)
 
-  // -------------------------------
-  // Load Data from API
-  // -------------------------------
   const loadDashboardData = async () => {
     try {
       setLoading(true)
       const BASE_URL = "http://localhost:8000"
 
-      // 1. Fetch seniors and volunteers
       const [seniorsRes, volunteersRes] = await Promise.all([
-        fetch(`${BASE_URL}/seniors`).then(r => r.json()),
-        fetch(`${BASE_URL}/volunteers`).then(r => r.json())
+        fetch(`${BASE_URL}/seniors`).then((r) => r.json()),
+        fetch(`${BASE_URL}/volunteers`).then((r) => r.json()),
       ])
 
       setSeniors(seniorsRes.seniors)
       setVolunteers(volunteersRes.volunteers)
 
-      // 2. Fetch risk assessments
       const assessmentsRes = await fetch(`${BASE_URL}/assess`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ seniors: seniorsRes.seniors })
-      }).then(r => r.json())
+        body: JSON.stringify({ seniors: seniorsRes.seniors }),
+      }).then((r) => r.json())
 
       setAssessments(assessmentsRes.assessments)
 
-      // 3. Fetch assignments & clusters
-      const allocationRes = await fetch(`${BASE_URL}/assignments`).then(r => r.json())
+      const allocationRes = await fetch(`${BASE_URL}/assignments`).then((r) => r.json())
       setAssignments(allocationRes.assignments)
 
-      // 4. Fetch schedules
-      const scheduleRes = await fetch(`${BASE_URL}/schedules`).then(r => r.json())
+      const scheduleRes = await fetch(`${BASE_URL}/schedules`).then((r) => r.json())
       setSchedules(scheduleRes.schedules)
-
     } catch (err) {
       console.error("Failed to load dashboard data", err)
     } finally {
@@ -106,15 +101,16 @@ export default function VolunteerDashboard() {
     loadDashboardData()
   }, [])
 
-  // -------------------------------
-  // Dashboard Stats
-  // -------------------------------
-  const highPrioritySeniors = seniors.filter(s =>
-    assessments?.find(a => a.uid === s.uid)?.priority === "HIGH"
-  )
+  const levels: Record<1 | 2 | 3, string> = {
+    1: "LOW",
+    2: "MEDIUM",
+    3: "HIGH",
+  }
+
+  const highPrioritySeniors = seniors.filter((s) => levels[s.overall_wellbeing] === "HIGH")
   const highRiskCount = highPrioritySeniors.length
-  const activeVolunteers = volunteers.filter(v => v.available && v.available.length > 0).length
-  const todaySchedules = schedules.filter(s => new Date(s.datetime).toDateString() === new Date().toDateString())
+  const activeVolunteers = volunteers.filter((v) => v.available && v.available.length > 0).length
+  const todaySchedules = schedules.filter((s) => new Date(s.datetime).toDateString() === new Date().toDateString())
 
   return (
     <div className="min-h-screen bg-background">
@@ -128,7 +124,6 @@ export default function VolunteerDashboard() {
       />
 
       <div className="container mx-auto px-6 py-6">
-        {/* Stats Cards */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
           <Card>
             <CardHeader className="flex justify-between pb-2">
@@ -163,20 +158,87 @@ export default function VolunteerDashboard() {
             </CardContent>
           </Card>
 
-          <Card>
-            <CardHeader className="flex justify-between pb-2">
-              <CardTitle className="text-sm font-medium">High Priority</CardTitle>
-              <AlertTriangle className="h-4 w-4 text-destructive" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-destructive">{highRiskCount}</div>
-              <p className="text-xs text-muted-foreground">need immediate care</p>
-            </CardContent>
-          </Card>
+          <Dialog open={showHighRiskModal} onOpenChange={setShowHighRiskModal}>
+            <DialogTrigger asChild>
+              <Card className="cursor-pointer hover:bg-muted/50 transition-colors">
+                <CardHeader className="flex justify-between pb-2">
+                  <CardTitle className="text-sm font-medium">High Priority</CardTitle>
+                  <AlertTriangle className="h-4 w-4 text-destructive" />
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold text-destructive">{highRiskCount}</div>
+                  <p className="text-xs text-muted-foreground">need immediate care</p>
+                </CardContent>
+              </Card>
+            </DialogTrigger>
+            <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+              <DialogHeader>
+                <DialogTitle className="flex items-center gap-2">
+                  <AlertTriangle className="h-5 w-5 text-destructive" />
+                  High Risk Seniors ({highRiskCount})
+                </DialogTitle>
+              </DialogHeader>
+              <div className="space-y-4">
+                {highPrioritySeniors.length === 0 ? (
+                  <p className="text-muted-foreground text-center py-8">No high-risk seniors at this time.</p>
+                ) : (
+                  highPrioritySeniors.map((senior) => (
+                    <Card key={senior.uid} className="border-l-4 border-l-destructive">
+                      <CardContent className="pt-4">
+                        <div className="flex justify-between items-start mb-3">
+                          <div>
+                            <h3 className="font-semibold text-lg">{senior.name || `Senior ${senior.uid}`}</h3>
+                            <p className="text-sm text-muted-foreground">ID: {senior.uid}</p>
+                          </div>
+                          <Badge variant="destructive">HIGH RISK</Badge>
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-4 mb-3">
+                          <div>
+                            <p className="text-sm font-medium">Physical Health</p>
+                            <p className="text-sm text-muted-foreground">
+                              {senior.physical ? `${5 - senior.physical}/5` : "Not assessed"}
+                            </p>
+                          </div>
+                          <div>
+                            <p className="text-sm font-medium">Mental Health</p>
+                            <p className="text-sm text-muted-foreground">
+                              {senior.mental ? `${5 - senior.mental}/5` : "Not assessed"}
+                            </p>
+                          </div>
+                          <div>
+                            <p className="text-sm font-medium">Community Support</p>
+                            <p className="text-sm text-muted-foreground">
+                              {senior.community ? `${5 - senior.community}/5` : "Not assessed"}
+                            </p>
+                          </div>
+                          <div>
+                            <p className="text-sm font-medium">Last Visit</p>
+                            <p className="text-sm text-muted-foreground">
+                              {senior.last_visit ? new Date(senior.last_visit).toLocaleDateString() : "Never"}
+                            </p>
+                          </div>
+                        </div>
+
+                        <div className="flex justify-between items-center">
+                          <div>
+                            <p className="text-sm font-medium">Location</p>
+                            <p className="text-sm text-muted-foreground">
+                              {senior.coords.lat.toFixed(4)}, {senior.coords.lng.toFixed(4)}
+                            </p>
+                          </div>
+                          {senior.cluster && <Badge variant="outline">Cluster {senior.cluster}</Badge>}
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ))
+                )}
+              </div>
+            </DialogContent>
+          </Dialog>
         </div>
 
-        {/* Map Section */}
-        <Card className="lg:col-span-2 mb-8">
+        <div className="lg:col-span-2 mb-8">
           <CardHeader className="flex justify-between">
             <CardTitle className="flex items-center gap-2">
               <MapPin className="h-5 w-5" /> District Map & Clusters
@@ -187,34 +249,30 @@ export default function VolunteerDashboard() {
           </CardHeader>
           {!isMapCollapsed && (
             <CardContent>
-              <InteractiveMap seniors={seniors} volunteers={volunteers} assignments={assignments} schedules={schedules} />
+              <InteractiveMap
+                seniors={seniors}
+                volunteers={volunteers}
+                assignments={assignments}
+                schedules={schedules}
+              />
             </CardContent>
           )}
-          {/* Schedule */}
-          {/* <ScheduleInterface schedules={schedules} volunteers={volunteers} assignments={assignments} /> */}
-        </Card>
+        </div>
 
-        {/* Schedule Section */}
-        <Card className={`lg:col-span-2 ${!isScheduleCollapsed ? 'pb-0' : ''}`}>
+        <Card className={`lg:col-span-2 ${!isScheduleCollapsed ? "pb-0" : ""}`}>
           <CardHeader className="flex justify-between">
             <CardTitle className="flex items-center gap-2">
               <Calendar className="h-5 w-5" /> Scheduling Overview
             </CardTitle>
             <Button variant="ghost" size="sm" onClick={() => setIsScheduleCollapsed(!isScheduleCollapsed)}>
               {isScheduleCollapsed ? <ChevronDown className="h-4 w-4" /> : <ChevronUp className="h-4 w-4" />}
-              {/* {isScheduleCollapsed ? <div className="mb-4" /> : <div className="h-4" />} */}
             </Button>
           </CardHeader>
-
-
-          {/* Schedule */}
           {!isScheduleCollapsed && (
-              <ScheduleInterface schedules={schedules} volunteers={volunteers} assignments={assignments} />
-          )} 
+            <ScheduleInterface schedules={schedules} volunteers={volunteers} assignments={assignments} />
+          )}
         </Card>
 
-
-        {/* Assignments */}
         <Card className="mt-6">
           <CardHeader className="flex justify-between">
             <CardTitle>Volunteer Assignments</CardTitle>

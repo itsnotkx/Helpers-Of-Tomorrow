@@ -19,6 +19,7 @@ interface Senior {
   community: number
   last_visit?: string
   cluster?: number
+  overall_wellbeing?: number
 }
 
 interface Volunteer {
@@ -76,106 +77,6 @@ export function InteractiveMap() {
   const [schedules, setSchedules] = useState<Schedule[]>([])
   const [clusters, setClusters] = useState<Cluster[]>([])
 
-  const mockData = {
-    seniors: [
-      {
-        uid: "senior-1",
-        name: "Alice Johnson",
-        coords: { lat: 1.3521, lng: 103.8198 },
-        physical: 4,
-        mental: 3,
-        community: 2,
-        last_visit: "2024-01-15",
-        cluster: 0,
-      },
-      {
-        uid: "senior-2",
-        name: "Bob Chen",
-        coords: { lat: 1.3541, lng: 103.8218 },
-        physical: 2,
-        mental: 4,
-        community: 3,
-        last_visit: "2024-01-10",
-        cluster: 0,
-      },
-      {
-        uid: "senior-3",
-        name: "Carol Smith",
-        coords: { lat: 1.3501, lng: 103.8178 },
-        physical: 1,
-        mental: 2,
-        community: 1,
-        last_visit: "2024-01-20",
-        cluster: 1,
-      },
-    ],
-    volunteers: [
-      {
-        vid: "vol-1",
-        name: "David Wilson",
-        coords: { lat: 1.3531, lng: 103.8208 },
-        skill: 3,
-        available: true,
-      },
-      {
-        vid: "vol-2",
-        name: "Emma Davis",
-        coords: { lat: 1.3511, lng: 103.8188 },
-        skill: 2,
-        available: ["Monday", "Wednesday", "Friday"],
-      },
-    ],
-    clusters: [
-      {
-        center: { lat: 1.3531, lng: 103.8208 },
-        seniors: [
-          {
-            uid: "senior-1",
-            name: "Alice Johnson",
-            coords: { lat: 1.3521, lng: 103.8198 },
-            physical: 4,
-            mental: 3,
-            community: 2,
-            last_visit: "2024-01-15",
-          },
-          {
-            uid: "senior-2",
-            name: "Bob Chen",
-            coords: { lat: 1.3541, lng: 103.8218 },
-            physical: 2,
-            mental: 4,
-            community: 3,
-            last_visit: "2024-01-10",
-          },
-        ],
-        radius: 0.5,
-      },
-      {
-        center: { lat: 1.3501, lng: 103.8178 },
-        seniors: [
-          {
-            uid: "senior-3",
-            name: "Carol Smith",
-            coords: { lat: 1.3501, lng: 103.8178 },
-            physical: 1,
-            mental: 2,
-            community: 1,
-            last_visit: "2024-01-20",
-          },
-        ],
-        radius: 0.3,
-      },
-    ],
-    schedules: [
-      {
-        volunteer: "vol-1",
-        cluster: 0,
-        datetime: "2024-01-25T10:00:00Z",
-        duration: 120,
-      },
-    ],
-  }
-
   // --- Fetch all data from backend ---
   useEffect(() => {
     async function loadData() {
@@ -196,34 +97,13 @@ export function InteractiveMap() {
           setAssignments(scheduleData.schedules.map((s) => ({ volunteer: s.volunteer, cluster: s.cluster })))
           setSchedules(scheduleData.schedules)
           setClusters(scheduleData.clusters)
-        } else {
-          // Use mock data when backend is not available
-          console.log("Backend not available, using mock data")
-          setSeniors(mockData.seniors)
-          setVolunteers(mockData.volunteers)
-          setAssignments(mockData.schedules.map((s) => ({ volunteer: s.volunteer, cluster: s.cluster })))
-          setSchedules(mockData.schedules)
-          setClusters(mockData.clusters)
         }
       } catch (err) {
-        console.error("Failed to fetch data, using mock data:", err)
-        // Use mock data as fallback
-        setSeniors(mockData.seniors)
-        setVolunteers(mockData.volunteers)
-        setAssignments(mockData.schedules.map((s) => ({ volunteer: s.volunteer, cluster: s.cluster })))
-        setSchedules(mockData.schedules)
-        setClusters(mockData.clusters)
+        console.error("Failed to fetch data", err)
       }
     }
     loadData()
   }, [])
-
-  // --- Compute assessments ---
-  const assessments = seniors.map((s) => {
-    const riskScore = (s.physical + s.mental + s.community) / 15
-    const priority: "HIGH" | "MEDIUM" | "LOW" = riskScore > 0.7 ? "HIGH" : riskScore > 0.4 ? "MEDIUM" : "LOW"
-    return { uid: s.uid, risk: riskScore, priority, needscare: riskScore > 0.6 }
-  })
 
   // --- Initialize Mapbox ---
   useEffect(() => {
@@ -236,15 +116,23 @@ export function InteractiveMap() {
     }
 
     mapboxgl.accessToken = mapboxToken
+    const singaporeBounds: [number, number, number, number] = [
+      103.605, 1.214, // west, south
+      104.045, 1.478  // east, north
+    ];
     map.current = new mapboxgl.Map({
       container: mapContainer.current,
       style: "mapbox://styles/mapbox/streets-v12",
       center: [103.8198, 1.3521],
       zoom: 11,
+
+      bounds: singaporeBounds
     })
     map.current.on("load", () => {
       setMapLoaded(true)
       // Add cluster circle source and layer
+      map.current.setMaxBounds(singaporeBounds);
+      map.current.setMinZoom(10);
       map.current!.addSource("cluster-circles", {
         type: "geojson",
         data: {
@@ -402,14 +290,22 @@ export function InteractiveMap() {
 
     // Senior markers
     seniors.forEach((s) => {
+      console.log(s.overall_wellbeing)
       if (!s.coords) return
-      const assessment = assessments.find((a) => a.uid === s.uid)
+      const levels = {
+        1: "LOW",
+        2: "MEDIUM",
+        3: "HIGH"
+      };
+
+      const assessment = levels[s.overall_wellbeing] || "LOW";
       const isInHighlightedCluster =
         highlightedCluster !== null &&
         clusters[highlightedCluster]?.seniors.some((clusterSenior) => clusterSenior.uid === s.uid)
-      const colorClass = isInHighlightedCluster ? "bg-purple-500" : priorityColors[assessment?.priority || "LOW"]
+      const colorClass = priorityColors[assessment || "LOW"]
+      console.log(colorClass)
       const sizeClass = isInHighlightedCluster ? "w-8 h-8" : "w-6 h-6"
-      const borderClass = isInHighlightedCluster ? "border-4 border-purple-300" : "border-2 border-white"
+      const borderClass = isInHighlightedCluster ? "border-4 border-purple-500" : "border-2 border-white"
 
       const el = document.createElement("div")
       el.className = `${sizeClass} ${colorClass} rounded-full ${borderClass} shadow-md cursor-pointer flex items-center justify-center text-xs relative z-20`
@@ -455,7 +351,7 @@ export function InteractiveMap() {
     }
 
     const lastVisit = s.last_visit ? new Date(s.last_visit).toLocaleDateString() : "N/A"
-    const priority = assessment?.priority || "LOW"
+    const priority = assessment || "LOW"
 
     popupRef.current = new mapboxgl.Popup({
       closeOnClick: false, // Disable auto-close to prevent conflicts
@@ -467,12 +363,12 @@ export function InteractiveMap() {
         <div class="p-3 min-w-[200px]">
           <h3 class="font-semibold text-sm mb-1">${s.name || s.uid}</h3>
           <div class="space-y-1 mb-2">
-            <div>🏥 Physical: ${s.physical}/5</div>
-            <div>🧠 Mental: ${s.mental}/5</div>
-            <div>👥 Community: ${s.community}/5</div>
+            <div>🏥 Physical: ${5 - s.physical}/5</div>
+            <div>🧠 Mental: ${5 - s.mental}/5</div>
+            <div>👥 Community: ${5 - s.community}/5</div>
             <div>📅 Last Visit: ${lastVisit}</div>
           </div>
-          <div class="px-2 py-1 bg-gray-100 rounded text-xs">${priority.toLowerCase()} priority</div>
+          <div class="px-2 py-1 bg-gray-100 rounded text-xs">${priority} priority</div>
         </div>
       `)
       .addTo(map.current)
