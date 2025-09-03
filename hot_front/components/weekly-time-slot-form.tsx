@@ -3,11 +3,23 @@
 import type React from "react"
 import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
+import { Loading } from "@/components/ui/loading_icon"
 import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
-import { ChevronDown, Plus, Trash2 } from "lucide-react"
+import { ChevronDown, Plus, Trash2, Loader2 } from "lucide-react"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
+import { useUser } from "@clerk/nextjs"
+
+
 
 interface TimeSlot {
   id: string
@@ -115,7 +127,27 @@ const convertTo24Hour = (time: string, period: string) => {
   return period === "AM" ? (hour === 12 ? 0 : hour) : hour === 12 ? 12 : hour + 12
 }
 
+// Convert frontend slot format to API format
+const convertSlotToApiFormat = (slot: TimeSlot, date: Date) => {
+  const startHour24 = convertTo24Hour(slot.startTime, slot.startPeriod)
+  const endHour24 = convertTo24Hour(slot.endTime, slot.endPeriod)
+
+  // Create datetime objects
+  const startDateTime = new Date(date)
+  startDateTime.setHours(startHour24, 0, 0, 0)
+
+  const endDateTime = new Date(date)
+  endDateTime.setHours(endHour24, 0, 0, 0)
+
+  return {
+    start_time: startDateTime.toISOString(),
+    end_time: endDateTime.toISOString(),
+  }
+}
+
 export function WeeklyTimeSlotForm() {
+  const { isLoaded, isSignedIn, user } = useUser();
+  
   const [schedule, setSchedule] = useState<WeeklySchedule>(() => {
     const initialSchedule: WeeklySchedule = {}
     DAYS_OF_WEEK.forEach((day) => {
@@ -126,6 +158,13 @@ export function WeeklyTimeSlotForm() {
 
   const [weekDates, setWeekDates] = useState<Date[]>([])
   const [isClient, setIsClient] = useState(false)
+  const [isSubmitting, setIsSubmitting] = useState(false)
+  const [submitStatus, setSubmitStatus] = useState<{ type: "success" | "error" | null; message: string }>({
+    type: null,
+    message: "",
+  })
+  const [showSuccessDialog, setShowSuccessDialog] = useState(false)
+  const [successMessage, setSuccessMessage] = useState("")
   const [openDays, setOpenDays] = useState<{ [key: string]: boolean }>(() => {
     const initialOpen: { [key: string]: boolean } = {}
     DAYS_OF_WEEK.forEach((day) => {
@@ -134,10 +173,18 @@ export function WeeklyTimeSlotForm() {
     return initialOpen
   })
 
+
+
   useEffect(() => {
     setWeekDates(getCurrentWeekDates())
     setIsClient(true)
   }, [])
+
+      // Early return for authentication check
+  if (!isLoaded || !isSignedIn) {
+    return <Loading />;
+  }
+
 
   const addTimeSlot = (day: string) => {
     const newSlot: TimeSlot = {
@@ -181,7 +228,7 @@ export function WeeklyTimeSlotForm() {
     return hasAllFields && startValid && endValid && endAfterStart
   }
 
-  const isDayValid = (day: string) => {
+   const isDayValid = (day: string) => {
     const daySlots = schedule[day]
     return daySlots.length === 0 || (daySlots.every((slot) => isSlotValid(slot)) && !hasTimeClash(daySlots))
   }
@@ -192,195 +239,288 @@ export function WeeklyTimeSlotForm() {
     )
   }
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!isScheduleValid()) {
       return
     }
-    console.log("Weekly Schedule:", schedule)
-    // Handle form submission here
+
+    setIsSubmitting(true)
+    setSubmitStatus({ type: null, message: "" })
+
+    try {
+      // Convert schedule to API format
+      const apiSlots: Array<{ start_time: string; end_time: string }> = []
+
+      DAYS_OF_WEEK.forEach((day, dayIndex) => {
+        const daySlots = schedule[day]
+        const dayDate = weekDates[dayIndex]
+
+        daySlots.forEach((slot) => {
+          if (isSlotValid(slot)) {
+            const apiSlot = convertSlotToApiFormat(slot, dayDate)
+            apiSlots.push(apiSlot)
+          }
+        })
+      })
+
+      const BASE_URL = "http://localhost:8000"
+      const emailId = user.primaryEmailAddress?.emailAddress
+      const response = await fetch(`${BASE_URL}/upload_slots`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          email: emailId,
+          slots: apiSlots,
+        }),
+      })
+
+      const result = await response.json()
+
+      if (response.ok && result.success) {
+        setSuccessMessage(
+          `Your time slots have been saved and are now available for scheduling.`,
+        )
+        setShowSuccessDialog(true)
+
+      } else {
+        setSubmitStatus({
+          type: "error",
+          message: result.error || "Failed to upload schedule",
+        })
+      }
+    } catch (error) {
+      console.error("Error submitting schedule:", error)
+      setSubmitStatus({
+        type: "error",
+        message: "Network error. Please check your connection and try again.",
+      })
+    } finally {
+      setIsSubmitting(false)
+    }
   }
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-6">
+    <>
+      <form onSubmit={handleSubmit} className="space-y-6">
         <div className="flex justify-center mb-6">
           <img src="/hotlogo.png" alt="Helpers of Tomorrow Logo" width={128} height={128} />
         </div>
-      <h1 className="text-3xl font-bold text-center mb-8">Weekly Schedule</h1>
-      <div className="text-center space-y-4">
+        <h1 className="text-3xl font-bold text-center mb-8">Weekly Schedule</h1>
+        <div className="text-center space-y-4">
+          <h1 className="text-2xl font-bold">Time Slots</h1>
+          <p className="text-muted-foreground">
+            From {weekDates[0]?.toLocaleDateString() || ""} to {weekDates[6]?.toLocaleDateString() || ""}
+          </p>
+        </div>
 
-        <h1 className="text-2xl font-bold">Time Slots</h1>
-        <p className="text-muted-foreground">
-          From {weekDates[0]?.toLocaleDateString() || ""} to {weekDates[6]?.toLocaleDateString() || ""}
-        </p>
-      </div>
+        {submitStatus.type === "error" && (
+          <div className="p-4 rounded-md bg-red-50 border border-red-200 text-red-800">
+            <span className="font-medium">{submitStatus.message}</span>
+          </div>
+        )}
 
-      <div className="bg-muted/30 p-4 space-y-2">
-        {DAYS_OF_WEEK.map((day, index) => (
-          <Card key={day} className="w-full border-0 shadow-sm bg-background/80">
-            <Collapsible
-              open={openDays[day]}
-              onOpenChange={(isOpen) => setOpenDays((prev) => ({ ...prev, [day]: isOpen }))}
-            >
-              <CollapsibleTrigger asChild>
-                <CardHeader className="cursor-pointer hover:bg-muted/50 transition-colors">
-                  <CardTitle className="flex items-center justify-between text-lg">
-                    <div className="flex flex-col items-start">
-                      <span>{day}</span>
-                      <span className="text-sm font-normal text-muted-foreground">
-                        {weekDates[index]?.toLocaleDateString() || ""}
-                      </span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <span className="text-sm text-muted-foreground">
-                        {schedule[day].length} slot{schedule[day].length !== 1 ? "s" : ""}
-                      </span>
-                      <ChevronDown
-                        className={`h-4 w-4 transition-transform duration-200 ${
-                          openDays[day] ? "rotate-0" : "rotate-180"
-                        }`}
-                      />
-                    </div>
-                  </CardTitle>
-                </CardHeader>
-              </CollapsibleTrigger>
+        <div className="bg-muted/30 p-4 space-y-2">
+          {DAYS_OF_WEEK.map((day, index) => (
+            <Card key={day} className="w-full border-0 shadow-sm bg-background/80">
+              <Collapsible
+                open={openDays[day]}
+                onOpenChange={(isOpen) => setOpenDays((prev) => ({ ...prev, [day]: isOpen }))}
+              >
+                <CollapsibleTrigger asChild>
+                  <CardHeader className="cursor-pointer hover:bg-muted/50 transition-colors">
+                    <CardTitle className="flex items-center justify-between text-lg">
+                      <div className="flex flex-col items-start">
+                        <span>{day}</span>
+                        <span className="text-sm font-normal text-muted-foreground">
+                          {weekDates[index]?.toLocaleDateString() || ""}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm text-muted-foreground">
+                          {schedule[day].length} slot{schedule[day].length !== 1 ? "s" : ""}
+                        </span>
+                        <ChevronDown
+                          className={`h-4 w-4 transition-transform duration-200 ${
+                            openDays[day] ? "rotate-0" : "rotate-180"
+                          }`}
+                        />
+                      </div>
+                    </CardTitle>
+                  </CardHeader>
+                </CollapsibleTrigger>
 
-              <CollapsibleContent>
-                <CardContent className="pt-0">
-                  <div className="space-y-4">
-                    {schedule[day].map((slot) => (
-                      <div key={slot.id} className="flex items-center gap-3 p-3 border bg-muted/20">
-                        <div className="flex-1 grid grid-cols-2 gap-3">
-                          <div className="space-y-2">
-                            <Label htmlFor={`${slot.id}-start`} className="text-sm">
-                              Start Time
-                            </Label>
-                            <div className="flex gap-2">
-                              <Select
-                                value={slot.startTime}
-                                onValueChange={(value) => updateTimeSlot(day, slot.id, "startTime", value)}
-                              >
-                                <SelectTrigger className="flex-1">
-                                  <SelectValue placeholder="Time" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                  {TIME_OPTIONS.map((time) => (
-                                    <SelectItem key={time.value} value={time.value}>
-                                      {time.display}
-                                    </SelectItem>
-                                  ))}
-                                </SelectContent>
-                              </Select>
-                              <Select
-                                value={slot.startPeriod}
-                                onValueChange={(value) => updateTimeSlot(day, slot.id, "startPeriod", value)}
-                              >
-                                <SelectTrigger className="w-20">
-                                  <SelectValue />
-                                </SelectTrigger>
-                                <SelectContent>
-                                  {AM_PM_OPTIONS.map((period) => (
-                                    <SelectItem key={period.value} value={period.value}>
-                                      {period.display}
-                                    </SelectItem>
-                                  ))}
-                                </SelectContent>
-                              </Select>
+                <CollapsibleContent>
+                  <CardContent className="pt-0">
+                    <div className="space-y-4">
+                      {schedule[day].map((slot) => (
+                        <div key={slot.id} className="flex items-center gap-3 p-3 border bg-muted/20">
+                          <div className="flex-1 grid grid-cols-2 gap-3">
+                            <div className="space-y-2">
+                              <Label htmlFor={`${slot.id}-start`} className="text-sm">
+                                Start Time
+                              </Label>
+                              <div className="flex gap-2">
+                                <Select
+                                  value={slot.startTime}
+                                  onValueChange={(value) => updateTimeSlot(day, slot.id, "startTime", value)}
+                                >
+                                  <SelectTrigger className="flex-1">
+                                    <SelectValue placeholder="Time" />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    {TIME_OPTIONS.map((time) => (
+                                      <SelectItem key={time.value} value={time.value}>
+                                        {time.display}
+                                      </SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
+                                <Select
+                                  value={slot.startPeriod}
+                                  onValueChange={(value) => updateTimeSlot(day, slot.id, "startPeriod", value)}
+                                >
+                                  <SelectTrigger className="w-20">
+                                    <SelectValue />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    {AM_PM_OPTIONS.map((period) => (
+                                      <SelectItem key={period.value} value={period.value}>
+                                        {period.display}
+                                      </SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
+                              </div>
+                              {slot.startTime &&
+                                slot.startPeriod &&
+                                !isValidTimeRange(slot.startTime, slot.startPeriod) && (
+                                  <p className="text-xs text-destructive">Time must be between 8am and 10pm</p>
+                                )}
                             </div>
-                            {slot.startTime &&
-                              slot.startPeriod &&
-                              !isValidTimeRange(slot.startTime, slot.startPeriod) && (
+                            <div className="space-y-2">
+                              <Label className="text-sm">End Time</Label>
+                              <div className="flex gap-2">
+                                <Select
+                                  value={slot.endTime}
+                                  onValueChange={(value) => updateTimeSlot(day, slot.id, "endTime", value)}
+                                >
+                                  <SelectTrigger className="flex-1">
+                                    <SelectValue placeholder="Time" />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    {TIME_OPTIONS.map((time) => (
+                                      <SelectItem key={time.value} value={time.value}>
+                                        {time.display}
+                                      </SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
+                                <Select
+                                  value={slot.endPeriod}
+                                  onValueChange={(value) => updateTimeSlot(day, slot.id, "endPeriod", value)}
+                                >
+                                  <SelectTrigger className="w-20">
+                                    <SelectValue />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    {AM_PM_OPTIONS.map((period) => (
+                                      <SelectItem key={period.value} value={period.value}>
+                                        {period.display}
+                                      </SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
+                              </div>
+                              {slot.endTime && slot.endPeriod && !isValidTimeRange(slot.endTime, slot.endPeriod) && (
                                 <p className="text-xs text-destructive">Time must be between 8am and 10pm</p>
                               )}
-                          </div>
-                          <div className="space-y-2">
-                            <Label className="text-sm">End Time</Label>
-                            <div className="flex gap-2">
-                              <Select
-                                value={slot.endTime}
-                                onValueChange={(value) => updateTimeSlot(day, slot.id, "endTime", value)}
-                              >
-                                <SelectTrigger className="flex-1">
-                                  <SelectValue placeholder="Time" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                  {TIME_OPTIONS.map((time) => (
-                                    <SelectItem key={time.value} value={time.value}>
-                                      {time.display}
-                                    </SelectItem>
-                                  ))}
-                                </SelectContent>
-                              </Select>
-                              <Select
-                                value={slot.endPeriod}
-                                onValueChange={(value) => updateTimeSlot(day, slot.id, "endPeriod", value)}
-                              >
-                                <SelectTrigger className="w-20">
-                                  <SelectValue />
-                                </SelectTrigger>
-                                <SelectContent>
-                                  {AM_PM_OPTIONS.map((period) => (
-                                    <SelectItem key={period.value} value={period.value}>
-                                      {period.display}
-                                    </SelectItem>
-                                  ))}
-                                </SelectContent>
-                              </Select>
+                              {slot.startTime &&
+                                slot.startPeriod &&
+                                slot.endTime &&
+                                slot.endPeriod &&
+                                isValidTimeRange(slot.endTime, slot.endPeriod) &&
+                                !isEndTimeAfterStartTime(slot) && (
+                                  <p className="text-xs text-destructive">End time must be after start time</p>
+                                )}
                             </div>
-                            {slot.endTime && slot.endPeriod && !isValidTimeRange(slot.endTime, slot.endPeriod) && (
-                              <p className="text-xs text-destructive">Time must be between 8am and 10pm</p>
-                            )}
-                            {slot.startTime &&
-                              slot.startPeriod &&
-                              slot.endTime &&
-                              slot.endPeriod &&
-                              isValidTimeRange(slot.endTime, slot.endPeriod) &&
-                              !isEndTimeAfterStartTime(slot) && (
-                                <p className="text-xs text-destructive">End time must be after start time</p>
-                              )}
                           </div>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="icon"
+                            onClick={() => removeTimeSlot(day, slot.id)}
+                            className="shrink-0 text-destructive hover:text-destructive"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
                         </div>
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="icon"
-                          onClick={() => removeTimeSlot(day, slot.id)}
-                          className="shrink-0 text-destructive hover:text-destructive"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    ))}
+                      ))}
 
-                    {hasTimeClash(schedule[day]) && (
-                      <div className="p-3 bg-destructive/10 border border-destructive/20 text-destructive text-sm">
-                        ⚠️ Time slots are overlapping. Please adjust the times to avoid conflicts.
-                      </div>
-                    )}
+                      {hasTimeClash(schedule[day]) && (
+                        <div className="p-3 bg-destructive/10 border border-destructive/20 text-destructive text-sm">
+                          ⚠️ Time slots are overlapping. Please adjust the times to avoid conflicts.
+                        </div>
+                      )}
 
-                    <Button
-                      type="button"
-                      variant="outline"
-                      onClick={() => addTimeSlot(day)}
-                      className="w-full"
-                      disabled={!isDayValid(day)}
-                    >
-                      <Plus className="h-4 w-4 mr-2" />
-                      Add Time Slot
-                    </Button>
-                  </div>
-                </CardContent>
-              </CollapsibleContent>
-            </Collapsible>
-          </Card>
-        ))}
-      </div>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={() => addTimeSlot(day)}
+                        className="w-full"
+                        disabled={!isDayValid(day)}
+                      >
+                        <Plus className="h-4 w-4 mr-2" />
+                        Add Time Slot
+                      </Button>
+                    </div>
+                  </CardContent>
+                </CollapsibleContent>
+              </Collapsible>
+            </Card>
+          ))}
+        </div>
 
-      <div className="flex justify-center pt-6">
-        <Button type="submit" size="lg" className="px-8" disabled={!isScheduleValid()}>
-          Save Schedule
-        </Button>
-      </div>
-    </form>
+        <div className="flex justify-center pt-6">
+          <Button type="submit" size="lg" className="px-8" disabled={!isScheduleValid() || isSubmitting}>
+            {isSubmitting ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                Saving Schedule...
+              </>
+            ) : (
+              "Save Schedule"
+            )}
+          </Button>
+        </div>
+      </form>
+
+      <Dialog open={showSuccessDialog} onOpenChange={setShowSuccessDialog}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <div className="flex-shrink-0 w-6 h-6 bg-green-500 rounded-full flex items-center justify-center">
+                <svg className="w-4 h-4 text-white" fill="currentColor" viewBox="0 0 20 20">
+                  <path
+                    fillRule="evenodd"
+                    d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
+                    clipRule="evenodd"
+                  />
+                </svg>
+              </div>
+              Slots Saved Successfully!
+            </DialogTitle>
+            <DialogDescription className="text-base">{successMessage}</DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button onClick={() => setShowSuccessDialog(false)} className="w-full">
+              Okay
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </>
   )
 }

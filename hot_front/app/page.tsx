@@ -9,6 +9,9 @@ import { InteractiveMap } from "@/components/interactive-map"
 import { ScheduleInterface } from "@/components/schedule-interface"
 import { DashboardHeader } from "@/components/dashboard-header"
 
+import { auth } from "@clerk/nextjs/server"
+
+
 interface Senior {
   uid: string
   name?: string
@@ -22,6 +25,7 @@ interface Senior {
 
 interface Volunteer {
   vid: string
+  email?: string
   name?: string
   coords: { lat: number; lng: number }
   skill?: number
