@@ -243,9 +243,15 @@ def allocate_volunteers(data: dict):
     if len(seniors) == 0:
         return {"assignments": [], "clusters": [], "cluster_density": {}, "seniors": []}
     
-    # Step 1: K-means clustering of seniors (~5 per cluster)
-    n_clusters = max(1, len(seniors)//5)
-    n_clusters = min(n_clusters, len(seniors))  # ensure <= num seniors
+    # Calculate optimal number of clusters based on volunteer-to-senior ratio
+    # Use 1:3 ratio (1 volunteer per 3 seniors) as optimal target
+    target_ratio = 3  # seniors per volunteer
+    recommended_clusters = max(1, len(seniors) // (target_ratio * max(1, len(volunteers))))
+    min_clusters = max(1, len(seniors) // 6)  # max 6 seniors per cluster
+    max_clusters = len(seniors) // 2  # min 2 seniors per cluster
+    n_clusters = max(min_clusters, min(recommended_clusters, max_clusters))
+    
+    # Step 1: K-means clustering of seniors
     labels, centroids = kmeans_clusters([s['coords'] for s in seniors], n_clusters)
     
     # Step 2: Assign seniors to clusters
@@ -258,13 +264,12 @@ def allocate_volunteers(data: dict):
     # Step 3: Calculate cluster density and radius
     cluster_density_map = {}
     cluster_radius_map = {}
+    volunteers_per_cluster = {i: 0 for i in range(n_clusters)}  # Track volunteers per cluster
     
     for cluster_id, cluster_seniors in clusters.items():
-        # Calculate density
         density = cluster_density(cluster_seniors)
         cluster_density_map[int(cluster_id)] = float(density)
         
-        # Calculate radius - distance from centroid to farthest senior
         if cluster_seniors:
             centroid_coords = {'lat': float(centroids[cluster_id][0]), 'lng': float(centroids[cluster_id][1])}
             max_distance = 0
@@ -282,48 +287,62 @@ def allocate_volunteers(data: dict):
             
         cluster_radius_map[int(cluster_id)] = float(radius)
     
-    # Step 4: Assign volunteers to clusters
+    # Step 4: Assign volunteers to clusters with workload balancing
     assignments = []
     for vol in volunteers:
         vol_coords = vol.get('coords')
         if not vol_coords:
             continue
+        
         best_cluster = None
         min_weighted_dist = float('inf')
         
         for cluster_id, cluster_seniors in clusters.items():
+            if not cluster_seniors:  # Skip empty clusters
+                continue
+                
             centroid = {'lat': float(centroids[cluster_id][0]), 'lng': float(centroids[cluster_id][1])}
-            weighted_dist = distance(vol_coords, centroid) / cluster_density_map[cluster_id]
+            base_dist = distance(vol_coords, centroid)
+            
+            # Workload factor: increases with more volunteers assigned
+            workload_factor = 1 + (volunteers_per_cluster[cluster_id] / max(1, len(cluster_seniors)))
+            # Density factor: decreases with higher density
+            density_factor = 1 / max(0.1, cluster_density_map[cluster_id])
+            
+            weighted_dist = base_dist * workload_factor * density_factor
             
             if vol.get('prefers_outside', False):
-                weighted_dist *= 0.8  # preference adjustment
+                weighted_dist *= 0.8
                 
             if weighted_dist < min_weighted_dist:
                 min_weighted_dist = weighted_dist
                 best_cluster = cluster_id
         
-        assignments.append({
-            "volunteer": vol['vid'],
-            "cluster": best_cluster,
-            "weighted_distance": round(min_weighted_dist, 4)
-        })
+        if best_cluster is not None:
+            volunteers_per_cluster[best_cluster] += 1
+            assignments.append({
+                "volunteer": vol['vid'],
+                "cluster": best_cluster,
+                "weighted_distance": round(min_weighted_dist, 4)
+            })
     
-    # Step 5: Format clusters for frontend
+    # Rest of the function remains the same
     clusters_output = []
     for cluster_id, cluster_seniors in clusters.items():
         clusters_output.append({
             "id": cluster_id,
             "center": {"lat": float(centroids[cluster_id][0]), "lng": float(centroids[cluster_id][1])},
-            "radius": cluster_radius_map[cluster_id],  # Add radius to output
+            "radius": cluster_radius_map[cluster_id],
             "seniors": cluster_seniors,
-            "senior_count": len(cluster_seniors)
+            "senior_count": len(cluster_seniors),
+            "volunteer_count": volunteers_per_cluster[cluster_id]  # Added this field
         })
     
     return {
         "assignments": assignments,
         "clusters": clusters_output,
         "cluster_density": cluster_density_map,
-        "cluster_radius": cluster_radius_map  # Include radius map in response
+        "cluster_radius": cluster_radius_map
     }
 
 
@@ -337,7 +356,7 @@ def get_assignments():
 
         if not seniors_resp.data or not volunteers_resp.data:
             logger.warning("No data retrieved from Supabase")
-            return {"assignments": [], "clusters": [], "cluster_density": {}}
+            return {"assignments": [], "clusters": [], "cluster_density": {}, "seniors": [], "volunteers": []}
 
         seniors = seniors_resp.data
         volunteers = volunteers_resp.data
@@ -369,11 +388,27 @@ def get_assignments():
 
         result = allocate_volunteers({"seniors": seniors, "volunteers": volunteers})
         logger.info(f"Successfully created {len(result['assignments'])} assignments")
-        return result
+        
+        # Include the processed seniors and volunteers in the return value
+        return {
+            "assignments": result["assignments"],
+            "clusters": result["clusters"],
+            "cluster_density": result["cluster_density"],
+            "cluster_radius": result["cluster_radius"],
+            "seniors": seniors,  # Include processed seniors with their cluster assignments
+            "volunteers": volunteers  # Include processed volunteers for scheduling
+        }
 
     except Exception as e:
         logger.error(f"Error in get_assignments: {str(e)}", exc_info=True)
-        return {"assignments": [], "clusters": [], "cluster_density": {}}
+        return {
+            "assignments": [], 
+            "clusters": [], 
+            "cluster_density": {},
+            "cluster_radius": {},
+            "seniors": [],
+            "volunteers": []
+        }
 
 @app.post("/schedule")
 def create_schedule(data: dict):
@@ -381,38 +416,166 @@ def create_schedule(data: dict):
     seniors = data.get("seniors", [])
     volunteers = data.get("volunteers", [])
 
-    # Map volunteer ID to volunteer object for availability check
+    logger.info(f"Creating schedule for {len(assignments)} assignments, {len(seniors)} seniors, {len(volunteers)} volunteers")
+
+    if not assignments or not seniors or not volunteers:
+        logger.warning("Missing required data for scheduling")
+        return {"schedules": []}
+
+    # Create email to volunteer ID mapping
+    vol_email_to_id = {vol['email']: vol['vid'] for vol in volunteers}
     volunteer_map = {vol['vid']: vol for vol in volunteers}
 
-    schedules = []
-    time_slots = [9, 11, 14, 16]
+    # Get all volunteer availabilities for the next week
+    try:
+        # Get availabilities for all volunteers
+        availabilities_resp = supabase.table("availabilities").select("*").execute()
+        availabilities = availabilities_resp.data if availabilities_resp.data else []
+        logger.info(f"Found {len(availabilities)} availability slots")
+        
+        # Log raw availability data for debugging
+        if availabilities:
+            logger.info(f"Sample raw availability: {availabilities[0]}")
+        
+        # Group availabilities by volunteer
+        volunteer_availabilities = {}
+        for avail in availabilities:
+            try:
+                vol_email = avail['volunteer_email']
+                if vol_email in vol_email_to_id:
+                    vid = vol_email_to_id[vol_email]
+                    if vid not in volunteer_availabilities:
+                        volunteer_availabilities[vid] = []
+                    
+                    # Log raw data before processing
+                    logger.info(f"Processing availability - Date: {avail['date']}, Start: {avail['start_t']}, End: {avail['end_t']}")
+                    
+                    # Ensure date and time are properly formatted
+                    date_str = avail['date']
+                    start_time = avail['start_t']
+                    end_time = avail['end_t']
+                    
+                    # Format date consistently
+                    if isinstance(date_str, datetime):
+                        formatted_date = date_str.strftime('%Y-%m-%d')
+                    else:
+                        formatted_date = datetime.strptime(date_str, '%Y-%m-%d').strftime('%Y-%m-%d')
+                    
+                    # Format times consistently
+                    formatted_start = datetime.strptime(start_time, '%H:%M:%S').strftime('%H:%M')
+                    formatted_end = datetime.strptime(end_time, '%H:%M:%S').strftime('%H:%M')
+                    
+                    volunteer_availabilities[vid].append({
+                        'date': formatted_date,
+                        'start': formatted_start,
+                        'end': formatted_end
+                    })
+                    logger.info(f"Processed availability for volunteer {vid}: {formatted_date} {formatted_start}-{formatted_end}")
+            except Exception as e:
+                logger.error(f"Error processing availability: {str(e)}, Data: {avail}")
+                continue
 
-    seniors_sorted = sorted(seniors, key=lambda s: s.get('risk', 0), reverse=True)
+    except Exception as e:
+        logger.error(f"Error fetching availabilities: {str(e)}")
+        return {"schedules": []}
+
+    # Sort seniors by priority (wellbeing) and risk
+    seniors_with_priority = []
+    for senior in seniors:
+        priority_score = 0
+        if senior.get('overall_wellbeing') == 1:  # Low wellbeing
+            priority_score += 3
+        elif senior.get('overall_wellbeing') == 2:  # Medium wellbeing
+            priority_score += 2
+        risk_score = senior.get('risk', 0)
+        seniors_with_priority.append({
+            **senior,
+            'priority_score': priority_score + risk_score
+        })
+
+    seniors_sorted = sorted(seniors_with_priority, 
+                          key=lambda s: s['priority_score'], 
+                          reverse=True)
+
+    # Create schedule - maximum one visit per senior
+    schedules = []
+    used_slots = {}  # Track used time slots
+    scheduled_seniors = set()  # Track which seniors have been scheduled
 
     for assignment in assignments:
         vol_id = assignment['volunteer']
         cluster_id = assignment['cluster']
-        vol_obj = volunteer_map.get(vol_id)
-        if not vol_obj:
+        
+        vol_slots = volunteer_availabilities.get(vol_id, [])
+        if not vol_slots:
             continue
-        cluster_seniors = [s for s in seniors_sorted if s.get('cluster') == cluster_id]
+
+        # Get unscheduled seniors in this cluster, sorted by priority
+        cluster_seniors = [
+            s for s in seniors_sorted 
+            if s.get('cluster') == cluster_id and s['uid'] not in scheduled_seniors
+        ]
+        
+        logger.info(f"Processing cluster {cluster_id}: {len(cluster_seniors)} unscheduled seniors for volunteer {vol_id}")
+        
+        # Schedule one visit per senior until no more slots available
         for senior in cluster_seniors:
-            for day_offset in range(1, 8):
-                for hour in time_slots:
-                    dt = get_iso_time(days=day_offset, hour=hour)
-                    if is_available(vol_obj, dt):
-                        schedules.append({
-                            "volunteer": vol_id,
-                            "senior": senior['uid'],
-                            "cluster": cluster_id,
-                            "datetime": dt,
-                            "duration": 60
-                        })
-                        break
-                else:
+            # Find first available slot
+            for slot in vol_slots:
+                slot_key = f"{vol_id}_{slot['date']}_{slot['start']}"
+                if slot_key in used_slots:
                     continue
-                break
-    return {"schedules": schedules}
+
+                schedule_entry = {
+                    "volunteer": vol_id,
+                    "senior": senior['uid'],
+                    "cluster": cluster_id,
+                    "date": slot['date'],
+                    "start_time": slot['start'],
+                    "end_time": slot['end'],
+                    "priority_score": senior['priority_score']
+                }
+                
+                schedules.append(schedule_entry)
+                logger.info(f"Scheduled visit: Volunteer {vol_id} -> Senior {senior['uid']}")
+                
+                used_slots[slot_key] = True
+                scheduled_seniors.add(senior['uid'])
+                break  # Move to next senior after scheduling one visit
+
+    stats = {
+        "total_scheduled": len(schedules),
+        "unique_seniors": len(set(s['senior'] for s in schedules)),
+        "unique_volunteers": len(set(s['volunteer'] for s in schedules))
+    }
+    
+    logger.info(f"Schedule generation complete. Stats: {stats}")
+    if schedules:
+        logger.info(f"Sample schedule entry: {json.dumps(schedules[0], indent=2)}")
+        logger.info(f"Sample schedule entry: {json.dumps(schedules[1], indent=2)}")
+    else:
+        logger.warning("No schedules created")
+    
+    return {
+        "schedules": schedules,
+        "stats": stats
+    }
+
+# -------------------------------
+# Data Endpoints
+# -------------------------------
+
+@app.get("/seniors")
+def get_seniors():  # Changed from get_senior to get_seniors
+    response = supabase.table("seniors").select("*").execute()
+    logger.info(f"Fetched {len(response.data)} seniors")
+    return {"seniors": response.data}
+
+@app.get("/volunteers")
+def get_volunteers():  # This was correct but adding logging
+    response = supabase.table("volunteers").select("*").execute()
+    logger.info(f"Fetched {len(response.data)} volunteers")
+    return {"volunteers": response.data}
 
 @app.get("/schedules")
 def get_schedules():
@@ -422,76 +585,25 @@ def get_schedules():
         
         if not assignments_data.get("assignments"):
             logger.warning("No assignments available for scheduling")
-            return {"schedules": [], "clusters": [], "cluster_density": {}}
+            return {"schedules": [], "clusters": [], "cluster_density": {}, "stats": {}}
 
-        schedules = create_schedule({
+        schedule_result = create_schedule({
             "assignments": assignments_data["assignments"],
             "seniors": assignments_data.get("seniors", []),
             "volunteers": assignments_data.get("volunteers", [])
         })
 
-        logger.info(f"Generated {len(schedules.get('schedules', []))} schedules")
+        logger.info(f"Generated {len(schedule_result.get('schedules', []))} schedules")
         return {
-            "schedules": schedules["schedules"],
-            "clusters": assignments_data["clusters"],
-            "cluster_density": assignments_data["cluster_density"]
+            "schedules": schedule_result.get("schedules", []),
+            "clusters": assignments_data.get("clusters", []),
+            "cluster_density": assignments_data.get("cluster_density", {}),
+            "stats": schedule_result.get("stats", {})
         }
 
     except Exception as e:
         logger.error(f"Error in get_schedules: {str(e)}", exc_info=True)
-        return {"schedules": [], "clusters": [], "cluster_density": {}}
-
-# Classify seniors to get their overall wellbeing.
-@app.get("/classify-seniors")
-def get_senior_wellbeing():
-    current_dir = os.path.dirname(os.path.abspath(__file__))
-    model = joblib.load(os.path.join(current_dir, 'seniorModel', 'training', 'senior_risk_model.pkl'))["model"]
-    print(model)
-    response = supabase.table("seniors").select("*").execute()
-    data = response.data
-    df = pd.DataFrame(data)
-    features = ['age', 'physical', 'mental', 'dl_intervention', 'rece_gov_sup', 'community', 'making_ends_meet', 'living_situation']
-    X = df[features]
-    df["overall_wellbeing"] = model.predict(X)
-
-    for idx, row in df.iterrows():
-        supabase.table("seniors").update({"overall_wellbeing": int(row["overall_wellbeing"])}).eq("uid", row["uid"]).execute()
-
-    return {"status": "success"}
-
-# -------------------------------
-# Data Endpoints
-# -------------------------------
-
-@app.get("/seniors")
-def get_senior():
-    response = supabase.table("seniors").select("*").execute()
-    return {"seniors": response.data}
-
-@app.get("/volunteers")
-def get_volunteers():
-    response = supabase.table("volunteers").select("*").execute()
-    return {"volunteers": response.data}
-
-@app.get("/senior/{uid}")
-def get_senior(uid: str):
-    """Get senior details from DB"""
-    response = supabase.table("seniors").select("*").eq("uid", uid).single().execute()
-    return response.data
-
-@app.get("/volunteer/{vid}")
-def get_volunteer(vid: str):
-    """Get volunteer details from DB"""
-    response = supabase.table("volunteers").select("*").eq("vid", vid).single().execute()
-    return response.data
-
-@app.get("/district/{name}")
-def get_district_data(name: str):
-    """Get district overview from DB"""
-    response = supabase.table("districts").select("*").eq("name", name).single().execute()
-    return response.data
-
-
+        return {"schedules": [], "clusters": [], "cluster_density": {}, "stats": {}}
 
 # -------------------------------
 # Health Check

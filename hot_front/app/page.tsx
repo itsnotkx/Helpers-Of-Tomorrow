@@ -280,7 +280,7 @@ export default function VolunteerDashboard() {
             </Button>
           </CardHeader>
           {!isScheduleCollapsed && (
-            <ScheduleInterface schedules={schedules} volunteers={volunteers} assignments={assignments} />
+            <ScheduleInterface schedules={schedules} volunteers={volunteers} seniors={seniors} assignments={assignments} />
           )}
         </Card>
 
