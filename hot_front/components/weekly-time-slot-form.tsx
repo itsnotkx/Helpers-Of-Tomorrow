@@ -141,8 +141,6 @@ const convertSlotToApiFormat = (slot: TimeSlot, date: Date) => {
   
   const endDateTime = new Date(date)
   endDateTime.setHours(endHour24, 0, 0, 0)
-
-  console.log(startDateTime, endDateTime)
   
   // Format as ISO string but maintain local timezone
   const formatLocalISO = (dateTime: Date) => {

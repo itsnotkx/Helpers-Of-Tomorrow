@@ -277,6 +277,8 @@ def upload_slots(data: dict):
         
         # Validate slot format
         processed_slots = []
+        dates_to_clear = set()  # Track unique dates for deletion
+        
         for i, slot in enumerate(slots):
             if not isinstance(slot, dict):
                 return {"error": f"Slot {i} must be an object"}
@@ -296,10 +298,13 @@ def upload_slots(data: dict):
                 if end_dt <= start_dt:
                     return {"error": f"Slot {i}: end_time must be after start_time"}
                 
+                date_str = start_dt.date().isoformat()
+                dates_to_clear.add(date_str)  # Add date to deletion set
+                
                 processed_slots.append({
                     "start_time": start_time,
                     "end_time": end_time,
-                    "date": start_dt.date().isoformat(),  # Extract date for database
+                    "date": date_str,  # Extract date for database
                     "start_time_only": start_dt.time().isoformat(),  # Extract time portion only
                     "end_time_only": end_dt.time().isoformat(),  # Extract time portion only
                     "duration_minutes": int((end_dt - start_dt).total_seconds() / 60)
@@ -307,6 +312,20 @@ def upload_slots(data: dict):
                 
             except ValueError as e:
                 return {"error": f"Slot {i}: Invalid datetime format - {str(e)}"}
+        
+        # Delete existing slots for the same email and dates
+        try:
+            deleted_count = 0
+            for date_str in dates_to_clear:
+                delete_response = supabase.table("availabilities").delete().eq("volunteer_email", email).eq("date", date_str).execute()
+                if delete_response.data:
+                    deleted_count += len(delete_response.data)
+            
+            logger.info(f"Deleted {deleted_count} existing slots for volunteer {email} on dates: {list(dates_to_clear)}")
+            
+        except Exception as delete_error:
+            logger.error(f"Error deleting existing slots: {str(delete_error)}")
+            return {"error": f"Failed to delete existing slots: {str(delete_error)}"}
         
         # Insert each slot as a separate row in availabilities table
         try:
@@ -331,6 +350,7 @@ def upload_slots(data: dict):
             return {
                 "success": True,
                 "email": email,
+                "deleted_slots": deleted_count,
                 "slots_uploaded": len(inserted_rows),
                 "slots": processed_slots,
                 "inserted_records": len(inserted_rows)
@@ -343,7 +363,6 @@ def upload_slots(data: dict):
     except Exception as e:
         logger.error(f"Error in upload_slots: {str(e)}")
         return {"error": "Internal server error"}
-    
 
     
 @app.post("/allocate")
