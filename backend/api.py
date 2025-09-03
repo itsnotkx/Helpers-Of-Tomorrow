@@ -559,34 +559,7 @@ def get_district_data(name: str):
     response = supabase.table("districts").select("*").eq("name", name).single().execute()
     return response.data
 
-# -------------------------------
-# Demo Data Generator
-# -------------------------------
-@app.get("/demo/seniors")
-def generate_demo_seniors(count: int = 10):
-    seniors = []
-    for i in range(count):
-        seniors.append({
-            "uid": f"senior_{i}",
-            "coords": get_sg_coords(),
-            "physical": random.randint(1, 5),
-            "mental": random.randint(1, 5),
-            "community": random.randint(1, 5),
-        })
-    return {"seniors": seniors}
 
-@app.get("/demo/volunteers")
-def generate_demo_volunteers(count: int = 5):
-    volunteers = []
-    for i in range(count):
-        available_slots = [get_iso_time(days=d, hour=h) for d in range(1, 8) for h in [9,11,14,16]]
-        volunteers.append({
-            "vid": f"vol_{i}",
-            "coords": get_sg_coords(),
-            "skill": random.randint(1, 3),
-            "available": available_slots
-        })
-    return {"volunteers": volunteers}
 
 # -------------------------------
 # Health Check
