@@ -35,11 +35,12 @@ interface WeeklySchedule {
 
 const DAYS_OF_WEEK = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
 
-const getCurrentWeekDates = () => {
+const getNextWeekDates = () => {
   const today = new Date()
   const currentDay = today.getDay()
   const monday = new Date(today)
-  monday.setDate(today.getDate() - (currentDay === 0 ? 6 : currentDay - 1))
+  // Add 7 days to get next week's Monday
+  monday.setDate(today.getDate() - (currentDay === 0 ? 6 : currentDay - 1) + 7)
 
   const weekDates = []
   for (let i = 0; i < 7; i++) {
@@ -253,16 +254,16 @@ const loadSavedSlots = async () => {
       const result = await response.json()
       
       if (response.ok && result.slots && result.slots.length > 0) {
-        const currentWeekDates = getCurrentWeekDates()
+        const currentWeekDates = getNextWeekDates()
         const populatedSchedule = convertBackendToFrontendFormat(result.slots, currentWeekDates)
         setSchedule(populatedSchedule)
         setWeekDates(currentWeekDates)
       } else {
-        setWeekDates(getCurrentWeekDates())
+        setWeekDates(getNextWeekDates())
       }
     } catch (error) {
       console.error("Error loading saved slots:", error)
-      setWeekDates(getCurrentWeekDates())
+      setWeekDates(getNextWeekDates())
     } finally {
       setIsLoading(false)
     }
@@ -274,7 +275,7 @@ const loadSavedSlots = async () => {
     }
   }, [isLoaded, isSignedIn, user])
   useEffect(() => {
-    setWeekDates(getCurrentWeekDates())
+    setWeekDates(getNextWeekDates())
     setIsClient(true)
   }, [])
 
