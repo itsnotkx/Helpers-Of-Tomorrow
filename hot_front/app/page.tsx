@@ -9,8 +9,8 @@ import { MapPin, Users, Calendar, AlertTriangle, Activity, ChevronDown, ChevronU
 import { InteractiveMap } from "@/components/interactive-map"
 import { ScheduleInterface } from "@/components/schedule-interface"
 import { DashboardHeader } from "@/components/dashboard-header"
-
-import { auth } from "@clerk/nextjs/server"
+import { useOrganization } from "@clerk/nextjs"
+import { useRouter } from "next/navigation"
 
 
 interface Senior {
@@ -67,6 +67,8 @@ export default function VolunteerDashboard() {
   const [isScheduleCollapsed, setIsScheduleCollapsed] = useState(false)
   const [isAssignmentsCollapsed, setIsAssignmentsCollapsed] = useState(false)
   const [showHighRiskModal, setShowHighRiskModal] = useState(false)
+  const { isLoaded, membership } = useOrganization()
+  const router = useRouter()
   const wellbeingLabels: Record<number, string> = {
     1: "Very Poor",
     2: "Poor",
@@ -109,6 +111,12 @@ export default function VolunteerDashboard() {
   }
 
   useEffect(() => {
+    if (membership != undefined && membership.role == 'org:member') {
+      router.push('/volunteer')
+    }
+  }, [isLoaded, membership])
+
+  useEffect(() => {
     loadDashboardData()
   }, [])
 
@@ -122,6 +130,14 @@ export default function VolunteerDashboard() {
   const highRiskCount = highPrioritySeniors.length
   const activeVolunteers = volunteers.filter((v) => v.available && v.available.length > 0).length
   const todaySchedules = schedules.filter((s) => new Date(s.datetime).toDateString() === new Date().toDateString())
+
+  if (!isLoaded) {
+      return <div className="flex justify-center items-center min-h-screen">Loading...</div>
+    }
+
+    if (!membership) {
+      return <div className="flex justify-center items-center min-h-screen">You are not a member of this organization.</div>
+    }
 
   return (
     <div className="min-h-screen bg-background">
