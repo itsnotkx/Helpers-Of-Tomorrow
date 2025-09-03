@@ -73,21 +73,35 @@ def is_available(vol, slot):
 # Core Endpoints
 # -------------------------------
 @app.post("/assess")
-def assess_seniors(seniors: List[dict]):
-    results = []
-    for senior in seniors:
-        physical = senior.get("physical", 3)
-        mental = senior.get("mental", 3) 
-        community = senior.get("community", 3)
-        risk = (5-physical)*0.4 + (5-mental)*0.3 + (5-community)*0.3
-        risk = risk / 5
-        results.append({
-            "uid": senior.get("uid"),
-            "risk": round(risk, 2),
-            "priority": "HIGH" if risk > 0.7 else "MEDIUM" if risk > 0.4 else "LOW",
-            "needscare": risk > 0.6
-        })
-    return {"assessments": results}
+def classify_seniors():
+    """Classify seniors with ML model and update overall_wellbeing"""
+    current_dir = os.path.dirname(os.path.abspath(__file__))
+    model_path = os.path.join(current_dir, 'seniorModel', 'training', 'senior_risk_model.pkl')
+    model = joblib.load(model_path)["model"]
+
+    response = supabase.table("seniors").select("*").execute()
+    data = response.data
+    df = pd.DataFrame(data)
+
+    # Features for ML model
+    features = ['age', 'physical', 'mental', 'dl_intervention', 'rece_gov_sup',
+                'community', 'making_ends_meet', 'living_situation']
+
+    # Handle missing features safely
+    for feat in features:
+        if feat not in df.columns:
+            df[feat] = 0  # or some default value
+
+    X = df[features]
+    df["overall_wellbeing"] = model.predict(X)
+
+    # Update DB safely
+    for idx, row in df.iterrows():
+        supabase.table("seniors")\
+            .update({"overall_wellbeing": int(row["overall_wellbeing"])})\
+            .eq("uid", row["uid"]).execute()
+
+    return {"status": "success"}
 
 @app.post("/allocate")
 def allocate_volunteers(data: dict):
@@ -261,37 +275,6 @@ def get_district_data(name: str):
 # -------------------------------
 
 import json  # for safer coords parsing
-
-@app.get("/classify-seniors")
-def classify_seniors():
-    """Classify seniors with ML model and update overall_wellbeing"""
-    current_dir = os.path.dirname(os.path.abspath(__file__))
-    model_path = os.path.join(current_dir, 'seniorModel', 'training', 'senior_risk_model.pkl')
-    model = joblib.load(model_path)["model"]
-
-    response = supabase.table("seniors").select("*").execute()
-    data = response.data
-    df = pd.DataFrame(data)
-
-    # Features for ML model
-    features = ['age', 'physical', 'mental', 'dl_intervention', 'rece_gov_sup',
-                'community', 'making_ends_meet', 'living_situation']
-
-    # Handle missing features safely
-    for feat in features:
-        if feat not in df.columns:
-            df[feat] = 0  # or some default value
-
-    X = df[features]
-    df["overall_wellbeing"] = model.predict(X)
-
-    # Update DB safely
-    for idx, row in df.iterrows():
-        supabase.table("seniors")\
-            .update({"overall_wellbeing": int(row["overall_wellbeing"])})\
-            .eq("uid", row["uid"]).execute()
-
-    return {"status": "success"}
 
 
 @app.get("/assignments")
