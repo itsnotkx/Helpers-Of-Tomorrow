@@ -220,6 +220,48 @@ def classify_seniors(data: dict):
             ]
         }
 
+@app.get("/get_slots/{email}")
+def get_slots(email: str):
+    """Fetch volunteer availability slots"""
+    try:
+        if not email:
+            return {"error": "email is required"}
+
+        response = supabase.table("availabilities").select("*").eq("volunteer_email", email).execute()
+        if not response.data:
+            logger.info(f"No availability slots found for volunteer {email}")
+            return {"email": email, "slots": []}
+
+        slots = []
+        for record in response.data:
+            date_str = record.get("date")
+            start_time_str = record.get("start_t")
+            end_time_str = record.get("end_t")
+
+            if not date_str or not start_time_str or not end_time_str:
+                logger.warning(f"Incomplete slot data in record: {record}")
+                continue
+
+            try:
+                start_dt = datetime.fromisoformat(f"{date_str}T{start_time_str}+08:00")
+                end_dt = datetime.fromisoformat(f"{date_str}T{end_time_str}+08:00")
+                slots.append({
+                    "date": date_str,
+                    "start_time": start_dt.isoformat(),
+                    "end_time": end_dt.isoformat()
+                })
+            except ValueError as ve:
+                logger.error(f"Error parsing datetime for record {record}: {ve}")
+                continue
+
+        logger.info(f"Retrieved {len(slots)} slots for volunteer {email}")
+        return {"email": email, "slots": slots}
+
+    except Exception as e:
+        logger.error(f"Error in get_slots: {str(e)}", exc_info=True)
+        return {"error": "Internal server error"}
+    
+
 @app.post("/upload_slots")
 def upload_slots(data: dict):
     """Upload volunteer availability slots"""
