@@ -55,12 +55,18 @@ export default function VolunteerSchedule({  userId }: { userId: string }) {
                     <CardContent>
                         <p className="text-sm">{s.task}</p>
                     </CardContent>
-                    <CardFooter>
-                        <button className="text-red-600 text-sm hover:underline">Acknowledge</button>
+                    <CardFooter className="flex justify-end">
+                        <label className="flex items-center gap-2 cursor-pointer">
+                        <input
+                            type="checkbox"
+                            className="w-4 h-4 accent-blue-600 cursor-pointer"
+                        />
+                        <span className="text-sm">Acknowledge</span>
+                        </label>
                     </CardFooter>
                     </Card>
                 ))}
-            </div>      
+            </div> 
     </div>
     )
 }
