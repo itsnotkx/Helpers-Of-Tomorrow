@@ -118,7 +118,7 @@ export default function VolunteerDashboard() {
     3: "HIGH",
   }
 
-  const highPrioritySeniors = seniors.filter((s) => levels[s.overall_wellbeing] === "HIGH")
+  const highPrioritySeniors = seniors.filter((s) => levels[s.overall_wellbeing] === "LOW")
   const highRiskCount = highPrioritySeniors.length
   const activeVolunteers = volunteers.filter((v) => v.available && v.available.length > 0).length
   const todaySchedules = schedules.filter((s) => new Date(s.datetime).toDateString() === new Date().toDateString())

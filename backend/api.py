@@ -87,138 +87,70 @@ def is_available(vol, slot):
 # -------------------------------
 @app.post("/assess")
 def classify_seniors(data: dict):
-    """Classify seniors with ML model and return risk assessments"""
-    seniors = data.get("seniors", [])
-    if not seniors:
-        logger.warning("No seniors provided for assessment")
-        return {"assessments": []}
-
     try:
-        logger.info(f"Starting assessment for {len(seniors)} seniors")
+        # Load the model
         current_dir = os.path.dirname(os.path.abspath(__file__))
-        model_path = os.path.join(current_dir, 'seniorModel', 'training', 'senior_risk_model.pkl')
-        
-        if not os.path.exists(model_path):
-            logger.error(f"Model file not found at {model_path}")
-            raise FileNotFoundError("Model file not found")
-            
-        logger.info("Loading model...")
-        try:
-            # Use only joblib since it works
-            model_data = joblib.load(model_path)
-            logger.info("Model loaded using joblib")
-            
-            # Extract the model object
-            if isinstance(model_data, dict):
-                model = model_data.get('model')
-            else:
-                model = model_data
-                
-            # Verify it's a valid model
-            if not isinstance(model, RandomForestClassifier):
-                logger.error(f"Invalid model type: {type(model)}")
-                raise TypeError("Model is not a RandomForestClassifier")
-                
-            logger.info(f"Model type: {type(model)}")
-            
-        except Exception as load_error:
-            logger.error(f"Model loading failed: {load_error}")
-            raise Exception(f"Failed to load valid model: {str(load_error)}")
+        model_data = joblib.load(os.path.join(current_dir, 'seniorModel', 'training', 'senior_risk_model.pkl'))
+        model = model_data["model"]
 
-        # Create DataFrame from seniors data
+        # Get seniors data and prepare features
+        seniors = data.get("seniors", [])
+        if not seniors:
+            return {"assessments": []}
+
+        # Create DataFrame with required features
         df = pd.DataFrame(seniors)
-        
-        # Prepare features as expected by the model
-        feature_cols = ['age', 'physical', 'mental', 'dl_intervention', 'rece_gov_sup',
-                       'community', 'making_ends_meet', 'living_situation']
-        
-        # Fill missing values
-        for col in feature_cols:
-            if col not in df.columns:
-                if col in ['dl_intervention', 'rece_gov_sup']:
-                    df[col] = 'No'
-                elif col == 'making_ends_meet':
-                    df[col] = 'Manageable'
-                elif col == 'living_situation':
-                    df[col] = 'Alone'
-                elif col == 'community':
-                    df[col] = 'Low'
-                else:
-                    df[col] = 0
+        features = ['age', 'physical', 'mental', 'dl_intervention', 'rece_gov_sup', 
+                   'community', 'making_ends_meet', 'living_situation']
+        X = df[features]
 
-        # Map categorical values
-        yes_mapping = {'Yes': 1, 'No': 0}
-        meeting_ends_mapping = {'Struggling': 1, 'Manageable': 2, 'Comfortable': 3}
-        living_situation_mapping = {'Alone': 1, 'With Spouse': 2, 'With Family': 3, 'Assisted Living': 4}
-        low_high_mapping = {'Low': 1, 'Medium': 2, 'High': 3}
+        # Get predictions and probabilities
+        predictions = model.predict(X)  # 1=LOW, 2=MEDIUM, 3=HIGH wellbeing
+        probabilities = model.predict_proba(X)
 
-        for col in df.select_dtypes(include=['object']).columns:
-            if col == 'making_ends_meet':
-                df[col] = df[col].map(meeting_ends_mapping)
-            elif col == 'living_situation':
-                df[col] = df[col].map(living_situation_mapping)
-            elif col == 'community':
-                df[col] = df[col].map(low_high_mapping)
-            elif col in ["dl_intervention", 'rece_gov_sup']:
-                df[col] = df[col].map(yes_mapping)
+        # Update wellbeing scores in database
+        for i, senior in enumerate(seniors):
+            try:
+                supabase.table("seniors").update(
+                    {"overall_wellbeing": int(predictions[i])}
+                ).eq("uid", senior['uid']).execute()
+            except Exception as e:
+                logger.error(f"Failed to update wellbeing for senior {senior['uid']}: {str(e)}")
 
-        logger.info(f"Features prepared: {feature_cols}")
-        logger.debug(f"Feature data sample: {df.head()}")
-        
-        try:
-            # Convert features to numpy array if needed
-            X = df[feature_cols]  # Keep as DataFrame to preserve feature names
-            predictions = model.predict(X)
-            probabilities = model.predict_proba(X)
-            logger.info("Successfully made predictions")
-            
-            # Ensure predictions are in valid range
-            predictions = np.clip(predictions, 0, 2)  # Clip to valid range 0-2
-            
-        except Exception as pred_error:
-            logger.error(f"Prediction failed: {pred_error}")
-            logger.error(f"Feature shape: {df[feature_cols].shape}")
-            logger.error(f"Features head: \n{df[feature_cols].head()}")
-            raise Exception(f"Model prediction failed: {pred_error}")
-        
-        logger.info(f"Predictions completed. Distribution: {pd.Series(predictions).value_counts().to_dict()}")
-        
-        # Create assessments with fixed class mapping
+        # Create assessments with inverted mapping (low wellbeing = high priority)
         assessments = []
-        class_mapping = {0: "LOW", 1: "MEDIUM", 2: "HIGH"}
+        wellbeing_to_priority = {
+            1: "HIGH",    # LOW wellbeing → HIGH priority
+            2: "MEDIUM",  # MEDIUM wellbeing → MEDIUM priority
+            3: "LOW"      # HIGH wellbeing → LOW priority
+        }
         
         for i, senior in enumerate(seniors):
-            prediction = int(predictions[i])  # Ensure integer
+            prediction = int(predictions[i])  # wellbeing level
             probs = probabilities[i]
             max_prob = max(probs)
-            risk_score = (senior.get('physical', 0) + senior.get('mental', 0) + senior.get('community', 0)) / 15
+            
+            # Calculate risk score based on physical, mental and community metrics
+            risk_score = (
+                float(senior.get('physical', 0)) + 
+                float(senior.get('mental', 0)) + 
+                float(senior.get('community', 0))
+            ) / 15  # Normalize to 0-1 range
 
             assessments.append({
                 "uid": senior['uid'],
-                "risk": risk_score,
-                "priority": class_mapping.get(prediction, "MEDIUM"),  # Default to MEDIUM if invalid
-                "needscare": risk_score > 0.6,
-                "confidence": float(max_prob)
+                "risk": round(risk_score, 2),
+                "priority": wellbeing_to_priority.get(prediction, "MEDIUM"),
+                "needscare": risk_score > 0.6 or prediction == 1,  # Needs care if high risk or low wellbeing
+                "confidence": round(float(max_prob), 2),
+                "wellbeing": prediction  # Added this to show original wellbeing score
             })
 
         return {"assessments": assessments}
 
     except Exception as e:
         logger.error(f"Error in classify_seniors: {str(e)}", exc_info=True)
-        return {
-            "assessments": [
-                {
-                    "uid": s['uid'],
-                    "risk": (s.get('physical', 0) + s.get('mental', 0) + s.get('community', 0)) / 15,
-                    "priority": "HIGH" if (s.get('physical', 0) + s.get('mental', 0) + s.get('community', 0)) / 15 > 0.7 
-                              else "MEDIUM" if (s.get('physical', 0) + s.get('mental', 0) + s.get('community', 0)) / 15 > 0.4 
-                              else "LOW",
-                    "needscare": (s.get('physical', 0) + s.get('mental', 0) + s.get('community', 0)) / 15 > 0.6,
-                    "confidence": 0.8  # Default confidence for fallback
-                }
-                for s in seniors
-            ]
-        }
+        return {"error": str(e), "assessments": []}
 
 @app.post("/upload_slots")
 def upload_slots(data: dict):
