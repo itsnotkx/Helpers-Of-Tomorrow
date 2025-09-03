@@ -112,28 +112,29 @@ export function ScheduleInterface({ schedules, volunteers, assignments }: Schedu
   }
 
   return (
-    <div className="space-y-6">
-      <Tabs defaultValue="daily" className="w-full">
-        <TabsList className="grid w-full grid-cols-3">
+    // <div className="space-y-6">
+    <div className="">
+      <Tabs defaultValue="daily" className="w-full gap-0">
+        <TabsList className="grid w-full grid-cols-3 rounded-none">
           <TabsTrigger value="daily">Daily View</TabsTrigger>
           <TabsTrigger value="weekly">Weekly Overview</TabsTrigger>
           <TabsTrigger value="volunteers">By Volunteer</TabsTrigger>
         </TabsList>
 
         {/* Daily Schedule View */}
-        <TabsContent value="daily" className="space-y-4">
-          <Card>
-            <CardHeader>
+        <TabsContent value="daily" className="space-b-4">
+            <Card className="rounded-t-none border-none">            
+              <CardHeader>
               <div className="flex items-center justify-between">
                 <CardTitle className="flex items-center gap-2">
                   <Calendar className="h-5 w-5" />
                   Daily Schedule
                 </CardTitle>
-                <div className="flex items-center gap-2">
-                  <Button variant="outline" size="sm" onClick={() => navigateDate("prev")}>
-                    <ChevronLeft className="h-4 w-4" />
+                <div className="flex items-center ">
+                  <Button variant="outline" className="rounded-r-none" size="sm" onClick={() => navigateDate("prev")}>
+                    <ChevronLeft className="" />
                   </Button>
-                  <Badge variant="outline" className="px-3">
+                  <Badge variant="outline" className="h-8 border-x-0 rounded-none">
                     {selectedDate.toLocaleDateString("en-SG", {
                       weekday: "long",
                       year: "numeric",
@@ -141,8 +142,8 @@ export function ScheduleInterface({ schedules, volunteers, assignments }: Schedu
                       day: "numeric",
                     })}
                   </Badge>
-                  <Button variant="outline" size="sm" onClick={() => navigateDate("next")}>
-                    <ChevronRight className="h-4 w-4" />
+                  <Button variant="outline" className="rounded-l-none" size="sm" onClick={() => navigateDate("next")}>
+                    <ChevronRight className="" />
                   </Button>
                 </div>
               </div>
@@ -189,8 +190,10 @@ export function ScheduleInterface({ schedules, volunteers, assignments }: Schedu
         </TabsContent>
 
         {/* Weekly Overview */}
-        <TabsContent value="weekly" className="space-y-4">
-          <Card>
+        {/* <TabsContent value="weekly" className="space-y-4">  */}
+                  <TabsContent value="weekly" className="">
+
+            <Card className="rounded-t-none border-none">            
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <Calendar className="h-5 w-5" />
@@ -247,16 +250,18 @@ export function ScheduleInterface({ schedules, volunteers, assignments }: Schedu
         </TabsContent>
 
         {/* Volunteer-specific schedules */}
-        <TabsContent value="volunteers" className="space-y-4">
-          <Card>
+        {/* <TabsContent value="volunteers" className="space-y-4"> */}
+          <TabsContent value="volunteers" className="border-none padding-none">
+
+             <Card className="rounded-t-none border-none">            
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <User className="h-5 w-5" />
                 Volunteer Schedules
               </CardTitle>
             </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
+            <CardContent className="border-none">
+              <div className="space-y-4 border-none">
                 {/* Volunteer selector */}
                 <div className="flex flex-wrap gap-2">
                   <Button

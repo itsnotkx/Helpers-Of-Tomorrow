@@ -58,6 +58,7 @@ export default function VolunteerDashboard() {
   const [loading, setLoading] = useState(true)
   const [selectedDistrict, setSelectedDistrict] = useState("Central Singapore")
   const [isMapCollapsed, setIsMapCollapsed] = useState(false)
+  const [isScheduleCollapsed, setIsScheduleCollapsed] = useState(false)
   const [isAssignmentsCollapsed, setIsAssignmentsCollapsed] = useState(false)
 
   // -------------------------------
@@ -175,7 +176,7 @@ export default function VolunteerDashboard() {
         </div>
 
         {/* Map Section */}
-        <Card className="lg:col-span-2">
+        <Card className="lg:col-span-2 mb-8">
           <CardHeader className="flex justify-between">
             <CardTitle className="flex items-center gap-2">
               <MapPin className="h-5 w-5" /> District Map & Clusters
@@ -189,10 +190,29 @@ export default function VolunteerDashboard() {
               <InteractiveMap seniors={seniors} volunteers={volunteers} assignments={assignments} schedules={schedules} />
             </CardContent>
           )}
+          {/* Schedule */}
+          {/* <ScheduleInterface schedules={schedules} volunteers={volunteers} assignments={assignments} /> */}
         </Card>
 
-        {/* Schedule */}
-        <ScheduleInterface schedules={schedules} volunteers={volunteers} assignments={assignments} />
+        {/* Schedule Section */}
+        <Card className={`lg:col-span-2 ${!isScheduleCollapsed ? 'pb-0' : ''}`}>
+          <CardHeader className="flex justify-between">
+            <CardTitle className="flex items-center gap-2">
+              <Calendar className="h-5 w-5" /> Scheduling Overview
+            </CardTitle>
+            <Button variant="ghost" size="sm" onClick={() => setIsScheduleCollapsed(!isScheduleCollapsed)}>
+              {isScheduleCollapsed ? <ChevronDown className="h-4 w-4" /> : <ChevronUp className="h-4 w-4" />}
+              {/* {isScheduleCollapsed ? <div className="mb-4" /> : <div className="h-4" />} */}
+            </Button>
+          </CardHeader>
+
+
+          {/* Schedule */}
+          {!isScheduleCollapsed && (
+              <ScheduleInterface schedules={schedules} volunteers={volunteers} assignments={assignments} />
+          )} 
+        </Card>
+
 
         {/* Assignments */}
         <Card className="mt-6">
