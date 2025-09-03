@@ -220,6 +220,90 @@ def classify_seniors(data: dict):
             ]
         }
 
+@app.post("/upload_slots")
+def upload_slots(data: dict):
+    """Upload volunteer availability slots"""
+    try:
+        email = data.get("email")
+        slots = data.get("slots", [])
+        
+        if not email:
+            return {"error": "email is required"}
+
+        if not slots:
+            return {"error": "slots list is required"}
+        
+        # Validate slot format
+        processed_slots = []
+        for i, slot in enumerate(slots):
+            if not isinstance(slot, dict):
+                return {"error": f"Slot {i} must be an object"}
+            
+            start_time = slot.get("start_time")
+            end_time = slot.get("end_time")
+            
+            if not start_time or not end_time:
+                return {"error": f"Slot {i} must have both start_time and end_time"}
+            
+            # Validate datetime format (ISO format expected)
+            try:
+                # Parse to validate format
+                start_dt = datetime.fromisoformat(start_time.replace('Z', '+00:00'))
+                end_dt = datetime.fromisoformat(end_time.replace('Z', '+00:00'))
+                
+                if end_dt <= start_dt:
+                    return {"error": f"Slot {i}: end_time must be after start_time"}
+                
+                processed_slots.append({
+                    "start_time": start_time,
+                    "end_time": end_time,
+                    "date": start_dt.date().isoformat(),  # Extract date for database
+                    "start_time_only": start_dt.time().isoformat(),  # Extract time portion only
+                    "end_time_only": end_dt.time().isoformat(),  # Extract time portion only
+                    "duration_minutes": int((end_dt - start_dt).total_seconds() / 60)
+                })
+                
+            except ValueError as e:
+                return {"error": f"Slot {i}: Invalid datetime format - {str(e)}"}
+        
+        # Insert each slot as a separate row in availabilities table
+        try:
+            inserted_rows = []
+            
+            for slot in processed_slots:
+                # Insert individual availability record matching your table schema
+                response = supabase.table("availabilities").insert({
+                    "volunteer_email": email,  # Changed from volunteer_id to email to match your table
+                    "date": slot["date"],
+                    "start_t": slot["start_time_only"],  # Now just the time portion (e.g., "11:00:00")
+                    "end_t": slot["end_time_only"]  # Now just the time portion (e.g., "13:00:00")
+                }).execute()
+                
+                if response.data:
+                    inserted_rows.extend(response.data)
+                else:
+                    logger.warning(f"Failed to insert slot: {slot}")
+            
+            logger.info(f"Inserted {len(inserted_rows)} availability slots for volunteer {email}")
+            
+            return {
+                "success": True,
+                "email": email,
+                "slots_uploaded": len(inserted_rows),
+                "slots": processed_slots,
+                "inserted_records": len(inserted_rows)
+            }
+            
+        except Exception as db_error:
+            logger.error(f"Database error: {str(db_error)}")
+            return {"error": f"Failed to insert availability slots: {str(db_error)}"}
+        
+    except Exception as e:
+        logger.error(f"Error in upload_slots: {str(e)}")
+        return {"error": "Internal server error"}
+    
+
+    
 @app.post("/allocate")
 def allocate_volunteers(data: dict):
     volunteers = data.get("volunteers", [])
