@@ -12,6 +12,13 @@ from dotenv import load_dotenv
 import uvicorn
 import joblib
 import pandas as pd
+import logging
+import json  # for safer coords parsing
+import pickle  # Add this import
+from sklearn.base import BaseEstimator
+from sklearn.ensemble import RandomForestClassifier  # Add this import
+
+os.environ['OMP_NUM_THREADS'] = '1'  # Add this at the top with other imports
 
 app = FastAPI(title="AIC Senior Care MVP")
 load_dotenv('.env.local')
@@ -21,6 +28,12 @@ print(url)
 print(key)
 supabase = create_client(url, key)
 
+# Set up logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(levelname)s - %(message)s'
+)
+logger = logging.getLogger(__name__)
 
 origins = [
     "http://localhost:3000",
@@ -54,7 +67,9 @@ def distance(coord1, coord2):
 
 def kmeans_clusters(coords_list, n_clusters):
     X = np.array([[c['lat'], c['lng']] for c in coords_list])
-    kmeans = KMeans(n_clusters=n_clusters, n_init=10, random_state=42)
+    kmeans = KMeans(n_clusters=n_clusters, 
+                    n_init=10, 
+                    random_state=42,)  # Let scikit-learn decide based on dataset size
     kmeans.fit(X)
     return kmeans.labels_, kmeans.cluster_centers_
 
@@ -73,35 +88,139 @@ def is_available(vol, slot):
 # Core Endpoints
 # -------------------------------
 @app.post("/assess")
-def classify_seniors():
-    """Classify seniors with ML model and update overall_wellbeing"""
-    current_dir = os.path.dirname(os.path.abspath(__file__))
-    model_path = os.path.join(current_dir, 'seniorModel', 'training', 'senior_risk_model.pkl')
-    model = joblib.load(model_path)["model"]
+def classify_seniors(data: dict):
+    """Classify seniors with ML model and return risk assessments"""
+    seniors = data.get("seniors", [])
+    if not seniors:
+        logger.warning("No seniors provided for assessment")
+        return {"assessments": []}
 
-    response = supabase.table("seniors").select("*").execute()
-    data = response.data
-    df = pd.DataFrame(data)
+    try:
+        logger.info(f"Starting assessment for {len(seniors)} seniors")
+        current_dir = os.path.dirname(os.path.abspath(__file__))
+        model_path = os.path.join(current_dir, 'seniorModel', 'training', 'senior_risk_model.pkl')
+        
+        if not os.path.exists(model_path):
+            logger.error(f"Model file not found at {model_path}")
+            raise FileNotFoundError("Model file not found")
+            
+        logger.info("Loading model...")
+        try:
+            # Use only joblib since it works
+            model_data = joblib.load(model_path)
+            logger.info("Model loaded using joblib")
+            
+            # Extract the model object
+            if isinstance(model_data, dict):
+                model = model_data.get('model')
+            else:
+                model = model_data
+                
+            # Verify it's a valid model
+            if not isinstance(model, RandomForestClassifier):
+                logger.error(f"Invalid model type: {type(model)}")
+                raise TypeError("Model is not a RandomForestClassifier")
+                
+            logger.info(f"Model type: {type(model)}")
+            
+        except Exception as load_error:
+            logger.error(f"Model loading failed: {load_error}")
+            raise Exception(f"Failed to load valid model: {str(load_error)}")
 
-    # Features for ML model
-    features = ['age', 'physical', 'mental', 'dl_intervention', 'rece_gov_sup',
-                'community', 'making_ends_meet', 'living_situation']
+        # Create DataFrame from seniors data
+        df = pd.DataFrame(seniors)
+        
+        # Prepare features as expected by the model
+        feature_cols = ['age', 'physical', 'mental', 'dl_intervention', 'rece_gov_sup',
+                       'community', 'making_ends_meet', 'living_situation']
+        
+        # Fill missing values
+        for col in feature_cols:
+            if col not in df.columns:
+                if col in ['dl_intervention', 'rece_gov_sup']:
+                    df[col] = 'No'
+                elif col == 'making_ends_meet':
+                    df[col] = 'Manageable'
+                elif col == 'living_situation':
+                    df[col] = 'Alone'
+                elif col == 'community':
+                    df[col] = 'Low'
+                else:
+                    df[col] = 0
 
-    # Handle missing features safely
-    for feat in features:
-        if feat not in df.columns:
-            df[feat] = 0  # or some default value
+        # Map categorical values
+        yes_mapping = {'Yes': 1, 'No': 0}
+        meeting_ends_mapping = {'Struggling': 1, 'Manageable': 2, 'Comfortable': 3}
+        living_situation_mapping = {'Alone': 1, 'With Spouse': 2, 'With Family': 3, 'Assisted Living': 4}
+        low_high_mapping = {'Low': 1, 'Medium': 2, 'High': 3}
 
-    X = df[features]
-    df["overall_wellbeing"] = model.predict(X)
+        for col in df.select_dtypes(include=['object']).columns:
+            if col == 'making_ends_meet':
+                df[col] = df[col].map(meeting_ends_mapping)
+            elif col == 'living_situation':
+                df[col] = df[col].map(living_situation_mapping)
+            elif col == 'community':
+                df[col] = df[col].map(low_high_mapping)
+            elif col in ["dl_intervention", 'rece_gov_sup']:
+                df[col] = df[col].map(yes_mapping)
 
-    # Update DB safely
-    for idx, row in df.iterrows():
-        supabase.table("seniors")\
-            .update({"overall_wellbeing": int(row["overall_wellbeing"])})\
-            .eq("uid", row["uid"]).execute()
+        logger.info(f"Features prepared: {feature_cols}")
+        logger.debug(f"Feature data sample: {df.head()}")
+        
+        try:
+            # Convert features to numpy array if needed
+            X = df[feature_cols]  # Keep as DataFrame to preserve feature names
+            predictions = model.predict(X)
+            probabilities = model.predict_proba(X)
+            logger.info("Successfully made predictions")
+            
+            # Ensure predictions are in valid range
+            predictions = np.clip(predictions, 0, 2)  # Clip to valid range 0-2
+            
+        except Exception as pred_error:
+            logger.error(f"Prediction failed: {pred_error}")
+            logger.error(f"Feature shape: {df[feature_cols].shape}")
+            logger.error(f"Features head: \n{df[feature_cols].head()}")
+            raise Exception(f"Model prediction failed: {pred_error}")
+        
+        logger.info(f"Predictions completed. Distribution: {pd.Series(predictions).value_counts().to_dict()}")
+        
+        # Create assessments with fixed class mapping
+        assessments = []
+        class_mapping = {0: "LOW", 1: "MEDIUM", 2: "HIGH"}
+        
+        for i, senior in enumerate(seniors):
+            prediction = int(predictions[i])  # Ensure integer
+            probs = probabilities[i]
+            max_prob = max(probs)
+            risk_score = (senior.get('physical', 0) + senior.get('mental', 0) + senior.get('community', 0)) / 15
 
-    return {"status": "success"}
+            assessments.append({
+                "uid": senior['uid'],
+                "risk": risk_score,
+                "priority": class_mapping.get(prediction, "MEDIUM"),  # Default to MEDIUM if invalid
+                "needscare": risk_score > 0.6,
+                "confidence": float(max_prob)
+            })
+
+        return {"assessments": assessments}
+
+    except Exception as e:
+        logger.error(f"Error in classify_seniors: {str(e)}", exc_info=True)
+        return {
+            "assessments": [
+                {
+                    "uid": s['uid'],
+                    "risk": (s.get('physical', 0) + s.get('mental', 0) + s.get('community', 0)) / 15,
+                    "priority": "HIGH" if (s.get('physical', 0) + s.get('mental', 0) + s.get('community', 0)) / 15 > 0.7 
+                              else "MEDIUM" if (s.get('physical', 0) + s.get('mental', 0) + s.get('community', 0)) / 15 > 0.4 
+                              else "LOW",
+                    "needscare": (s.get('physical', 0) + s.get('mental', 0) + s.get('community', 0)) / 15 > 0.6,
+                    "confidence": 0.8  # Default confidence for fallback
+                }
+                for s in seniors
+            ]
+        }
 
 @app.post("/allocate")
 def allocate_volunteers(data: dict):
@@ -173,31 +292,50 @@ def allocate_volunteers(data: dict):
 @app.get("/assignments")
 def get_assignments():
     """Fetch seniors and volunteers, parse coords, and run clustering"""
-    seniors_resp = supabase.table("seniors").select("*").execute()
-    volunteers_resp = supabase.table("volunteers").select("*").execute()
+    try:
+        logger.info("Fetching assignments data from Supabase")
+        seniors_resp = supabase.table("seniors").select("*").execute()
+        volunteers_resp = supabase.table("volunteers").select("*").execute()
 
-    seniors = seniors_resp.data
-    volunteers = volunteers_resp.data
+        if not seniors_resp.data or not volunteers_resp.data:
+            logger.warning("No data retrieved from Supabase")
+            return {"assignments": [], "clusters": [], "cluster_density": {}}
 
-    # Safely parse coords
-    for s in seniors:
-        coords = s.get("coords")
-        if isinstance(coords, str):
+        seniors = seniors_resp.data
+        volunteers = volunteers_resp.data
+        
+        logger.info(f"Processing {len(seniors)} seniors and {len(volunteers)} volunteers")
+
+        # Parse coordinates and handle errors
+        for s in seniors:
             try:
-                s["coords"] = json.loads(coords)
-            except Exception:
-                s["coords"] = None
+                coords = s.get("coords")
+                if isinstance(coords, str):
+                    s["coords"] = json.loads(coords)
+                elif not isinstance(coords, dict):
+                    s["coords"] = {"lat": 1.3521, "lng": 103.8198}  # Default to Singapore center
+            except Exception as e:
+                logger.error(f"Error parsing senior coords: {e}")
+                s["coords"] = {"lat": 1.3521, "lng": 103.8198}
 
-    for v in volunteers:
-        coords = v.get("coords")
-        if isinstance(coords, str):
+        for v in volunteers:
             try:
-                v["coords"] = json.loads(coords)
-            except Exception:
-                v["coords"] = None
+                coords = v.get("coords")
+                if isinstance(coords, str):
+                    v["coords"] = json.loads(coords)
+                elif not isinstance(coords, dict):
+                    v["coords"] = {"lat": 1.3521, "lng": 103.8198}
+            except Exception as e:
+                logger.error(f"Error parsing volunteer coords: {e}")
+                v["coords"] = {"lat": 1.3521, "lng": 103.8198}
 
-    # Call existing clustering & allocation logic
-    return allocate_volunteers({"seniors": seniors, "volunteers": volunteers})
+        result = allocate_volunteers({"seniors": seniors, "volunteers": volunteers})
+        logger.info(f"Successfully created {len(result['assignments'])} assignments")
+        return result
+
+    except Exception as e:
+        logger.error(f"Error in get_assignments: {str(e)}", exc_info=True)
+        return {"assignments": [], "clusters": [], "cluster_density": {}}
 
 @app.post("/schedule")
 def create_schedule(data: dict):
@@ -238,6 +376,33 @@ def create_schedule(data: dict):
                 break
     return {"schedules": schedules}
 
+@app.get("/schedules")
+def get_schedules():
+    try:
+        logger.info("Fetching schedule data")
+        assignments_data = get_assignments()
+        
+        if not assignments_data.get("assignments"):
+            logger.warning("No assignments available for scheduling")
+            return {"schedules": [], "clusters": [], "cluster_density": {}}
+
+        schedules = create_schedule({
+            "assignments": assignments_data["assignments"],
+            "seniors": assignments_data.get("seniors", []),
+            "volunteers": assignments_data.get("volunteers", [])
+        })
+
+        logger.info(f"Generated {len(schedules.get('schedules', []))} schedules")
+        return {
+            "schedules": schedules["schedules"],
+            "clusters": assignments_data["clusters"],
+            "cluster_density": assignments_data["cluster_density"]
+        }
+
+    except Exception as e:
+        logger.error(f"Error in get_schedules: {str(e)}", exc_info=True)
+        return {"schedules": [], "clusters": [], "cluster_density": {}}
+
 # -------------------------------
 # Data Endpoints
 # -------------------------------
@@ -269,88 +434,6 @@ def get_district_data(name: str):
     """Get district overview from DB"""
     response = supabase.table("districts").select("*").eq("name", name).single().execute()
     return response.data
-
-# -------------------------------
-# Refactored Data Handling & ML
-# -------------------------------
-
-import json  # for safer coords parsing
-
-
-@app.get("/assignments")
-def get_assignments():
-    """Fetch seniors and volunteers, parse coords, and run clustering"""
-    seniors_resp = supabase.table("seniors").select("*").execute()
-    volunteers_resp = supabase.table("volunteers").select("*").execute()
-
-    seniors = seniors_resp.data
-    volunteers = volunteers_resp.data
-
-    # Safely parse coords
-    for s in seniors:
-        coords = s.get("coords")
-        if isinstance(coords, str):
-            try:
-                s["coords"] = json.loads(coords)
-            except Exception:
-                s["coords"] = None
-
-    for v in volunteers:
-        coords = v.get("coords")
-        if isinstance(coords, str):
-            try:
-                v["coords"] = json.loads(coords)
-            except Exception:
-                v["coords"] = None
-
-    # Call existing clustering & allocation logic
-    return allocate_volunteers({"seniors": seniors, "volunteers": volunteers})
-
-
-@app.get("/schedules")
-def get_schedules():
-    """Generate schedules based on current assignments and include cluster info"""
-    seniors_resp = supabase.table("seniors").select("*").execute()
-    volunteers_resp = supabase.table("volunteers").select("*").execute()
-
-    seniors = seniors_resp.data
-    volunteers = volunteers_resp.data
-
-    # Safely parse coords
-    for s in seniors:
-        coords = s.get("coords")
-        if isinstance(coords, str):
-            try:
-                s["coords"] = json.loads(coords)
-            except Exception:
-                s["coords"] = None
-
-    for v in volunteers:
-        coords = v.get("coords")
-        if isinstance(coords, str):
-            try:
-                v["coords"] = json.loads(coords)
-            except Exception:
-                v["coords"] = None
-
-    # Get assignments + clusters
-    allocation = allocate_volunteers({"seniors": seniors, "volunteers": volunteers})
-    assignments = allocation["assignments"]
-    clusters = allocation["clusters"]
-    cluster_density_map = allocation["cluster_density"]
-
-    # Generate schedules
-    schedules = create_schedule({
-        "assignments": assignments,
-        "seniors": seniors,
-        "volunteers": volunteers
-    })
-
-    return {
-        "schedules": schedules["schedules"],
-        "clusters": clusters,
-        "cluster_density": cluster_density_map
-    }
 
 # -------------------------------
 # Demo Data Generator
