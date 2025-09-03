@@ -45,6 +45,7 @@ interface Schedule {
 interface Cluster {
   center: Coord
   seniors: Senior[]
+  radius: number
 }
 
 interface ScheduleResponse {
@@ -67,6 +68,7 @@ export function InteractiveMap() {
 
   const [mapLoaded, setMapLoaded] = useState(false)
   const [mapError, setMapError] = useState<string | null>(null)
+  const [highlightedCluster, setHighlightedCluster] = useState<number | null>(null)
 
   const [seniors, setSeniors] = useState<Senior[]>([])
   const [volunteers, setVolunteers] = useState<Volunteer[]>([])
@@ -74,29 +76,143 @@ export function InteractiveMap() {
   const [schedules, setSchedules] = useState<Schedule[]>([])
   const [clusters, setClusters] = useState<Cluster[]>([])
 
+  const mockData = {
+    seniors: [
+      {
+        uid: "senior-1",
+        name: "Alice Johnson",
+        coords: { lat: 1.3521, lng: 103.8198 },
+        physical: 4,
+        mental: 3,
+        community: 2,
+        last_visit: "2024-01-15",
+        cluster: 0,
+      },
+      {
+        uid: "senior-2",
+        name: "Bob Chen",
+        coords: { lat: 1.3541, lng: 103.8218 },
+        physical: 2,
+        mental: 4,
+        community: 3,
+        last_visit: "2024-01-10",
+        cluster: 0,
+      },
+      {
+        uid: "senior-3",
+        name: "Carol Smith",
+        coords: { lat: 1.3501, lng: 103.8178 },
+        physical: 1,
+        mental: 2,
+        community: 1,
+        last_visit: "2024-01-20",
+        cluster: 1,
+      },
+    ],
+    volunteers: [
+      {
+        vid: "vol-1",
+        name: "David Wilson",
+        coords: { lat: 1.3531, lng: 103.8208 },
+        skill: 3,
+        available: true,
+      },
+      {
+        vid: "vol-2",
+        name: "Emma Davis",
+        coords: { lat: 1.3511, lng: 103.8188 },
+        skill: 2,
+        available: ["Monday", "Wednesday", "Friday"],
+      },
+    ],
+    clusters: [
+      {
+        center: { lat: 1.3531, lng: 103.8208 },
+        seniors: [
+          {
+            uid: "senior-1",
+            name: "Alice Johnson",
+            coords: { lat: 1.3521, lng: 103.8198 },
+            physical: 4,
+            mental: 3,
+            community: 2,
+            last_visit: "2024-01-15",
+          },
+          {
+            uid: "senior-2",
+            name: "Bob Chen",
+            coords: { lat: 1.3541, lng: 103.8218 },
+            physical: 2,
+            mental: 4,
+            community: 3,
+            last_visit: "2024-01-10",
+          },
+        ],
+        radius: 0.5,
+      },
+      {
+        center: { lat: 1.3501, lng: 103.8178 },
+        seniors: [
+          {
+            uid: "senior-3",
+            name: "Carol Smith",
+            coords: { lat: 1.3501, lng: 103.8178 },
+            physical: 1,
+            mental: 2,
+            community: 1,
+            last_visit: "2024-01-20",
+          },
+        ],
+        radius: 0.3,
+      },
+    ],
+    schedules: [
+      {
+        volunteer: "vol-1",
+        cluster: 0,
+        datetime: "2024-01-25T10:00:00Z",
+        duration: 120,
+      },
+    ],
+  }
+
   // --- Fetch all data from backend ---
   useEffect(() => {
     async function loadData() {
       try {
-        // /schedules returns schedules + clusters
         const [sRes, vRes, scRes] = await Promise.all([
-          fetch("http://localhost:8000/seniors"),
-          fetch("http://localhost:8000/volunteers"),
-          fetch("http://localhost:8000/schedules"),
+          fetch("http://localhost:8000/seniors").catch(() => null),
+          fetch("http://localhost:8000/volunteers").catch(() => null),
+          fetch("http://localhost:8000/schedules").catch(() => null),
         ])
 
-        const seniorsData: Senior[] = (await sRes.json()).seniors || []
-        const volunteersData: Volunteer[] = (await vRes.json()).volunteers || []
-        const scheduleData: ScheduleResponse = await scRes.json()
+        if (sRes && vRes && scRes) {
+          const seniorsData: Senior[] = (await sRes.json()).seniors || []
+          const volunteersData: Volunteer[] = (await vRes.json()).volunteers || []
+          const scheduleData: ScheduleResponse = await scRes.json()
 
-        setSeniors(seniorsData)
-        setVolunteers(volunteersData)
-        setAssignments(scheduleData.schedules.map((s) => ({ volunteer: s.volunteer, cluster: s.cluster })))
-        setSchedules(scheduleData.schedules)
-        setClusters(scheduleData.clusters)
+          setSeniors(seniorsData)
+          setVolunteers(volunteersData)
+          setAssignments(scheduleData.schedules.map((s) => ({ volunteer: s.volunteer, cluster: s.cluster })))
+          setSchedules(scheduleData.schedules)
+          setClusters(scheduleData.clusters)
+        } else {
+          // Use mock data when backend is not available
+          console.log("Backend not available, using mock data")
+          setSeniors(mockData.seniors)
+          setVolunteers(mockData.volunteers)
+          setAssignments(mockData.schedules.map((s) => ({ volunteer: s.volunteer, cluster: s.cluster })))
+          setSchedules(mockData.schedules)
+          setClusters(mockData.clusters)
+        }
       } catch (err) {
-        console.error("Failed to fetch data:", err)
-        setMapError("Failed to load map data")
+        console.error("Failed to fetch data, using mock data:", err)
+        // Use mock data as fallback
+        setSeniors(mockData.seniors)
+        setVolunteers(mockData.volunteers)
+        setAssignments(mockData.schedules.map((s) => ({ volunteer: s.volunteer, cluster: s.cluster })))
+        setSchedules(mockData.schedules)
+        setClusters(mockData.clusters)
       }
     }
     loadData()
@@ -105,99 +221,226 @@ export function InteractiveMap() {
   // --- Compute assessments ---
   const assessments = seniors.map((s) => {
     const riskScore = (s.physical + s.mental + s.community) / 15
-    const priority: "HIGH" | "MEDIUM" | "LOW" =
-      riskScore > 0.7 ? "HIGH" : riskScore > 0.4 ? "MEDIUM" : "LOW"
+    const priority: "HIGH" | "MEDIUM" | "LOW" = riskScore > 0.7 ? "HIGH" : riskScore > 0.4 ? "MEDIUM" : "LOW"
     return { uid: s.uid, risk: riskScore, priority, needscare: riskScore > 0.6 }
   })
 
   // --- Initialize Mapbox ---
   useEffect(() => {
     if (!mapContainer.current) return
-    mapboxgl.accessToken = process.env.NEXT_PUBLIC_MAPBOX_TOKEN!
 
+    const mapboxToken = process.env.NEXT_PUBLIC_MAPBOX_TOKEN
+    if (!mapboxToken) {
+      setMapError("Mapbox token is required. Please set NEXT_PUBLIC_MAPBOX_TOKEN in your environment variables.")
+      return
+    }
+
+    mapboxgl.accessToken = mapboxToken
     map.current = new mapboxgl.Map({
       container: mapContainer.current,
       style: "mapbox://styles/mapbox/streets-v12",
       center: [103.8198, 1.3521],
       zoom: 11,
     })
-
     map.current.on("load", () => {
       setMapLoaded(true)
+      // Add cluster circle source and layer
+      map.current!.addSource("cluster-circles", {
+        type: "geojson",
+        data: {
+          type: "FeatureCollection",
+          features: [],
+        },
+      })
+
+      // Add circle layer for cluster boundaries
+      map.current!.addLayer({
+        id: "cluster-circles-layer",
+        type: "fill",
+        source: "cluster-circles",
+        paint: {
+          "fill-color": "#8B5CF6", // Purple color matching cluster markers
+          "fill-opacity": 0.2,
+          "fill-outline-color": "#8B5CF6",
+        },
+      })
+
+      // Add circle outline layer
+      map.current!.addLayer({
+        id: "cluster-circles-outline",
+        type: "line",
+        source: "cluster-circles",
+        paint: {
+          "line-color": "#8B5CF6",
+          "line-width": 2,
+          "line-opacity": 0.8,
+        },
+      })
+
       renderMarkers()
     })
-
     map.current.on("error", (e) => {
       console.error("Map error:", e)
       setMapError((e as any).message || "Failed to load map")
     })
-
     return () => map.current?.remove()
   }, [])
 
   // --- Re-render markers when data changes ---
   useEffect(() => {
     if (mapLoaded) renderMarkers()
-  }, [seniors, volunteers, clusters, mapLoaded])
+  }, [seniors, volunteers, clusters, mapLoaded, highlightedCluster])
+
+  // --- Helper function to create circle polygon ---
+  const createCirclePolygon = (center, radiusKm, points = 64) => {
+    const coords = []
+    const distanceX = radiusKm / (111.32 * Math.cos((center[1] * Math.PI) / 180))
+    const distanceY = radiusKm / 110.54
+
+    for (let i = 0; i < points; i++) {
+      const theta = (i / points) * (2 * Math.PI)
+      const x = distanceX * Math.cos(theta)
+      const y = distanceY * Math.sin(theta)
+      coords.push([center[0] + x, center[1] + y])
+    }
+    coords.push(coords[0]) // Close the polygon
+    return coords
+  }
+
+  // --- Update cluster circles ---
+  const updateClusterCircles = () => {
+    if (!map.current || !mapLoaded) return
+
+    const features = clusters.map((cluster) => ({
+      type: "Feature",
+      geometry: {
+        type: "Polygon",
+        coordinates: [
+          createCirclePolygon(
+            [cluster.center.lng, cluster.center.lat],
+            cluster.radius || 0.5, // Use the radius from backend, fallback to 0.5km
+          ),
+        ],
+      },
+      properties: {
+        clusterId: cluster.id,
+        seniorCount: cluster.seniors.length,
+        radius: cluster.radius,
+      },
+    }))
+
+    const source = map.current.getSource("cluster-circles")
+    if (source) {
+      source.setData({
+        type: "FeatureCollection",
+        features: features,
+      })
+    }
+  }
 
   // --- Render all markers ---
   const renderMarkers = () => {
     if (!map.current) return
-
     markersRef.current.forEach((m) => m.remove())
     markersRef.current = []
+
+    // Update cluster circles first
+    updateClusterCircles()
 
     // Cluster markers
     clusters.forEach((cluster, idx) => {
       const el = document.createElement("div")
       el.className =
-        "w-10 h-10 bg-purple-500 rounded-full flex items-center justify-center text-white font-bold shadow-lg cursor-pointer"
+        "w-10 h-10 bg-purple-500 rounded-full flex items-center justify-center text-white font-bold shadow-lg cursor-pointer relative z-10"
       el.innerText = cluster.seniors.length.toString()
 
-      const marker = new mapboxgl.Marker(el)
-        .setLngLat([cluster.center.lng, cluster.center.lat])
-        .addTo(map.current!)
+      // Add hover effect to highlight corresponding circle
+      el.addEventListener("mouseenter", () => {
+        map.current?.setPaintProperty("cluster-circles-layer", "fill-opacity", [
+          "case",
+          ["==", ["get", "clusterId"], cluster.id],
+          0.4, // Highlighted opacity
+          0.2, // Default opacity
+        ])
+        map.current?.setPaintProperty("cluster-circles-outline", "line-width", [
+          "case",
+          ["==", ["get", "clusterId"], cluster.id],
+          3, // Highlighted width
+          2, // Default width
+        ])
+      })
 
-      el.addEventListener("click", () =>
-        map.current?.flyTo({ center: [cluster.center.lng, cluster.center.lat], zoom: 14 })
-      )
+      el.addEventListener("mouseleave", () => {
+        map.current?.setPaintProperty("cluster-circles-layer", "fill-opacity", 0.2)
+        map.current?.setPaintProperty("cluster-circles-outline", "line-width", 2)
+      })
+
+      const marker = new mapboxgl.Marker(el).setLngLat([cluster.center.lng, cluster.center.lat]).addTo(map.current!)
+
+      el.addEventListener("click", () => {
+        setHighlightedCluster(idx)
+
+        if (popupRef.current) {
+          popupRef.current.remove()
+          popupRef.current = null
+        }
+
+        // Fit map to cluster bounds
+        const bounds = new mapboxgl.LngLatBounds()
+        cluster.seniors.forEach((senior) => {
+          if (senior.coords) {
+            bounds.extend([senior.coords.lng, senior.coords.lat])
+          }
+        })
+        map.current?.fitBounds(bounds, { padding: 50 })
+      })
 
       markersRef.current.push(marker)
     })
+
+    const seniorMarkerElements = new Map()
 
     // Senior markers
     seniors.forEach((s) => {
       if (!s.coords) return
       const assessment = assessments.find((a) => a.uid === s.uid)
-      const colorClass = priorityColors[assessment?.priority || "LOW"]
+      const isInHighlightedCluster =
+        highlightedCluster !== null &&
+        clusters[highlightedCluster]?.seniors.some((clusterSenior) => clusterSenior.uid === s.uid)
+      const colorClass = isInHighlightedCluster ? "bg-purple-500" : priorityColors[assessment?.priority || "LOW"]
+      const sizeClass = isInHighlightedCluster ? "w-8 h-8" : "w-6 h-6"
+      const borderClass = isInHighlightedCluster ? "border-4 border-purple-300" : "border-2 border-white"
 
       const el = document.createElement("div")
-      el.className =
-        `w-6 h-6 ${colorClass} rounded-full border-2 border-white shadow-md cursor-pointer flex items-center justify-center text-xs`
+      el.className = `${sizeClass} ${colorClass} rounded-full ${borderClass} shadow-md cursor-pointer flex items-center justify-center text-xs relative z-20`
       el.innerText = "👤"
+      el.style.transition = "all 0.2s ease-in-out"
 
-      const marker = new mapboxgl.Marker(el)
-        .setLngLat([s.coords.lng, s.coords.lat])
-        .addTo(map.current!)
+      // Store reference to this element for highlighting
+      seniorMarkerElements.set(s.uid, el)
 
-      el.addEventListener("click", () => showSeniorPopup(s, assessment))
+      const marker = new mapboxgl.Marker(el).setLngLat([s.coords.lng, s.coords.lat]).addTo(map.current!)
+      el.addEventListener("click", (e) => {
+        e.stopPropagation()
+        setHighlightedCluster(null)
+        showSeniorPopup(s, assessment)
+      })
       markersRef.current.push(marker)
     })
 
     // Volunteer markers
     volunteers.forEach((v) => {
       if (!v.coords) return
-
       const el = document.createElement("div")
       el.className =
-        "w-6 h-6 bg-blue-500 rounded-full border-2 border-white shadow-md flex items-center justify-center text-xs"
+        "w-6 h-6 bg-blue-500 rounded-full border-2 border-white shadow-md flex items-center justify-center text-xs relative z-20"
       el.innerText = "🙋"
-
-      const marker = new mapboxgl.Marker(el)
-        .setLngLat([v.coords.lng, v.coords.lat])
-        .addTo(map.current!)
-
-      el.addEventListener("click", () => showVolunteerPopup(v))
+      const marker = new mapboxgl.Marker(el).setLngLat([v.coords.lng, v.coords.lat]).addTo(map.current!)
+      el.addEventListener("click", (e) => {
+        e.stopPropagation()
+        setHighlightedCluster(null)
+        showVolunteerPopup(v)
+      })
       markersRef.current.push(marker)
     })
   }
@@ -205,11 +448,20 @@ export function InteractiveMap() {
   // --- Popups ---
   const showSeniorPopup = (s: Senior, assessment?: { priority: "HIGH" | "MEDIUM" | "LOW" }) => {
     if (!map.current) return
-    popupRef.current?.remove()
+
+    if (popupRef.current) {
+      popupRef.current.remove()
+      popupRef.current = null
+    }
+
     const lastVisit = s.last_visit ? new Date(s.last_visit).toLocaleDateString() : "N/A"
     const priority = assessment?.priority || "LOW"
 
-    popupRef.current = new mapboxgl.Popup({ closeOnClick: true })
+    popupRef.current = new mapboxgl.Popup({
+      closeOnClick: false, // Disable auto-close to prevent conflicts
+      closeButton: true, // Show close button instead
+      focusAfterOpen: false, // Prevent focus issues
+    })
       .setLngLat([s.coords.lng, s.coords.lat])
       .setHTML(`
         <div class="p-3 min-w-[200px]">
@@ -224,17 +476,28 @@ export function InteractiveMap() {
         </div>
       `)
       .addTo(map.current)
+
+    popupRef.current.on("close", () => {
+      popupRef.current = null
+    })
   }
 
   const showVolunteerPopup = (v: Volunteer) => {
     if (!map.current) return
-    popupRef.current?.remove()
+
+    if (popupRef.current) {
+      popupRef.current.remove()
+      popupRef.current = null
+    }
 
     const assignment = assignments.find((a) => a.volunteer === v.vid)
-    const available =
-      typeof v.available === "boolean" ? v.available : v.available.length > 0
+    const available = typeof v.available === "boolean" ? v.available : v.available.length > 0
 
-    popupRef.current = new mapboxgl.Popup({ closeOnClick: true })
+    popupRef.current = new mapboxgl.Popup({
+      closeOnClick: false, // Disable auto-close to prevent conflicts
+      closeButton: true, // Show close button instead
+      focusAfterOpen: false, // Prevent focus issues
+    })
       .setLngLat([v.coords.lng, v.coords.lat])
       .setHTML(`
         <div class="p-3 min-w-[200px]">
@@ -245,6 +508,10 @@ export function InteractiveMap() {
         </div>
       `)
       .addTo(map.current)
+
+    popupRef.current.on("close", () => {
+      popupRef.current = null
+    })
   }
 
   return (
@@ -265,7 +532,7 @@ export function InteractiveMap() {
       <div ref={mapContainer} className="w-full h-full rounded-lg" />
 
       {/* Legend */}
-      <div className="absolute bottom-4 left-4 bg-white p-3 rounded-lg shadow-lg z-10">
+      <div className="absolute bottom-4 left-4 bg-white p-3 rounded-lg shadow-lg z-50">
         <h4 className="text-xs font-medium mb-2">Legend</h4>
         <div className="space-y-1">
           <LegendItem color="bg-red-500" label="High Priority Senior" />
@@ -274,6 +541,12 @@ export function InteractiveMap() {
           <LegendItem color="bg-blue-500" label="Volunteer" />
           <LegendItem color="bg-purple-500" label="Cluster" />
         </div>
+        {highlightedCluster !== null && (
+          <div className="mt-2 pt-2 border-t border-gray-200">
+            <div className="text-xs text-purple-600 font-medium">Cluster {highlightedCluster + 1} highlighted</div>
+            <div className="text-xs text-gray-500">Click elsewhere to clear</div>
+          </div>
+        )}
       </div>
     </div>
   )

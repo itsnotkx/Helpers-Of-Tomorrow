@@ -17,8 +17,6 @@ app = FastAPI(title="AIC Senior Care MVP")
 load_dotenv('.env.local')
 url = os.getenv("SUPABASE_URL")
 key = os.getenv("SUPABASE_KEY")
-print(url)
-print(key)
 supabase = create_client(url, key)
 
 
@@ -107,66 +105,90 @@ def classify_seniors():
 def allocate_volunteers(data: dict):
     volunteers = data.get("volunteers", [])
     seniors = data.get("seniors", [])
-
     if len(seniors) == 0:
         return {"assignments": [], "clusters": [], "cluster_density": {}, "seniors": []}
-
+    
     # Step 1: K-means clustering of seniors (~5 per cluster)
     n_clusters = max(1, len(seniors)//5)
     n_clusters = min(n_clusters, len(seniors))  # ensure <= num seniors
-
     labels, centroids = kmeans_clusters([s['coords'] for s in seniors], n_clusters)
-
+    
     # Step 2: Assign seniors to clusters
     clusters = {i: [] for i in range(n_clusters)}
     for idx, senior in enumerate(seniors):
         cluster_id = int(labels[idx])
         clusters[cluster_id].append(senior)
         senior['cluster'] = cluster_id
-
-    # Step 3: Calculate cluster density
-    cluster_density_map = {int(i): float(cluster_density(cluster)) for i, cluster in clusters.items()}
-
+    
+    # Step 3: Calculate cluster density and radius
+    cluster_density_map = {}
+    cluster_radius_map = {}
+    
+    for cluster_id, cluster_seniors in clusters.items():
+        # Calculate density
+        density = cluster_density(cluster_seniors)
+        cluster_density_map[int(cluster_id)] = float(density)
+        
+        # Calculate radius - distance from centroid to farthest senior
+        if cluster_seniors:
+            centroid_coords = {'lat': float(centroids[cluster_id][0]), 'lng': float(centroids[cluster_id][1])}
+            max_distance = 0
+            
+            for senior in cluster_seniors:
+                dist = distance(senior['coords'], centroid_coords)
+                max_distance = max(max_distance, dist)
+            
+            # Add a small buffer (10% extra) to ensure all seniors are visually within the circle
+            radius = max_distance * 1.1
+            # Set minimum radius for visual clarity (e.g., 200 meters)
+            radius = max(radius, 0.2)  # 0.2 km = 200 meters
+        else:
+            radius = 0.2  # default minimum radius
+            
+        cluster_radius_map[int(cluster_id)] = float(radius)
+    
     # Step 4: Assign volunteers to clusters
     assignments = []
     for vol in volunteers:
         vol_coords = vol.get('coords')
         if not vol_coords:
             continue
-
         best_cluster = None
         min_weighted_dist = float('inf')
-
+        
         for cluster_id, cluster_seniors in clusters.items():
             centroid = {'lat': float(centroids[cluster_id][0]), 'lng': float(centroids[cluster_id][1])}
             weighted_dist = distance(vol_coords, centroid) / cluster_density_map[cluster_id]
-
+            
             if vol.get('prefers_outside', False):
                 weighted_dist *= 0.8  # preference adjustment
-
+                
             if weighted_dist < min_weighted_dist:
                 min_weighted_dist = weighted_dist
                 best_cluster = cluster_id
-
+        
         assignments.append({
             "volunteer": vol['vid'],
             "cluster": best_cluster,
             "weighted_distance": round(min_weighted_dist, 4)
         })
-
+    
     # Step 5: Format clusters for frontend
     clusters_output = []
     for cluster_id, cluster_seniors in clusters.items():
         clusters_output.append({
             "id": cluster_id,
             "center": {"lat": float(centroids[cluster_id][0]), "lng": float(centroids[cluster_id][1])},
-            "seniors": cluster_seniors
+            "radius": cluster_radius_map[cluster_id],  # Add radius to output
+            "seniors": cluster_seniors,
+            "senior_count": len(cluster_seniors)
         })
-
+    
     return {
         "assignments": assignments,
         "clusters": clusters_output,
-        "cluster_density": cluster_density_map
+        "cluster_density": cluster_density_map,
+        "cluster_radius": cluster_radius_map  # Include radius map in response
     }
 
 
