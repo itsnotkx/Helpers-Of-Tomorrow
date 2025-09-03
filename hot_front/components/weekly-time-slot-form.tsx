@@ -128,26 +128,98 @@ const convertTo24Hour = (time: string, period: string) => {
 }
 
 // Convert frontend slot format to API format
-const convertSlotToApiFormat = (slot: TimeSlot, date: Date) => {
+// Convert frontend slot format to API format
+const convertSlotToApiFormat = (slot: TimeSlot, date: Date) => { 
+  console.log(slot)
   const startHour24 = convertTo24Hour(slot.startTime, slot.startPeriod)
   const endHour24 = convertTo24Hour(slot.endTime, slot.endPeriod)
-
-  // Create datetime objects
+  console.log(startHour24, endHour24)
+  
+  // Create datetime objects in local timezone
   const startDateTime = new Date(date)
   startDateTime.setHours(startHour24, 0, 0, 0)
-
+  
   const endDateTime = new Date(date)
   endDateTime.setHours(endHour24, 0, 0, 0)
 
-  return {
-    start_time: startDateTime.toISOString(),
-    end_time: endDateTime.toISOString(),
+  console.log(startDateTime, endDateTime)
+  
+  // Format as ISO string but maintain local timezone
+  const formatLocalISO = (dateTime: Date) => {
+    const year = dateTime.getFullYear()
+    const month = String(dateTime.getMonth() + 1).padStart(2, '0')
+    const day = String(dateTime.getDate()).padStart(2, '0')
+    const hours = String(dateTime.getHours()).padStart(2, '0')
+    const minutes = String(dateTime.getMinutes()).padStart(2, '0')
+    const seconds = String(dateTime.getSeconds()).padStart(2, '0')
+    
+    return `${year}-${month}-${day}T${hours}:${minutes}:${seconds}`
   }
+  
+  const startTimeISO = formatLocalISO(startDateTime)
+  const endTimeISO = formatLocalISO(endDateTime)
+  
+  
+  return {
+    start_time: startTimeISO,
+    end_time: endTimeISO,
+  }
+}
+
+const convertBackendToFrontendFormat = (backendSlots: any[], weekDates: Date[]) => {
+  const schedule: WeeklySchedule = {}
+  
+  // Initialize empty schedule
+  DAYS_OF_WEEK.forEach((day) => {
+    schedule[day] = []
+  })
+  
+  backendSlots.forEach((slot) => {
+    // console.log(slot)
+    // Parse the date from the slot
+    const slotDate = new Date(slot.date)
+    
+    // Parse start and end times - they come as ISO strings
+    const startTime = new Date(slot.start_time)
+    const endTime = new Date(slot.end_time)
+    
+    // Find which day of the week this slot belongs to
+    const dayIndex = weekDates.findIndex(date => 
+      date.toDateString() === slotDate.toDateString()
+    )
+    
+    if (dayIndex !== -1) {
+      const dayName = DAYS_OF_WEEK[dayIndex]
+      
+      // Helper function to format time for frontend
+      const formatTimeFor12Hour = (date: Date) => {
+        const hours = date.getHours()
+        const displayHour = hours === 0 ? 12 : hours > 12 ? hours - 12 : hours === 12 ? 12 : hours
+        return `${displayHour.toString().padStart(2, '0')}:00`
+      }
+      
+      const getTimePeriod = (date: Date) => {
+        return date.getHours() < 12 ? "AM" : "PM"
+      }
+      
+      const timeSlot: TimeSlot = {
+        id: `${dayName}-${Date.now()}-${Math.random()}`,
+        startTime: formatTimeFor12Hour(startTime),
+        startPeriod: getTimePeriod(startTime),
+        endTime: formatTimeFor12Hour(endTime),
+        endPeriod: getTimePeriod(endTime),
+      }
+      
+      schedule[dayName].push(timeSlot)
+    }
+  })
+  
+  return schedule
 }
 
 export function WeeklyTimeSlotForm() {
   const { isLoaded, isSignedIn, user } = useUser();
-  
+  // const 
   const [schedule, setSchedule] = useState<WeeklySchedule>(() => {
     const initialSchedule: WeeklySchedule = {}
     DAYS_OF_WEEK.forEach((day) => {
@@ -159,6 +231,7 @@ export function WeeklyTimeSlotForm() {
   const [weekDates, setWeekDates] = useState<Date[]>([])
   const [isClient, setIsClient] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [isLoading, setIsLoading] = useState(true) // Add loading state
   const [submitStatus, setSubmitStatus] = useState<{ type: "success" | "error" | null; message: string }>({
     type: null,
     message: "",
@@ -173,8 +246,35 @@ export function WeeklyTimeSlotForm() {
     return initialOpen
   })
 
-
-
+const loadSavedSlots = async () => {
+    if (!user?.primaryEmailAddress?.emailAddress) return
+    
+    try {
+      const BASE_URL = "http://localhost:8000"
+      const response = await fetch(`${BASE_URL}/get_slots/${user.primaryEmailAddress.emailAddress}`)
+      const result = await response.json()
+      
+      if (response.ok && result.slots && result.slots.length > 0) {
+        const currentWeekDates = getCurrentWeekDates()
+        const populatedSchedule = convertBackendToFrontendFormat(result.slots, currentWeekDates)
+        setSchedule(populatedSchedule)
+        setWeekDates(currentWeekDates)
+      } else {
+        setWeekDates(getCurrentWeekDates())
+      }
+    } catch (error) {
+      console.error("Error loading saved slots:", error)
+      setWeekDates(getCurrentWeekDates())
+    } finally {
+      setIsLoading(false)
+    }
+  }
+   useEffect(() => {
+    setIsClient(true)
+    if (isLoaded && isSignedIn && user) {
+      loadSavedSlots()
+    }
+  }, [isLoaded, isSignedIn, user])
   useEffect(() => {
     setWeekDates(getCurrentWeekDates())
     setIsClient(true)
@@ -258,6 +358,7 @@ export function WeeklyTimeSlotForm() {
 
         daySlots.forEach((slot) => {
           if (isSlotValid(slot)) {
+            // console.log(slot)
             const apiSlot = convertSlotToApiFormat(slot, dayDate)
             apiSlots.push(apiSlot)
           }
