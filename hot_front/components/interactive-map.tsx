@@ -77,6 +77,15 @@ export function InteractiveMap() {
   const [schedules, setSchedules] = useState<Schedule[]>([])
   const [clusters, setClusters] = useState<Cluster[]>([])
 
+  const wellbeingLabels: Record<number, string> = {
+    1: "Very Poor",
+    2: "Poor",
+    3: "Normal",
+    4: "Good",
+    5: "Very Good",
+    }
+
+
   // --- Fetch all data from backend ---
   useEffect(() => {
     async function loadData() {
@@ -363,10 +372,10 @@ export function InteractiveMap() {
         <div class="p-3 min-w-[200px]">
           <h3 class="font-semibold text-sm mb-1">${s.name || s.uid}</h3>
           <div class="space-y-1 mb-2">
-            <div>🏥 Physical: ${5 - s.physical}/5</div>
-            <div>🧠 Mental: ${5 - s.mental}/5</div>
-            <div>👥 Community: ${5 - s.community}/5</div>
-            <div>📅 Last Visit: ${lastVisit}</div>
+          <div>🏥 Physical: ${wellbeingLabels[6 - s.physical] || "Unknown"}</div>
+          <div>🧠 Mental: ${wellbeingLabels[6 - s.mental] || "Unknown"}</div>
+          <div>👥 Community: ${wellbeingLabels[6- s.community] || "Unknown"}</div>
+          <div>📅 Last Visit: ${lastVisit}</div>
           </div>
           <div class="px-2 py-1 bg-gray-100 rounded text-xs">${priority} priority</div>
         </div>

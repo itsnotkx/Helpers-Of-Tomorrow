@@ -67,6 +67,13 @@ export default function VolunteerDashboard() {
   const [isScheduleCollapsed, setIsScheduleCollapsed] = useState(false)
   const [isAssignmentsCollapsed, setIsAssignmentsCollapsed] = useState(false)
   const [showHighRiskModal, setShowHighRiskModal] = useState(false)
+  const wellbeingLabels: Record<number, string> = {
+    1: "Very Poor",
+    2: "Poor",
+    3: "Normal",
+    4: "Good",
+    5: "Very Good",
+  }
 
   const loadDashboardData = async () => {
     try {
@@ -201,19 +208,19 @@ export default function VolunteerDashboard() {
                           <div>
                             <p className="text-sm font-medium">Physical Health</p>
                             <p className="text-sm text-muted-foreground">
-                              {senior.physical ? `${5 - senior.physical}/5` : "Not assessed"}
+                              {senior.physical ? `${wellbeingLabels[6 - senior.physical]}` : "Not assessed"}
                             </p>
                           </div>
                           <div>
                             <p className="text-sm font-medium">Mental Health</p>
                             <p className="text-sm text-muted-foreground">
-                              {senior.mental ? `${5 - senior.mental}/5` : "Not assessed"}
+                              {senior.mental ? `${wellbeingLabels[6 - senior.mental]}` : "Not assessed"}
                             </p>
                           </div>
                           <div>
                             <p className="text-sm font-medium">Community Support</p>
                             <p className="text-sm text-muted-foreground">
-                              {senior.community ? `${5 - senior.community}/5` : "Not assessed"}
+                              {senior.community ? `${wellbeingLabels[6 - senior.community]}` : "Not assessed"}
                             </p>
                           </div>
                           <div>
