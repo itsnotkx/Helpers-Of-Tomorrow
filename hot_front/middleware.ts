@@ -1,32 +1,27 @@
-import { clerkMiddleware, createRouteMatcher } from "@clerk/nextjs/server"
-import { NextResponse } from "next/server"
+import { clerkMiddleware, createRouteMatcher } from "@clerk/nextjs/server";
+import { NextResponse } from "next/server";
 
-const isProtectedRoute = createRouteMatcher(["/", "/dashboard(.*)"])
+const isProtectedRoute = createRouteMatcher(["/", "/dashboard(.*)"]);
 
-export default clerkMiddleware(async (auth, req) => {
+export default clerkMiddleware(async(auth, req) => {
   if (isProtectedRoute(req)) {
-   try {
-      const user = await auth.protect();
-      const role = user.publicMetadata.role;
+    const { userId, orgId, orgRole } = await auth();
 
-      if (!role) {
-        // User has no role set → not part of the org
-        return NextResponse.redirect(new URL("/not-member", req.url));
-      }
-      
-      // Role check
-      if (user.publicMetadata.role === "org:member") {
-        console.log("Redirecting org:member to /volunteer");
-        return NextResponse.redirect(new URL("/volunteer", req.url));
-      }
+    if (!userId) {
+      return NextResponse.redirect(new URL("/not-member", req.url));
+    }
 
-    } catch (err) {
-      // If not authenticated, redirect to /volunteer
+    if (!orgId) {
+      return NextResponse.redirect(new URL("/not-member", req.url));
+    }
+
+    if (orgRole === "org:member") {
       return NextResponse.redirect(new URL("/volunteer", req.url));
     }
   }
-  return NextResponse.next()
-})
+
+  return NextResponse.next();
+});
 
 export const config = {
   matcher: [
