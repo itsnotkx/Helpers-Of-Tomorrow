@@ -6,7 +6,20 @@ const isProtectedRoute = createRouteMatcher(["/", "/dashboard(.*)"])
 export default clerkMiddleware(async (auth, req) => {
   if (isProtectedRoute(req)) {
    try {
-      await auth.protect();
+      const user = await auth.protect();
+      const role = user.publicMetadata.role;
+
+      if (!role) {
+        // User has no role set → not part of the org
+        return NextResponse.redirect(new URL("/not-member", req.url));
+      }
+      
+      // Role check
+      if (user.publicMetadata.role === "org:member") {
+        console.log("Redirecting org:member to /volunteer");
+        return NextResponse.redirect(new URL("/volunteer", req.url));
+      }
+
     } catch (err) {
       // If not authenticated, redirect to /volunteer
       return NextResponse.redirect(new URL("/volunteer", req.url));
