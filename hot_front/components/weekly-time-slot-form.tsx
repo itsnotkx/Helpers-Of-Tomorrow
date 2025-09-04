@@ -405,10 +405,11 @@ const loadSavedSlots = async () => {
   return (
     <>
       <form onSubmit={handleSubmit} className="space-y-6">
-        <div className="flex justify-center mb-6">
+
+        {/* <div className="flex justify-center mb-6">
           <img src="/hotlogo.png" alt="Helpers of Tomorrow Logo" width={128} height={128} />
-        </div>
-        <h1 className="text-3xl font-bold text-center mb-8">Weekly Schedule</h1>
+        </div> */}
+        <h3 className="text-3xl font-bold text-center mb-8 mt-6">Weekly Schedule</h3>
         <div className="text-center space-y-4">
           <h1 className="text-2xl font-bold">Time Slots</h1>
           <p className="text-muted-foreground">
