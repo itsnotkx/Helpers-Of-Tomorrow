@@ -299,28 +299,25 @@ export function InteractiveMap() {
 
     // Senior markers
     seniors.forEach((s) => {
-      console.log(s.overall_wellbeing)
+      // console.log(s.overall_wellbeing)
       if (!s.coords) return
       const levels = {
         1: "HIGH",
         2: "MEDIUM",
         3: "LOW"
       };
-
       const assessment = levels[s.overall_wellbeing] || "LOW";
       const isInHighlightedCluster =
         highlightedCluster !== null &&
         clusters[highlightedCluster]?.seniors.some((clusterSenior) => clusterSenior.uid === s.uid)
       const colorClass = priorityColors[assessment || "LOW"]
-      console.log(colorClass)
       const sizeClass = isInHighlightedCluster ? "w-8 h-8" : "w-6 h-6"
       const borderClass = isInHighlightedCluster ? "border-4 border-purple-500" : "border-2 border-white"
 
       const el = document.createElement("div")
-      el.className = `${sizeClass} ${colorClass} rounded-full ${borderClass} shadow-md cursor-pointer flex items-center justify-center text-xs relative z-20`
+      el.className =               
+      `${sizeClass} ${colorClass} rounded-full ${borderClass} shadow-md cursor-pointer flex items-center justify-center text-xs relative z-20`
       el.innerText = "👤"
-      el.style.transition = "all 0.2s ease-in-out"
-
       // Store reference to this element for highlighting
       seniorMarkerElements.set(s.uid, el)
 

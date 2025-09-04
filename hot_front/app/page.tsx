@@ -310,11 +310,12 @@ export default function VolunteerDashboard() {
           {!isAssignmentsCollapsed && (
             <CardContent>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {assignments.map((a, i) => (
+                 {assignments.map((a, i) => 
+                 (
                   <div key={i} className="p-4 border rounded-lg">
                     <div className="flex justify-between mb-2">
                       <h4 className="font-medium">{a.volunteer}</h4>
-                      <Badge variant="secondary">{a.cluster}</Badge>
+                      <Badge variant="secondary" className="h-6">{a.cluster}</Badge>
                     </div>
                     <p className="text-sm text-muted-foreground">Distance: {a.weighted_distance} km</p>
                   </div>
