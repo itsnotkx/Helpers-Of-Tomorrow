@@ -17,7 +17,7 @@ export default function Scheduler() {
       <DashboardHeader
         title="Your Volunteer Schedule"
         subtitle={`Managing care for Singapore`}
-        selectedDistrict="Singapore"
+        selectedDistrict="Yishun"
         needButton={true}
         textToInput="Indicate Your Availability"
         onRefresh={push}

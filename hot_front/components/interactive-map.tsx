@@ -131,7 +131,7 @@ export function InteractiveMap() {
     ];
     map.current = new mapboxgl.Map({
       container: mapContainer.current,
-      style: "mapbox://styles/mapbox/streets-v12",
+      style: "mapbox://styles/wzinl/cmf5f4has01rh01pj8ajb1993",
       center: [103.8198, 1.3521],
       zoom: 11,
 

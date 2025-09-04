@@ -13,10 +13,11 @@ export default function Home() {
   }
 
   return (
-    <main className="container mx-auto py-8 px-4">
+    <main className="container mx-auto pb-8 px-4">
+
       <div className="max-w-4xl mx-auto">
-        <DashboardHeader
-          title="Volunteer Availability Submission"
+        <DashboardHeader  
+          title="Volunteer Availability"
           subtitle={`Managing care for Singapore`}
           selectedDistrict="Singapore"
           needButton={true}
