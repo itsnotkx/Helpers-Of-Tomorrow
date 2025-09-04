@@ -2,6 +2,7 @@ import { clerkMiddleware, createRouteMatcher } from "@clerk/nextjs/server";
 import { NextResponse } from "next/server";
 
 const isProtectedRoute = createRouteMatcher(["/", "/dashboard(.*)"]);
+const memberRoute = createRouteMatcher(["/volunteer(.*)"]);
 
 export default clerkMiddleware(async(auth, req) => {
   if (isProtectedRoute(req)) {
@@ -19,6 +20,22 @@ export default clerkMiddleware(async(auth, req) => {
       return NextResponse.redirect(new URL("/volunteer", req.url));
     }
   }
+
+    if (memberRoute(req)) {
+      const { userId, orgId, orgRole } = await auth();
+
+      if (!userId) {
+      return NextResponse.redirect(new URL("/not-member", req.url));
+      }
+
+      if (!orgId) {
+        return NextResponse.redirect(new URL("/not-member", req.url));
+      }
+
+      if (orgRole === "org:admin") {
+        return NextResponse.redirect(new URL("/", req.url));
+      }
+    }
 
   return NextResponse.next();
 });
