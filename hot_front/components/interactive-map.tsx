@@ -302,9 +302,9 @@ export function InteractiveMap() {
       console.log(s.overall_wellbeing)
       if (!s.coords) return
       const levels = {
-        1: "LOW",
+        1: "HIGH",
         2: "MEDIUM",
-        3: "HIGH"
+        3: "LOW"
       };
 
       const assessment = levels[s.overall_wellbeing] || "LOW";
