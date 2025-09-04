@@ -260,7 +260,8 @@ export function ScheduleInterface({
             <CardContent>
               <div className="grid grid-cols-7 gap-2">
                 {weekDays.map((day, index) => {
-                  const daySchedules = weekSchedules[day.toDateString()] || [];
+                  const dayKey = day.toISOString().split("T")[0];
+                  const daySchedules = weekSchedules[dayKey] || [];
                   const isToday =
                     day.toDateString() === new Date().toDateString();
 
@@ -297,8 +298,10 @@ export function ScheduleInterface({
                                 key={idx}
                                 className="text-xs p-1 bg-muted rounded text-center"
                               >
-                                {schedule.start_time}{" "}
-                                {/* Use start_time directly instead of parsing datetime */}
+                                <div>{schedule.start_time}</div>
+                                <div className="text-muted-foreground">
+                                  {getSeniorName(schedule.senior)}
+                                </div>
                               </div>
                             ))}
                             {daySchedules.length > 3 && (

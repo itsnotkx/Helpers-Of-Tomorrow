@@ -82,6 +82,17 @@ def cluster_density(cluster_seniors):
 def is_available(vol, slot):
     return slot in vol.get('available', [])
 
+# Add helper functions for name lookup
+def get_volunteer_name(vid, volunteers):
+    """Get volunteer name from ID"""
+    volunteer = next((v for v in volunteers if v['vid'] == vid), None)
+    return volunteer['name'] if volunteer else vid
+
+def get_senior_name(uid, seniors):
+    """Get senior name from UID"""
+    senior = next((s for s in seniors if s['uid'] == uid), None)
+    return senior['name'] if senior else uid
+
 # -------------------------------
 # Core Endpoints
 # -------------------------------
@@ -598,7 +609,11 @@ def create_schedule(data: dict):
                 }
                 
                 schedules.append(schedule_entry)
-                logger.info(f"Scheduled visit: Volunteer {vol_id} -> Senior {senior['uid']}")
+                
+                # Enhanced logging with names
+                volunteer_name = get_volunteer_name(vol_id, volunteers)
+                senior_name = get_senior_name(senior['uid'], seniors)
+                logger.info(f"Sample schedule entry: {json.dumps(schedule_entry, indent=2)} - Volunteer: {volunteer_name}, Senior: {senior_name}")
                 
                 used_slots[slot_key] = True
                 scheduled_seniors.add(senior['uid'])
@@ -612,8 +627,17 @@ def create_schedule(data: dict):
     
     logger.info(f"Schedule generation complete. Stats: {stats}")
     if schedules:
-        logger.info(f"Sample schedule entry: {json.dumps(schedules[0], indent=2)}")
-        logger.info(f"Sample schedule entry: {json.dumps(schedules[1], indent=2)}")
+        # Enhanced sample logging with names
+        sample_entry = schedules[0]
+        volunteer_name = get_volunteer_name(sample_entry['volunteer'], volunteers)
+        senior_name = get_senior_name(sample_entry['senior'], seniors)
+        logger.info(f"Sample schedule entry: {json.dumps(sample_entry, indent=2)} - Volunteer: {volunteer_name}, Senior: {senior_name}")
+        
+        if len(schedules) > 1:
+            sample_entry2 = schedules[1]
+            volunteer_name2 = get_volunteer_name(sample_entry2['volunteer'], volunteers)
+            senior_name2 = get_senior_name(sample_entry2['senior'], seniors)
+            logger.info(f"Sample schedule entry: {json.dumps(sample_entry2, indent=2)} - Volunteer: {volunteer_name2}, Senior: {senior_name2}")
     else:
         logger.warning("No schedules created")
     
