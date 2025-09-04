@@ -314,7 +314,7 @@ export default function VolunteerDashboard() {
                  (
                   <div key={i} className="p-4 border rounded-lg">
                     <div className="flex justify-between mb-2">
-                      <h4 className="font-medium">{a.volunteer}</h4>
+                       {volunteers.find(v => v.vid === a.volunteer)?.name || "Unknown"}
                       <Badge variant="secondary" className="h-6">{a.cluster}</Badge>
                     </div>
                     <p className="text-sm text-muted-foreground">Distance: {a.weighted_distance} km</p>
