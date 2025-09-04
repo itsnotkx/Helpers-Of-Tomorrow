@@ -411,7 +411,6 @@ const loadSavedSlots = async () => {
         </div> */}
         <h3 className="text-3xl font-bold text-center mb-8 mt-6">Weekly Schedule</h3>
         <div className="text-center space-y-4">
-          <h1 className="text-2xl font-bold">Time Slots</h1>
           <p className="text-muted-foreground">
             From {weekDates[0]?.toLocaleDateString() || ""} to {weekDates[6]?.toLocaleDateString() || ""}
           </p>
@@ -457,8 +456,8 @@ const loadSavedSlots = async () => {
                   <CardContent className="pt-0">
                     <div className="space-y-4">
                       {schedule[day].map((slot) => (
-                        <div key={slot.id} className="flex items-center gap-3 p-3 border bg-muted/20">
-                          <div className="flex-1 grid grid-cols-2 gap-3">
+                        <div key={slot.id} className="flex items-start gap-3 p-3 border bg-muted/20">
+                          <div className="flex-1 grid grid-cols-1 md:grid-cols-2 gap-3">
                             <div className="space-y-2">
                               <Label htmlFor={`${slot.id}-start`} className="text-sm">
                                 Start Time
@@ -548,15 +547,17 @@ const loadSavedSlots = async () => {
                                 )}
                             </div>
                           </div>
-                          <Button
-                            type="button"
-                            variant="outline"
-                            size="icon"
-                            onClick={() => removeTimeSlot(day, slot.id)}
-                            className="shrink-0 text-destructive hover:text-destructive"
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
+                          <div className="flex items-center pt-7">
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="icon"
+                              onClick={() => removeTimeSlot(day, slot.id)}
+                              className="shrink-0 text-destructive hover:text-destructive"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
                         </div>
                       ))}
 
