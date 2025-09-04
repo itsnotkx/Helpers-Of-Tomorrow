@@ -5,10 +5,11 @@ import { useRouter } from "next/navigation"
 
 
 export default function Home() {
+
   const router = useRouter()
   
-  const refresh = () => {
-      router.refresh()
+  const push = () => {
+    router.push('/volunteer/12')
   }
 
   return (
@@ -18,9 +19,9 @@ export default function Home() {
           title="Volunteer Availability Submission"
           subtitle={`Managing care for Singapore`}
           selectedDistrict="Singapore"
-          usingMockData={false}
-          onTryConnectApi={refresh}
-          onRefresh={refresh}
+          needButton={true}
+          textToInput="See Your Schedule"
+          onRefresh={push}
         />
         <WeeklyTimeSlotForm />
       </div>

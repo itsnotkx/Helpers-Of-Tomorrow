@@ -3,8 +3,6 @@
 import { useState, useEffect } from "react"
 import React from "react"
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from "@/components/ui/card"
-import { DashboardHeader } from "@/components/dashboard-header"
-import { useRouter } from "next/navigation"
 
 
 type Schedule = {
@@ -22,25 +20,12 @@ const schedules: Schedule[] = [
 ]
 
 
-export default function VolunteerSchedule({  userId }: { userId: string }) {
-    const router = useRouter()
-
-    const refresh = () => {
-        router.refresh()
-    }
+export default function VolunteerSchedule() {
 
     return (
         <div>
-            <DashboardHeader
-                title="Your Volunteer Schedule"
-                subtitle={`Managing care for Singapore`}
-                selectedDistrict="Singapore"
-                usingMockData={false}
-                onTryConnectApi={refresh}
-                onRefresh={refresh}
-            />
-            <div className="flex justify-center mb-6">
-                <div> {userId} </div>
+            
+            <div className="flex justify-center mb-6">  
             </div>
 
             <div className="max-w-lg mx-auto space-y-4">
