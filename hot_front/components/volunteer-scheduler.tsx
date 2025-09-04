@@ -13,7 +13,6 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
-import { useRouter } from "next/navigation"
 
 
 type userSchedule = {
@@ -43,14 +42,11 @@ export default function VolunteerSchedule() {
       })
     
     const { isLoaded, isSignedIn, user } = useUser();
-    const router = useRouter()
     useEffect(() => {
         if (user?.primaryEmailAddress?.emailAddress) {
             fetchUserSchedules(user.primaryEmailAddress.emailAddress)
-        } else {
-            router.push('indicate-availability')
-        }
-    }, [])
+        } 
+    }, [isLoaded, isSignedIn, user])
 
     
     if (!isLoaded) {
@@ -105,7 +101,7 @@ export default function VolunteerSchedule() {
 
     const closeDialog = () => {
         setShowSuccessDialog(false)
-        router.push('/indicate-availability')
+        window.location.reload()
     }
 
     // Handle form submission
