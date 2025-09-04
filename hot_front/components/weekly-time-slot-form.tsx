@@ -478,18 +478,18 @@ const loadSavedSlots = async () => {
                   <CardContent className="pt-0">
                     <div className="space-y-4">
                       {schedule[day].map((slot) => (
-                        <div key={slot.id} className="flex items-start gap-3 p-3 border bg-muted/20">
+                        <div key={slot.id} className="flex items-start gap-3 p-3 border rounded-sm bg-muted/20">
                           <div className="flex-1 grid grid-cols-1 md:grid-cols-2 gap-3">
                             <div className="space-y-2">
                               <Label htmlFor={`${slot.id}-start`} className="text-sm">
                                 Start Time
                               </Label>
-                              <div className="flex gap-2">
+                              <div className="flex">
                                 <Select
                                   value={slot.startTime}
                                   onValueChange={(value) => updateTimeSlot(day, slot.id, "startTime", value)}
                                 >
-                                  <SelectTrigger className="flex-1">
+                                  <SelectTrigger className="flex-1 rounded-r-none">
                                     <SelectValue placeholder="Time" />
                                   </SelectTrigger>
                                   <SelectContent>
@@ -504,7 +504,7 @@ const loadSavedSlots = async () => {
                                   value={slot.startPeriod}
                                   onValueChange={(value) => updateTimeSlot(day, slot.id, "startPeriod", value)}
                                 >
-                                  <SelectTrigger className="w-20">
+                                  <SelectTrigger className="w-20 rounded-l-none border-l-0">
                                     <SelectValue />
                                   </SelectTrigger>
                                   <SelectContent>
@@ -524,12 +524,12 @@ const loadSavedSlots = async () => {
                             </div>
                             <div className="space-y-2">
                               <Label className="text-sm">End Time</Label>
-                              <div className="flex gap-2">
+                              <div className="flex">
                                 <Select
                                   value={slot.endTime}
                                   onValueChange={(value) => updateTimeSlot(day, slot.id, "endTime", value)}
                                 >
-                                  <SelectTrigger className="flex-1">
+                                  <SelectTrigger className="flex-1 rounded-r-none">
                                     <SelectValue placeholder="Time" />
                                   </SelectTrigger>
                                   <SelectContent>
@@ -544,7 +544,7 @@ const loadSavedSlots = async () => {
                                   value={slot.endPeriod}
                                   onValueChange={(value) => updateTimeSlot(day, slot.id, "endPeriod", value)}
                                 >
-                                  <SelectTrigger className="w-20">
+                                  <SelectTrigger className="w-20 rounded-l-none border-l-0">
                                     <SelectValue />
                                   </SelectTrigger>
                                   <SelectContent>
