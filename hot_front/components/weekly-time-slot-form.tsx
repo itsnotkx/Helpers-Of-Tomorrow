@@ -18,6 +18,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import { useUser } from "@clerk/nextjs"
+import { useRouter } from "next/navigation"
 
 
 
@@ -218,6 +219,7 @@ const convertBackendToFrontendFormat = (backendSlots: any[], weekDates: Date[]) 
 
 export function WeeklyTimeSlotForm() {
   const { isLoaded, isSignedIn, user } = useUser();
+  const router = useRouter();
   // const 
   const [schedule, setSchedule] = useState<WeeklySchedule>(() => {
     const initialSchedule: WeeklySchedule = {}
@@ -226,6 +228,23 @@ export function WeeklyTimeSlotForm() {
     })
     return initialSchedule
   })
+
+  const [isSunday, setIsSunday] = useState(false) // Add Sunday state
+  useEffect(() => {
+    setIsClient(true)
+    const today = new Date()
+    if (today.getDay() === 0) { // Sunday
+      setIsSunday(true)
+      router.push('/')
+      return
+    }
+    
+    if (isLoaded && isSignedIn && user) {
+      loadSavedSlots()
+    }
+  }, [isLoaded, isSignedIn, user, router])
+
+
 
   const [weekDates, setWeekDates] = useState<Date[]>([])
   const [isClient, setIsClient] = useState(false)
@@ -281,6 +300,9 @@ const loadSavedSlots = async () => {
 
       // Early return for authentication check
   if (!isLoaded || !isSignedIn) {
+    return <Loading />;
+  }
+  if (!isClient || isSunday) {
     return <Loading />;
   }
 
