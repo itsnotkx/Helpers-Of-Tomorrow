@@ -61,7 +61,15 @@ const priorityColors: Record<"HIGH" | "MEDIUM" | "LOW", string> = {
   LOW: "bg-green-500",
 }
 
-export function InteractiveMap() {
+export function InteractiveMap({
+  highlightedSeniorId,
+  onMapUnfocus,
+  onSeniorClick, // <-- Add this prop
+}: {
+  highlightedSeniorId?: string | null
+  onMapUnfocus?: () => void
+  onSeniorClick?: (seniorId: string) => void // <-- Add this prop type
+}) {
   const mapContainer = useRef<HTMLDivElement>(null)
   const map = useRef<mapboxgl.Map | null>(null)
   const markersRef = useRef<mapboxgl.Marker[]>([])
@@ -185,8 +193,117 @@ export function InteractiveMap() {
 
   // --- Re-render markers when data changes ---
   useEffect(() => {
-    if (mapLoaded) renderMarkers()
-  }, [seniors, volunteers, clusters, mapLoaded, highlightedCluster])
+    if (!map.current) return
+    if (!mapLoaded) return
+    markersRef.current.forEach((m) => m.remove())
+    markersRef.current = []
+
+    updateClusterCircles()
+
+    // Cluster markers
+    clusters.forEach((cluster, idx) => {
+      const el = document.createElement("div")
+      el.className =
+        "w-10 h-10 bg-purple-500 rounded-full flex items-center justify-center text-white font-bold shadow-lg cursor-pointer relative z-10"
+      el.innerText = cluster.seniors.length.toString()
+
+      // Add hover effect to highlight corresponding circle
+      el.addEventListener("mouseenter", () => {
+        map.current?.setPaintProperty("cluster-circles-layer", "fill-opacity", [
+          "case",
+          ["==", ["get", "clusterId"], cluster.id],
+          0.4, // Highlighted opacity
+          0.2, // Default opacity
+        ])
+        map.current?.setPaintProperty("cluster-circles-outline", "line-width", [
+          "case",
+          ["==", ["get", "clusterId"], cluster.id],
+          3, // Highlighted width
+          2, // Default width
+        ])
+      })
+
+      el.addEventListener("mouseleave", () => {
+        map.current?.setPaintProperty("cluster-circles-layer", "fill-opacity", 0.2)
+        map.current?.setPaintProperty("cluster-circles-outline", "line-width", 2)
+      })
+
+      const marker = new mapboxgl.Marker(el).setLngLat([cluster.center.lng, cluster.center.lat]).addTo(map.current!)
+
+      el.addEventListener("click", () => {
+        setHighlightedCluster(idx)
+
+        if (popupRef.current) {
+          popupRef.current.remove()
+          popupRef.current = null
+        }
+
+        // Fit map to cluster bounds
+        const bounds = new mapboxgl.LngLatBounds()
+        cluster.seniors.forEach((senior) => {
+          if (senior.coords) {
+            bounds.extend([senior.coords.lng, senior.coords.lat])
+          }
+        })
+        map.current?.fitBounds(bounds, { padding: 50 })
+      })
+
+      markersRef.current.push(marker)
+    })
+
+    // Senior markers
+    seniors.forEach((s) => {
+      if (!s.coords) return
+      const levels = { 1: "HIGH", 2: "MEDIUM", 3: "LOW" }
+      const assessment = levels[s.overall_wellbeing] || "LOW"
+      const isHighlighted = s.uid === highlightedSeniorId
+      const colorClass = priorityColors[assessment || "LOW"]
+      const sizeClass = "w-6 h-6"
+      const borderClass = isHighlighted ? "border-4 border-purple-500" : "border-2 border-white"
+      const boxShadow = isHighlighted ? "0 0 10px #a855f7" : "0 0 4px #888"
+
+      const el = document.createElement("div")
+      el.className = `${sizeClass} ${colorClass} rounded-full ${borderClass} shadow-md cursor-pointer flex items-center justify-center text-xs relative z-20`
+      el.innerText = "👤"
+      el.style.boxShadow = boxShadow
+
+      el.addEventListener("click", (e) => {
+        e.stopPropagation()
+        setHighlightedCluster(null)
+        showSeniorPopup(s, assessment)
+        if (onSeniorClick) onSeniorClick(s.uid) // <-- Call the callback here
+      })
+
+      const marker = new mapboxgl.Marker(el).setLngLat([s.coords.lng, s.coords.lat]).addTo(map.current!)
+      markersRef.current.push(marker)
+    })
+
+    // Volunteer markers
+    volunteers.forEach((v) => {
+      if (!v.coords) return
+      const el = document.createElement("div")
+      el.className =
+        "w-6 h-6 bg-blue-500 rounded-full border-2 border-white shadow-md flex items-center justify-center text-xs relative z-20"
+      el.innerText = "🙋"
+      const marker = new mapboxgl.Marker(el).setLngLat([v.coords.lng, v.coords.lat]).addTo(map.current!)
+      el.addEventListener("click", (e) => {
+        e.stopPropagation()
+        setHighlightedCluster(null)
+        showVolunteerPopup(v)
+      })
+      markersRef.current.push(marker)
+    })
+
+    // Clicking elsewhere on the map unfocuses
+    if (map.current && onMapUnfocus) {
+      map.current.on("click", onMapUnfocus)
+    }
+    return () => {
+      if (map.current && onMapUnfocus) {
+        map.current.off("click", onMapUnfocus)
+      }
+    }
+  }, [seniors, volunteers, clusters, highlightedSeniorId, mapLoaded, highlightedCluster, onMapUnfocus, onSeniorClick])
 
   // --- Helper function to create circle polygon ---
   const createCirclePolygon = (center, radiusKm, points = 64) => {

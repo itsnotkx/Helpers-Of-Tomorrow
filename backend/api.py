@@ -17,6 +17,7 @@ import json  # for safer coords parsing
 import pickle  # Add this import
 from sklearn.base import BaseEstimator
 from sklearn.ensemble import RandomForestClassifier  # Add this import
+from geopy.geocoders import Nominatim
 
 os.environ['OMP_NUM_THREADS'] = '1'  # Add this at the top with other imports
 
@@ -690,7 +691,64 @@ def get_schedules():
         logger.error(f"Error in get_schedules: {str(e)}", exc_info=True)
         return {"schedules": [], "clusters": [], "cluster_density": {}, "stats": {}}
 
-# -------------------------------
+@app.get("/schedules/{user_email}")
+def get_user_schedules(user_email: str):
+    geolocator = Nominatim(user_agent="geoapi")
+    try:
+        schedules_resp = supabase.table("assignments").select("*, seniors:sid(name, coords)").eq("volunteer_email", user_email).execute()
+
+        # logger.info(schedules_resp)
+
+        if not schedules_resp.data:
+            logger.warning(f"No schedules found for user: {user_email}")
+            return {"schedules": []}
+       
+        schedules = []
+        for schedule in schedules_resp.data:
+            seniors = schedule.get("seniors", {})
+            coords = seniors.get("coords")
+
+            if coords:
+                try:
+                    lat, lng = coords["lat"], coords["lng"]
+                    location = geolocator.reverse((lat, lng), language="en")
+                    # Replace coords with readable string
+                    seniors["coords"] = location.address  
+                except Exception as e:
+                    seniors["coords"] = None  # fallback
+
+            schedules.append({
+                "aid": schedule["aid"],
+                # "vid": schedule["vid"],
+                # "sid": schedule["sid"],
+                "date": schedule["date"],
+                "start_time": schedule["start_time"],
+                "end_time": schedule["end_time"],
+                "is_acknowledged": schedule["is_acknowledged"],
+                # "volunteer_email": schedule["volunteer_email"],
+                "senior_name": seniors["name"],
+                "address": seniors.get("coords"),
+            })
+
+        return {"data": schedules}
+
+    except Exception as e:
+        logger.error(f"Error in get_user_schedules: {str(e)}", exc_info=True)
+        return {"schedules": []}
+
+@app.put("/acknowledgements")
+def update_acknowledgements(aid: dict[str, str]):
+    #logger.info(f"Updating acknowledgements for aids: {aid}")
+    list_aid = list(aid.values())
+
+    #logger.info(f"List of AIDs to acknowledge: {list_aid}")
+    response = supabase.table("assignments").update(
+        {"is_acknowledged": True}
+    ).in_("aid", list_aid).execute()
+
+    return {"success": response.data}
+
+# -------------------------------j
 # Health Check
 # -------------------------------
 @app.get("/")
