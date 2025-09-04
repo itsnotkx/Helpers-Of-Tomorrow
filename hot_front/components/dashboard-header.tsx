@@ -10,17 +10,17 @@ interface DashboardHeaderProps {
   title: string
   subtitle: string
   selectedDistrict: string
-  usingMockData: boolean
-  onTryConnectApi: () => void
-  onRefresh: () => void
+  needButton: boolean
+  textToInput?: string
+  onRefresh?: () => void
 }
 
 export function DashboardHeader({
   title,
   subtitle,
   selectedDistrict,
-  usingMockData,
-  onTryConnectApi,
+  needButton,
+  textToInput,
   onRefresh,
 }: DashboardHeaderProps) {
   return (
@@ -32,12 +32,6 @@ export function DashboardHeader({
             <div>
               <h1 className="text-2xl font-bold text-foreground">{title}</h1>
               <p className="text-muted-foreground">{subtitle}</p>
-              {usingMockData && (
-                <Badge variant="outline" className="mt-2 text-xs">
-                  <AlertTriangle className="h-3 w-3 mr-1" />
-                  Demo Mode - Using sample data
-                </Badge>
-              )}
             </div>
           </div>
           <div className="flex items-center gap-4">
@@ -45,16 +39,13 @@ export function DashboardHeader({
               <MapPin className="h-3 w-3 mr-1" />
               {selectedDistrict}
             </Badge>
-            {usingMockData ? (
-              <Button onClick={onTryConnectApi} variant="outline" size="sm">
-                <Activity className="h-4 w-4 mr-2" />
-                Try Connect API
-              </Button>
-            ) : (
+            {needButton ? (
               <Button onClick={onRefresh} variant="outline" size="sm">
                 <Activity className="h-4 w-4 mr-2" />
-                Refresh
+                {textToInput}
               </Button>
+            ) : (
+              <div></div>
             )}
             <UserButton showName />
           </div>

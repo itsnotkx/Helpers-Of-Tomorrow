@@ -3,8 +3,7 @@
 import { useState, useEffect } from "react"
 import React from "react"
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from "@/components/ui/card"
-import { DashboardHeader } from "@/components/dashboard-header"
-import { useRouter } from "next/navigation"
+import { useUser } from "@clerk/nextjs"
 
 
 type Schedule = {
@@ -22,27 +21,29 @@ const schedules: Schedule[] = [
 ]
 
 
-export default function VolunteerSchedule({  userId }: { userId: string }) {
-    const router = useRouter()
-
-    const refresh = () => {
-        router.refresh()
+export default function VolunteerSchedule() {
+    const { isLoaded, isSignedIn, user } = useUser();
+    if (!isLoaded) {
+        return (
+            <div className="flex justify-center items-center min-h-screen">
+                <h1 className="text-2xl font-bold">Loading</h1>
+            </div>
+        )
     }
 
+    if (!isSignedIn || !user?.primaryEmailAddress?.emailAddress) {
+        return (
+            <div className="flex justify-center items-center min-h-screen">
+                <h1 className="text-2xl font-bold">Not Signed In</h1>
+            </div>
+        )
+    }
+
+    const userEmail = user.primaryEmailAddress.emailAddress;
+    
     return (
         <div>
-            <DashboardHeader
-                title="Your Volunteer Schedule"
-                subtitle={`Managing care for Singapore`}
-                selectedDistrict="Singapore"
-                usingMockData={false}
-                onTryConnectApi={refresh}
-                onRefresh={refresh}
-            />
-            <div className="flex justify-center mb-6">
-                <div> {userId} </div>
-            </div>
-
+            <h3 className="text-2xl font-bold text-center mb-6 mt-6">Your Current Schedule</h3>
             <div className="max-w-lg mx-auto space-y-4">
                 {schedules.map((s) => (
                     <Card key={s.id} className="shadow-md">

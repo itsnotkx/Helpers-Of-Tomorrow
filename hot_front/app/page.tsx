@@ -145,8 +145,8 @@ export default function VolunteerDashboard() {
         title="Senior Care Volunteer Dashboard"
         subtitle={`Managing care for ${selectedDistrict}`}
         selectedDistrict={selectedDistrict}
-        usingMockData={false}
-        onTryConnectApi={loadDashboardData}
+        needButton={true}
+        textToInput="Refresh Data"
         onRefresh={loadDashboardData}
       />
 
