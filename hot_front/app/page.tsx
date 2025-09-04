@@ -67,6 +67,7 @@ export default function VolunteerDashboard() {
   const [isScheduleCollapsed, setIsScheduleCollapsed] = useState(false)
   const [isAssignmentsCollapsed, setIsAssignmentsCollapsed] = useState(false)
   const [showHighRiskModal, setShowHighRiskModal] = useState(false)
+  const [highlightedSeniorId, setHighlightedSeniorId] = useState<string | null>(null)
   // const { isLoaded, membership } = useOrganization()
   // const router = useRouter()
   const wellbeingLabels: Record<number, string> = {
@@ -210,54 +211,60 @@ export default function VolunteerDashboard() {
                   <p className="text-muted-foreground text-center py-8">No high-risk seniors at this time.</p>
                 ) : (
                   highPrioritySeniors.map((senior) => (
-                    <Card key={senior.uid} className="border-l-4 border-l-destructive">
-                      <CardContent className="pt-4">
-                        <div className="flex justify-between items-start mb-3">
-                          <div>
-                            <h3 className="font-semibold text-lg">{senior.name || `Senior ${senior.uid}`}</h3>
-                            <p className="text-sm text-muted-foreground">ID: {senior.uid}</p>
+                    <div
+                      key={senior.uid}
+                      className="cursor-pointer rounded-lg border border-purple-500 p-4 hover:bg-purple-50 transition"
+                      onClick={() => setHighlightedSeniorId(senior.uid)}
+                    >
+                      <Card key={senior.uid} className="border-l-4 border-l-destructive">
+                        <CardContent className="pt-4">
+                          <div className="flex justify-between items-start mb-3">
+                            <div>
+                              <h3 className="font-semibold text-lg">{senior.name || `Senior ${senior.uid}`}</h3>
+                              <p className="text-sm text-muted-foreground">ID: {senior.uid}</p>
+                            </div>
+                            <Badge variant="destructive">HIGH RISK</Badge>
                           </div>
-                          <Badge variant="destructive">HIGH RISK</Badge>
-                        </div>
 
-                        <div className="grid grid-cols-2 gap-4 mb-3">
-                          <div>
-                            <p className="text-sm font-medium">Physical Health</p>
-                            <p className="text-sm text-muted-foreground">
-                              {senior.physical ? `${wellbeingLabels[6 - senior.physical]}` : "Not assessed"}
-                            </p>
+                          <div className="grid grid-cols-2 gap-4 mb-3">
+                            <div>
+                              <p className="text-sm font-medium">Physical Health</p>
+                              <p className="text-sm text-muted-foreground">
+                                {senior.physical ? `${wellbeingLabels[6 - senior.physical]}` : "Not assessed"}
+                              </p>
+                            </div>
+                            <div>
+                              <p className="text-sm font-medium">Mental Health</p>
+                              <p className="text-sm text-muted-foreground">
+                                {senior.mental ? `${wellbeingLabels[6 - senior.mental]}` : "Not assessed"}
+                              </p>
+                            </div>
+                            <div>
+                              <p className="text-sm font-medium">Community Support</p>
+                              <p className="text-sm text-muted-foreground">
+                                {senior.community ? `${wellbeingLabels[6 - senior.community]}` : "Not assessed"}
+                              </p>
+                            </div>
+                            <div>
+                              <p className="text-sm font-medium">Last Visit</p>
+                              <p className="text-sm text-muted-foreground">
+                                {senior.last_visit ? new Date(senior.last_visit).toLocaleDateString() : "Never"}
+                              </p>
+                            </div>
                           </div>
-                          <div>
-                            <p className="text-sm font-medium">Mental Health</p>
-                            <p className="text-sm text-muted-foreground">
-                              {senior.mental ? `${wellbeingLabels[6 - senior.mental]}` : "Not assessed"}
-                            </p>
-                          </div>
-                          <div>
-                            <p className="text-sm font-medium">Community Support</p>
-                            <p className="text-sm text-muted-foreground">
-                              {senior.community ? `${wellbeingLabels[6 - senior.community]}` : "Not assessed"}
-                            </p>
-                          </div>
-                          <div>
-                            <p className="text-sm font-medium">Last Visit</p>
-                            <p className="text-sm text-muted-foreground">
-                              {senior.last_visit ? new Date(senior.last_visit).toLocaleDateString() : "Never"}
-                            </p>
-                          </div>
-                        </div>
 
-                        <div className="flex justify-between items-center">
-                          <div>
-                            <p className="text-sm font-medium">Location</p>
-                            <p className="text-sm text-muted-foreground">
-                              {senior.coords.lat.toFixed(4)}, {senior.coords.lng.toFixed(4)}
-                            </p>
+                          <div className="flex justify-between items-center">
+                            <div>
+                              <p className="text-sm font-medium">Location</p>
+                              <p className="text-sm text-muted-foreground">
+                                {senior.coords.lat.toFixed(4)}, {senior.coords.lng.toFixed(4)}
+                              </p>
+                            </div>
+                            {senior.cluster && <Badge variant="outline">Cluster {senior.cluster}</Badge>}
                           </div>
-                          {senior.cluster && <Badge variant="outline">Cluster {senior.cluster}</Badge>}
-                        </div>
-                      </CardContent>
-                    </Card>
+                        </CardContent>
+                      </Card>
+                    </div>
                   ))
                 )}
               </div>
@@ -281,6 +288,9 @@ export default function VolunteerDashboard() {
                 volunteers={volunteers}
                 assignments={assignments}
                 schedules={schedules}
+                highlightedSeniorId={highlightedSeniorId}
+                onMapUnfocus={() => setHighlightedSeniorId(null)}
+                onSeniorClick={() => setExpandedDay(null)} // <-- This closes the expanded card
               />
             </CardContent>
           )}

@@ -13,6 +13,7 @@ interface DashboardHeaderProps {
   needButton: boolean
   textToInput?: string
   onRefresh?: () => void
+  onShowHighPriority?: () => void
 }
 
 export function DashboardHeader({
@@ -22,6 +23,7 @@ export function DashboardHeader({
   needButton,
   textToInput,
   onRefresh,
+  onShowHighPriority,
 }: DashboardHeaderProps) {
   return (
     <header className="border-b bg-card">
@@ -50,6 +52,17 @@ export function DashboardHeader({
             <UserButton showName />
           </div>
         </div>
+        {onShowHighPriority && (
+          <div className="flex justify-between items-center mb-6">
+            <h1 className="text-2xl font-bold">Senior Care Volunteer Dashboard</h1>
+            <button
+              className="px-4 py-2 bg-purple-600 text-white rounded hover:bg-purple-700"
+              onClick={onShowHighPriority}
+            >
+              Show High Priority Seniors
+            </button>
+          </div>
+        )}
       </div>
     </header>
   )
