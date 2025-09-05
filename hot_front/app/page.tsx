@@ -24,8 +24,7 @@ import { InteractiveMap } from "@/components/interactive-map";
 import { ScheduleInterface } from "@/components/schedule-interface";
 import { DashboardHeader } from "@/components/dashboard-header";
 import { useRef } from "react";
-// import { useOrganization } from "@clerk/nextjs"
-// import { useRouter } from "next/navigation"
+import { useUser } from "@clerk/nextjs";
 
 // Add neighbourhood mapping
 const SINGAPORE_NEIGHBOURHOODS = {
@@ -148,8 +147,14 @@ export default function VolunteerDashboard() {
     Map<string, HTMLElement>
   >(new Map());
   const mapRef = useRef<mapboxgl.Map | null>(null);
-  // const { isLoaded, membership } = useOrganization()
-  // const router = useRouter()
+  const { isLoaded, isSignedIn, user } = useUser();
+  const [dlisLoading, setDLIsLoading] = useState(true);
+  const [userSchedule, setUserSchedule] = useState<Volunteer>();
+  const [userCoordinates, setUserCoordinates] = useState<[number, number]>(
+    [103.8198, 1.3521]
+  );
+  const [constituencyName, setConstituencyName] = useState<string>("Singapore");
+
   const wellbeingLabels: Record<number, string> = {
     1: "Very Poor",
     2: "Poor",
@@ -158,8 +163,7 @@ export default function VolunteerDashboard() {
     5: "Very Good",
   };
 
-
-    const loadDashboardData = async () => {
+  const loadDashboardData = async () => {
     try {
       setLoading(true);
       const BASE_URL = "http://localhost:8000";
@@ -213,71 +217,58 @@ export default function VolunteerDashboard() {
   };
 
   useEffect(() => {
-    loadDashboardData()
-  }, [])
+    loadDashboardData();
+  }, []);
 
-  const { isLoaded, isSignedIn, user } = useUser();
-  const [dlisLoading, setDLIsLoading] = useState(true)
-  const [userSchedule, setUserSchedule] = useState<Volunteer>();
-    useEffect(() => {
-        if (user?.primaryEmailAddress?.emailAddress) {
-            fetch_dl_details(user.primaryEmailAddress.emailAddress)
-        } 
-    }, [isLoaded, isSignedIn, user])
+  useEffect(() => {
+    if (user?.primaryEmailAddress?.emailAddress) {
+      fetch_dl_details(user.primaryEmailAddress.emailAddress);
+    }
+  }, [isLoaded, isSignedIn, user]);
 
-  async function fetch_dl_details(email: string ) {
+  async function fetch_dl_details(email: string) {
     try {
-        setDLIsLoading(true)
-        const BASE_URL = "http://localhost:8000"
-        console.log(email)
-        if (email != "") {
-            const res = await fetch(`${BASE_URL}/dl/${email}`, {
-            method: "GET",
-            headers: {
-                "Content-Type": "application/json",
-            },
-        }).then((res) => res.json())
+      setDLIsLoading(true);
+      const BASE_URL = "http://localhost:8000";
+      console.log(email);
+      if (email != "") {
+        const res = await fetch(`${BASE_URL}/dl/${email}`, {
+          method: "GET",
+          headers: {
+            "Content-Type": "application/json",
+          },
+        }).then((res) => res.json());
 
-        console.log("Fetched user information:", res.dl_info[0])
+        console.log("Fetched user information:", res.dl_info[0]);
         if (res.dl_info[0] != null) {
-            if (res.dl_info[0].coords) {
-                setUserCoordinates([res.dl_info[0].coords.lng, res.dl_info[0].coords.lat])
-            }
-            if (res.dl_info[0].constituency_name) {
-                setConstituencyName(res.dl_info[0].constituency_name)
-            }
+          if (res.dl_info[0].coords) {
+            setUserCoordinates([
+              res.dl_info[0].coords.lng,
+              res.dl_info[0].coords.lat,
+            ]);
+          }
+          if (res.dl_info[0].constituency_name) {
+            setConstituencyName(res.dl_info[0].constituency_name);
+          }
         }
-        
-    }
+      }
     } catch (error) {
-        console.error("Error fetching schedules:", error)
+      console.error("Error fetching schedules:", error);
     } finally {
-        setDLIsLoading(false)
+      setDLIsLoading(false);
     }
-}
+  }
 
-    if (!isLoaded || dlisLoading) {
+  if (!isLoaded || dlisLoading) {
     return (
-        <div className="flex justify-center items-center min-h-screen">
-            <div className="text-center">
-                <h1 className="text-2xl font-bold mb-4">Loading Dashboard...</h1>
-                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-gray-900 mx-auto"></div>
-            </div>
+      <div className="flex justify-center items-center min-h-screen">
+        <div className="text-center">
+          <h1 className="text-2xl font-bold mb-4">Loading Dashboard...</h1>
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-gray-900 mx-auto"></div>
         </div>
-    )
+      </div>
+    );
   }
-  
-   // const { isLoaded, membership } = useOrganization()
-  // const router = useRouter()
-  const wellbeingLabels: Record<number, string> = {
-    1: "Very Poor",
-    2: "Poor",
-    3: "Normal",
-    4: "Good",
-    5: "Very Good",
-  }
-
-
 
   // Function to handle volunteer card click
   const handleVolunteerCardClick = (volunteerId: string) => {
@@ -347,16 +338,6 @@ export default function VolunteerDashboard() {
     }, 100); // Small delay to ensure map is expanded
   };
 
-  // useEffect(() => {
-  //   if (membership != undefined && membership.role == 'org:member') {
-  //     router.push('/volunteer')
-  //   }
-  // }, [isLoaded, membership])
-
-  useEffect(() => {
-    loadDashboardData();
-  }, []);
-
   const levels: Record<1 | 2 | 3, string> = {
     3: "LOW", // Changed: wellbeing 3 = priority LOW
     2: "MEDIUM", // Changed: wellbeing 2 = priority MEDIUM
@@ -373,16 +354,6 @@ export default function VolunteerDashboard() {
   const todaySchedules = schedules.filter(
     (s) => new Date(s.start_time).toDateString() === new Date().toDateString()
   );
-
-  // if (!isLoaded) {
-  //     return <div className="flex justify-center items-center min-h-screen">Loading...</div>
-  //   }
-
-  // if (!membership) {
-  //   return <div className="flex justify-center items-center min-h-screen">You are not a member of this organization.</div>
-  // }
-
-
 
   return (
     <div className="min-h-screen bg-background">
@@ -708,4 +679,5 @@ export default function VolunteerDashboard() {
     </div>
   );
 }
+
 
