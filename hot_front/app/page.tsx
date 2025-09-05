@@ -26,31 +26,7 @@ import { DashboardHeader } from "@/components/dashboard-header";
 import { useRef } from "react";
 import { useUser } from "@clerk/nextjs";
 
-// Add neighbourhood mapping
-const SINGAPORE_NEIGHBOURHOODS = {
-  yishun: [103.8454, 1.4382],
-  tampines: [103.9568, 1.3496],
-  jurong: [103.7436, 1.3404],
-  bedok: [103.9273, 1.3236],
-  hougang: [103.8924, 1.3612],
-  sembawang: [103.8184, 1.4491],
-  woodlands: [103.789, 1.4382],
-  angMoKio: [103.8454, 1.3691],
-  bishan: [103.8454, 1.3506],
-  punggol: [103.9021, 1.4043],
-  toapayoh: [103.8476, 1.3343],
-  clementi: [103.7649, 1.3162],
-  pasirRis: [103.9492, 1.3721],
-  serangoon: [103.8698, 1.3554],
-  bukit_batok: [103.7437, 1.3587],
-  choa_chu_kang: [103.7444, 1.384],
-  bukit_panjang: [103.7718, 1.3774],
-  queenstown: [103.8057, 1.2966],
-  kallang: [103.8614, 1.3111],
-  marine_parade: [103.9057, 1.3017],
-} as const;
 
-type NeighbourhoodKey = keyof typeof SINGAPORE_NEIGHBOURHOODS;
 
 interface Senior {
   uid: string;
@@ -96,35 +72,8 @@ interface Schedule {
   priority_score: number;
 }
 
-const getNeighbourhoodDisplayName = (key: NeighbourhoodKey): string => {
-  const names: Record<NeighbourhoodKey, string> = {
-    yishun: "Yishun",
-    tampines: "Tampines",
-    jurong: "Jurong",
-    bedok: "Bedok",
-    hougang: "Hougang",
-    sembawang: "Sembawang",
-    woodlands: "Woodlands",
-    angMoKio: "Ang Mo Kio",
-    bishan: "Bishan",
-    punggol: "Punggol",
-    toapayoh: "Toa Payoh",
-    clementi: "Clementi",
-    pasirRis: "Pasir Ris",
-    serangoon: "Serangoon",
-    bukit_batok: "Bukit Batok",
-    choa_chu_kang: "Choa Chu Kang",
-    bukit_panjang: "Bukit Panjang",
-    queenstown: "Queenstown",
-    kallang: "Kallang",
-    marine_parade: "Marine Parade",
-  };
-  return names[key];
-};
-
 export default function VolunteerDashboard() {
-  const [selectedNeighbourhood, setSelectedNeighbourhood] =
-    useState<NeighbourhoodKey>("sembawang");
+
   const [seniors, setSeniors] = useState<Senior[]>([]);
   const [volunteers, setVolunteers] = useState<Volunteer[]>([]);
   const [assignments, setAssignments] = useState<Assignment[]>([]);
@@ -151,9 +100,7 @@ export default function VolunteerDashboard() {
   const { isLoaded, isSignedIn, user } = useUser();
   const [dlisLoading, setDLIsLoading] = useState(true);
   const [userSchedule, setUserSchedule] = useState<Volunteer>();
-  const [userCoordinates, setUserCoordinates] = useState<[number, number]>([
-    103.8198, 1.3521,
-  ]);
+  const [userCoordinates, setUserCoordinates] = useState<[number, number]>();
   const [constituencyName, setConstituencyName] = useState<string>("Singapore");
 
   const wellbeingLabels: Record<number, string> = {
@@ -231,8 +178,7 @@ export default function VolunteerDashboard() {
     try {
       setDLIsLoading(true);
       const BASE_URL = "http://localhost:8000";
-      console.log(email);
-      if (email != "") {
+       if (email != "") {
         const res = await fetch(`${BASE_URL}/dl/${email}`, {
           method: "GET",
           headers: {
@@ -242,11 +188,12 @@ export default function VolunteerDashboard() {
 
         console.log("Fetched user information:", res.dl_info[0]);
         if (res.dl_info[0] != null) {
-          if (res.dl_info[0].coords) {
+          if (res.dl_info[0].constituency.centre_lat && res.dl_info[0].constituency.centre_long) {
             setUserCoordinates([
-              res.dl_info[0].coords.lng,
-              res.dl_info[0].coords.lat,
+              res.dl_info[0].constituency.centre_long,
+              res.dl_info[0].constituency.centre_lat,
             ]);
+            console.log("Set user coordinates to:", userCoordinates)
           }
           if (res.dl_info[0].constituency_name) {
             setConstituencyName(res.dl_info[0].constituency_name);
@@ -260,7 +207,7 @@ export default function VolunteerDashboard() {
     }
   }
 
-  if (!isLoaded && dlisLoading) {
+  if (!isLoaded || dlisLoading || loading) {
     return (
       <div className="flex justify-center items-center min-h-screen">
         <div className="text-center">
@@ -413,18 +360,15 @@ export default function VolunteerDashboard() {
     const bNeedsCare = seniorsNeedingImmediateCare.includes(b);
     return aNeedsCare === bNeedsCare ? 0 : aNeedsCare ? -1 : 1;
   });
-
+  console.log("User coordinates:", userCoordinates);
   return (
     <div className="min-h-screen bg-background">
       <DashboardHeader
         title="Senior Care Volunteer Dashboard"
-        subtitle={`Managing care for ${getNeighbourhoodDisplayName(
-          selectedNeighbourhood
-        )}`}
-        selectedDistrict={getNeighbourhoodDisplayName(selectedNeighbourhood)}
-        needButton={true}
-        textToInput="Refresh Data"
-        onRefresh={loadDashboardData}
+        subtitle={`Managing care for ${(
+          constituencyName)}`}
+        selectedDistrict={constituencyName}
+
       />
 
       <div className="container mx-auto px-6 py-6">
@@ -615,7 +559,7 @@ export default function VolunteerDashboard() {
             </DialogContent>
           </Dialog>
         </div>
-
+        
         <div className="lg:col-span-2 mb-8">
           <CardHeader className="flex justify-between">
             <CardTitle className="flex items-center gap-2">
@@ -642,11 +586,11 @@ export default function VolunteerDashboard() {
                   setHighlightedVolunteerId(null);
                 }}
                 centerCoordinates={
-                  selectedNeighbourhood
-                    ? (SINGAPORE_NEIGHBOURHOODS[selectedNeighbourhood] as [
-                        number,
-                        number
-                      ])
+                  userCoordinates
+                    ? (userCoordinates as [
+                      number,
+                      number
+                    ])
                     : undefined
                 }
               />
