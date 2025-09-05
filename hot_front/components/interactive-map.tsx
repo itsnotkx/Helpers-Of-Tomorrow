@@ -63,12 +63,24 @@ const priorityColors: Record<"HIGH" | "MEDIUM" | "LOW", string> = {
 
 export function InteractiveMap({
   highlightedSeniorId,
+  highlightedVolunteerId,
   onMapUnfocus,
-  onSeniorClick, // <-- Add this prop
+  onSeniorClick,
+  seniorMarkerElements,
+  setSeniorMarkerElements,
+  volunteerMarkerElements,
+  setVolunteerMarkerElements,
+  mapRef,
 }: {
   highlightedSeniorId?: string | null
+  highlightedVolunteerId?: string | null
   onMapUnfocus?: () => void
-  onSeniorClick?: (seniorId: string) => void // <-- Add this prop type
+  onSeniorClick?: (seniorId: string) => void
+  seniorMarkerElements: Map<string, HTMLElement>
+  setSeniorMarkerElements: (elements: Map<string, HTMLElement>) => void
+  volunteerMarkerElements: Map<string, HTMLElement>
+  setVolunteerMarkerElements: (elements: Map<string, HTMLElement>) => void
+  mapRef: React.MutableRefObject<mapboxgl.Map | null>
 }) {
   const mapContainer = useRef<HTMLDivElement>(null)
   const map = useRef<mapboxgl.Map | null>(null)
@@ -145,6 +157,10 @@ export function InteractiveMap({
 
       bounds: singaporeBounds
     })
+    
+    // Set map reference for parent component
+    mapRef.current = map.current
+    
     map.current.on("load", () => {
       setMapLoaded(true)
       // Add cluster circle source and layer
@@ -271,7 +287,7 @@ export function InteractiveMap({
         e.stopPropagation()
         setHighlightedCluster(null)
         showSeniorPopup(s, assessment)
-        if (onSeniorClick) onSeniorClick(s.uid) // <-- Call the callback here
+        if (onSeniorClick) onSeniorClick(s.uid)
       })
 
       const marker = new mapboxgl.Marker(el).setLngLat([s.coords.lng, s.coords.lat]).addTo(map.current!)
@@ -281,10 +297,17 @@ export function InteractiveMap({
     // Volunteer markers
     volunteers.forEach((v) => {
       if (!v.coords) return
+      const isHighlighted = v.vid === highlightedVolunteerId
+      const borderClass = isHighlighted ? "border-4 border-blue-500" : "border-2 border-white"
+      const sizeClass = isHighlighted ? "w-8 h-8" : "w-6 h-6"
+      const boxShadow = isHighlighted ? "0 0 10px #3b82f6" : "0 0 4px #888"
+      
       const el = document.createElement("div")
       el.className =
-        "w-6 h-6 bg-blue-500 rounded-full border-2 border-white shadow-md flex items-center justify-center text-xs relative z-20"
+        `${sizeClass} bg-blue-500 rounded-full ${borderClass} shadow-md flex items-center justify-center text-xs relative z-20 cursor-pointer`
       el.innerText = "🙋"
+      el.style.boxShadow = boxShadow
+      
       const marker = new mapboxgl.Marker(el).setLngLat([v.coords.lng, v.coords.lat]).addTo(map.current!)
       el.addEventListener("click", (e) => {
         e.stopPropagation()
@@ -303,7 +326,7 @@ export function InteractiveMap({
         map.current.off("click", onMapUnfocus)
       }
     }
-  }, [seniors, volunteers, clusters, highlightedSeniorId, mapLoaded, highlightedCluster, onMapUnfocus, onSeniorClick])
+  }, [seniors, volunteers, clusters, highlightedSeniorId, highlightedVolunteerId, mapLoaded, highlightedCluster, onMapUnfocus, onSeniorClick])
 
   // --- Helper function to create circle polygon ---
   const createCirclePolygon = (center, radiusKm, points = 64) => {
@@ -412,11 +435,11 @@ export function InteractiveMap({
       markersRef.current.push(marker)
     })
 
-    const seniorMarkerElements = new Map()
+    const newSeniorMap = new Map()
+    const newVolunteerMap = new Map()
 
     // Senior markers
     seniors.forEach((s) => {
-      // console.log(s.overall_wellbeing)
       if (!s.coords) return
       const levels = {
         1: "HIGH",
@@ -427,22 +450,26 @@ export function InteractiveMap({
       const isInHighlightedCluster =
         highlightedCluster !== null &&
         clusters[highlightedCluster]?.seniors.some((clusterSenior) => clusterSenior.uid === s.uid)
+      const isHighlighted = s.uid === highlightedSeniorId
       const colorClass = priorityColors[assessment || "LOW"]
-      const sizeClass = isInHighlightedCluster ? "w-8 h-8" : "w-6 h-6"
-      const borderClass = isInHighlightedCluster ? "border-4 border-purple-500" : "border-2 border-white"
+      const sizeClass = isInHighlightedCluster || isHighlighted ? "w-8 h-8" : "w-6 h-6"
+      const borderClass = isHighlighted ? "border-4 border-purple-500" : isInHighlightedCluster ? "border-4 border-purple-500" : "border-2 border-white"
+      const boxShadow = isHighlighted ? "0 0 10px #a855f7" : "0 0 4px #888"
 
       const el = document.createElement("div")
-      el.className =               
-      `${sizeClass} ${colorClass} rounded-full ${borderClass} shadow-md cursor-pointer flex items-center justify-center text-xs relative z-20`
+      el.className = `${sizeClass} ${colorClass} rounded-full ${borderClass} shadow-md cursor-pointer flex items-center justify-center text-xs relative z-20`
       el.innerText = "👤"
+      el.style.boxShadow = boxShadow
+      
       // Store reference to this element for highlighting
-      seniorMarkerElements.set(s.uid, el)
+      newSeniorMap.set(s.uid, el)
 
       const marker = new mapboxgl.Marker(el).setLngLat([s.coords.lng, s.coords.lat]).addTo(map.current!)
       el.addEventListener("click", (e) => {
         e.stopPropagation()
         setHighlightedCluster(null)
         showSeniorPopup(s, assessment)
+        if (onSeniorClick) onSeniorClick(s.uid)
       })
       markersRef.current.push(marker)
     })
@@ -450,10 +477,19 @@ export function InteractiveMap({
     // Volunteer markers
     volunteers.forEach((v) => {
       if (!v.coords) return
+      const isHighlighted = v.vid === highlightedVolunteerId
+      const borderClass = isHighlighted ? "border-4 border-blue-500" : "border-2 border-white"
+      const sizeClass = isHighlighted ? "w-8 h-8" : "w-6 h-6"
+      const boxShadow = isHighlighted ? "0 0 10px #3b82f6" : "0 0 4px #888"
+      
       const el = document.createElement("div")
-      el.className =
-        "w-6 h-6 bg-blue-500 rounded-full border-2 border-white shadow-md flex items-center justify-center text-xs relative z-20"
+      el.className = `${sizeClass} bg-blue-500 rounded-full ${borderClass} shadow-md flex items-center justify-center text-xs relative z-20 cursor-pointer`
       el.innerText = "🙋"
+      el.style.boxShadow = boxShadow
+      
+      // Store reference to this element for highlighting
+      newVolunteerMap.set(v.vid, el)
+      
       const marker = new mapboxgl.Marker(el).setLngLat([v.coords.lng, v.coords.lat]).addTo(map.current!)
       el.addEventListener("click", (e) => {
         e.stopPropagation()
@@ -462,10 +498,13 @@ export function InteractiveMap({
       })
       markersRef.current.push(marker)
     })
+    
+    setSeniorMarkerElements(newSeniorMap)
+    setVolunteerMarkerElements(newVolunteerMap)
   }
 
   // --- Popups ---
-  const showSeniorPopup = (s: Senior, assessment?: { priority: "HIGH" | "MEDIUM" | "LOW" }) => {
+  const showSeniorPopup = (s: Senior, assessment?: string) => {
     if (!map.current) return
 
     if (popupRef.current) {
@@ -523,7 +562,7 @@ export function InteractiveMap({
           <h3 class="font-semibold text-sm mb-1">${v.name || v.vid}</h3>
           <div>⭐ Skill: ${v.skill}/3</div>
           <div>${available ? "✅ Available" : "❌ Unavailable"}</div>
-          ${assignment ? `<div>📍 Assigned: ${assignment.cluster}</div>` : ""}
+          ${assignment ? `<div>📍 Assigned: Cluster ${assignment.cluster}</div>` : ""}
         </div>
       `)
       .addTo(map.current)
@@ -564,6 +603,16 @@ export function InteractiveMap({
           <div className="mt-2 pt-2 border-t border-gray-200">
             <div className="text-xs text-purple-600 font-medium">Cluster {highlightedCluster + 1} highlighted</div>
             <div className="text-xs text-gray-500">Click elsewhere to clear</div>
+          </div>
+        )}
+        {highlightedSeniorId && (
+          <div className="mt-2 pt-2 border-t border-gray-200">
+            <div className="text-xs text-purple-600 font-medium">Senior highlighted on map</div>
+          </div>
+        )}
+        {highlightedVolunteerId && (
+          <div className="mt-2 pt-2 border-t border-gray-200">
+            <div className="text-xs text-blue-600 font-medium">Volunteer highlighted on map</div>
           </div>
         )}
       </div>

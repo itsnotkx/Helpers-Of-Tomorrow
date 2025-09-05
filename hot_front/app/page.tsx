@@ -9,6 +9,7 @@ import { MapPin, Users, Calendar, AlertTriangle, Activity, ChevronDown, ChevronU
 import { InteractiveMap } from "@/components/interactive-map"
 import { ScheduleInterface } from "@/components/schedule-interface"
 import { DashboardHeader } from "@/components/dashboard-header"
+import { useRef } from "react"
 // import { useOrganization } from "@clerk/nextjs"
 // import { useRouter } from "next/navigation"
 
@@ -68,6 +69,10 @@ export default function VolunteerDashboard() {
   const [isAssignmentsCollapsed, setIsAssignmentsCollapsed] = useState(false)
   const [showHighRiskModal, setShowHighRiskModal] = useState(false)
   const [highlightedSeniorId, setHighlightedSeniorId] = useState<string | null>(null)
+  const [highlightedVolunteerId, setHighlightedVolunteerId] = useState<string | null>(null)
+  const [seniorMarkerElements, setSeniorMarkerElements] = useState<Map<string, HTMLElement>>(new Map())
+  const [volunteerMarkerElements, setVolunteerMarkerElements] = useState<Map<string, HTMLElement>>(new Map())
+  const mapRef = useRef<mapboxgl.Map | null>(null)
   // const { isLoaded, membership } = useOrganization()
   // const router = useRouter()
   const wellbeingLabels: Record<number, string> = {
@@ -109,6 +114,74 @@ export default function VolunteerDashboard() {
     } finally {
       setLoading(false)
     }
+  }
+
+  // Function to handle volunteer card click
+  const handleVolunteerCardClick = (volunteerId: string) => {
+    const volunteer = volunteers.find(v => v.vid === volunteerId)
+    if (!volunteer) return
+
+    // Set highlighted volunteer
+    setHighlightedVolunteerId(volunteerId)
+    
+    // Expand map if collapsed
+    if (isMapCollapsed) {
+      setIsMapCollapsed(false)
+    }
+
+    // Clear any senior highlights
+    setHighlightedSeniorId(null)
+    
+    // Find the volunteer's marker and click it to show popup
+    setTimeout(() => {
+      const markerEl = volunteerMarkerElements.get(volunteerId)
+      if (markerEl) {
+        markerEl.click()
+      }
+      
+      // Fly to volunteer's location
+      if (mapRef.current) {
+        mapRef.current.flyTo({
+          center: [volunteer.coords.lng, volunteer.coords.lat],
+          zoom: 18,
+          essential: true
+        })
+      }
+    }, 100) // Small delay to ensure map is expanded
+  }
+
+  // Function to handle senior card click
+  const handleSeniorCardClick = (seniorId: string) => {
+    const senior = seniors.find(s => s.uid === seniorId)
+    if (!senior) return
+
+    // Set highlighted senior
+    setHighlightedSeniorId(seniorId)
+    
+    // Expand map if collapsed
+    if (isMapCollapsed) {
+      setIsMapCollapsed(false)
+    }
+
+    // Clear any volunteer highlights
+    setHighlightedVolunteerId(null)
+    
+    // Find the senior's marker and click it to show popup
+    setTimeout(() => {
+      const markerEl = seniorMarkerElements.get(seniorId)
+      if (markerEl) {
+        markerEl.click()
+      }
+      
+      // Fly to senior's location
+      if (mapRef.current) {
+        mapRef.current.flyTo({
+          center: [senior.coords.lng, senior.coords.lat],
+          zoom: 18,
+          essential: true
+        })
+      }
+    }, 100) // Small delay to ensure map is expanded
   }
 
   // useEffect(() => {
@@ -214,7 +287,10 @@ export default function VolunteerDashboard() {
                     <div
                       key={senior.uid}
                       className="cursor-pointer rounded-lg border border-purple-500 p-4 hover:bg-purple-50 transition"
-                      onClick={() => setHighlightedSeniorId(senior.uid)}
+                      onClick={() => {
+                        handleSeniorCardClick(senior.uid)
+                        setShowHighRiskModal(false) // Close the modal
+                      }}
                     >
                       <Card key={senior.uid} className="border-l-4 border-l-destructive">
                         <CardContent className="pt-4">
@@ -289,13 +365,21 @@ export default function VolunteerDashboard() {
                 assignments={assignments}
                 schedules={schedules}
                 highlightedSeniorId={highlightedSeniorId}
-                onMapUnfocus={() => setHighlightedSeniorId(null)}
+                highlightedVolunteerId={highlightedVolunteerId}
+                onMapUnfocus={() => {
+                  setHighlightedSeniorId(null)
+                  setHighlightedVolunteerId(null)
+                }}
                 onSeniorClick={() => setExpandedDay(null)} // <-- This closes the expanded card
+                seniorMarkerElements={seniorMarkerElements}
+                setSeniorMarkerElements={setSeniorMarkerElements}
+                volunteerMarkerElements={volunteerMarkerElements}
+                setVolunteerMarkerElements={setVolunteerMarkerElements}
+                mapRef={mapRef}
               />
             </CardContent>
           )}
         </div>
-
         <Card className={`lg:col-span-2 ${!isScheduleCollapsed ? "pb-0" : ""}`}>
           <CardHeader className="flex justify-between">
             <CardTitle className="flex items-center gap-2">
@@ -309,27 +393,62 @@ export default function VolunteerDashboard() {
             <ScheduleInterface schedules={schedules} volunteers={volunteers} seniors={seniors} assignments={assignments} />
           )}
         </Card>
-
         <Card className="mt-6">
           <CardHeader className="flex justify-between">
-            <CardTitle>Volunteer Assignments</CardTitle>
-            <Button variant="ghost" size="sm" onClick={() => setIsAssignmentsCollapsed(!isAssignmentsCollapsed)}>
-              {isAssignmentsCollapsed ? <ChevronDown className="h-4 w-4" /> : <ChevronUp className="h-4 w-4" />}
+            <CardTitle>Volunteer Dashboard</CardTitle>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setIsAssignmentsCollapsed(!isAssignmentsCollapsed)}
+            >
+              {isAssignmentsCollapsed ? (
+                <ChevronDown className="h-4 w-4" />
+              ) : (
+                <ChevronUp className="h-4 w-4" />
+              )}
             </Button>
           </CardHeader>
           {!isAssignmentsCollapsed && (
             <CardContent>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                 {assignments.map((a, i) => 
-                 (
-                  <div key={i} className="p-4 border rounded-lg">
-                    <div className="flex justify-between mb-2">
-                       {volunteers.find(v => v.vid === a.volunteer)?.name || "Unknown"}
-                      <Badge variant="secondary" className="h-6">{a.cluster}</Badge>
+                {volunteers.map((v, i) => {
+                  const assigned = assignments.filter(a => a.volunteer === v.vid)
+                  const numSeniors = schedules.filter(s => s.volunteer === v.vid).length
+                  const cluster = assigned[0]?.cluster ?? "-"
+                  const distance = assigned[0]?.weighted_distance ?? "N/A"
+                  const isHighlighted = highlightedVolunteerId === v.vid
+
+                  return (
+                    <div
+                      key={i}
+                      className={`p-4 border rounded-lg cursor-pointer hover:bg-muted transition ${
+                        isHighlighted ? 'border-blue-500 bg-blue-50 shadow-lg' : ''
+                      }`}
+                      onClick={() => handleVolunteerCardClick(v.vid)}
+                    >
+                      <div className="flex justify-between mb-2">
+                        <h4 className="font-medium">{v.name || "Unknown Volunteer"}</h4>
+                        <Badge variant="secondary" className="h-6">
+                          Cluster {cluster}
+                        </Badge>
+                      </div>
+                      <p className="text-sm text-muted-foreground">
+                        Seniors Assigned: {numSeniors}
+                      </p>
+                      <p className="text-sm text-muted-foreground">
+                        Skill Level: {v.skill ?? "N/A"}
+                      </p>
+                      <p className="text-sm text-muted-foreground">
+                        Distance to Cluster: {distance} km
+                      </p>
+                      {isHighlighted && (
+                        <div className="text-xs text-blue-600 mt-2 font-medium">
+                          📍 Located on map
+                        </div>
+                      )}
                     </div>
-                    <p className="text-sm text-muted-foreground">Distance: {a.weighted_distance} km</p>
-                  </div>
-                ))}
+                  )
+                })}
               </div>
             </CardContent>
           )}
