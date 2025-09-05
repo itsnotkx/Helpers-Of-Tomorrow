@@ -183,10 +183,11 @@ export function InteractiveMap({
             // Collect *full senior objects* from schedules belonging to this cluster
             const clusterSeniors = schedulesFromAssignments
               .filter((schedule) => schedule.cluster === cluster.id)
-              .flatMap((schedule) =>
-                schedule.seniors
-                  .map((sid) => filteredSeniors.find((s) => s.uid === sid))
-                  .filter((s): s is Senior => !!s) // keep only found seniors
+              .flatMap(
+                (schedule) =>
+                  schedule.seniors
+                    .map((sid) => filteredSeniors.find((s) => s.uid === sid))
+                    .filter((s): s is Senior => !!s) // keep only found seniors
               );
 
             return {
@@ -196,7 +197,6 @@ export function InteractiveMap({
               seniors: clusterSeniors, // Senior[]
             };
           });
-
 
           setSeniors(filteredSeniors);
           setVolunteers(volunteersWithAssignments);
@@ -333,7 +333,7 @@ export function InteractiveMap({
 
       el.addEventListener("click", () => {
         setHighlightedCluster(idx);
-        console.log(cluster)
+        console.log(cluster);
 
         if (popupRef.current) {
           popupRef.current.remove();
@@ -549,7 +549,7 @@ export function InteractiveMap({
         }
 
         // Fit map to cluster bounds if seniors exist
-        console.log(cluster)
+        console.log(cluster);
         if (cluster.seniors && cluster.seniors.length > 0) {
           const bounds = new mapboxgl.LngLatBounds();
           cluster.seniors.forEach((senior) => {
@@ -625,6 +625,43 @@ export function InteractiveMap({
     });
   };
 
+  // Helper to calculate week boundaries with Sunday special case
+  const getWeekBoundaries = () => {
+    const now = new Date();
+    const currentDay = now.getDay(); // 0 = Sunday, 1 = Monday, etc.
+
+    let startOfWeek: Date;
+
+    if (currentDay === 0) {
+      // If today is Sunday, start from today (Sunday)
+      startOfWeek = new Date(now);
+      startOfWeek.setHours(0, 0, 0, 0);
+    } else {
+      // For any other day, get Monday of current week
+      startOfWeek = new Date(now);
+      startOfWeek.setDate(now.getDate() - currentDay + 1); // Monday of this week
+      startOfWeek.setHours(0, 0, 0, 0);
+    }
+
+    const endOfWeek = new Date(startOfWeek);
+    endOfWeek.setDate(startOfWeek.getDate() + 6); // 6 days later
+    endOfWeek.setHours(23, 59, 59, 999);
+
+    return { startOfWeek, endOfWeek };
+  };
+
+  // Helper to check if volunteer is active this week
+  const isVolunteerActiveThisWeek = (volunteerId: string) => {
+    const { startOfWeek, endOfWeek } = getWeekBoundaries();
+
+    return schedules.some((schedule) => {
+      if (schedule.volunteer !== volunteerId) return false;
+
+      const scheduleDate = new Date(schedule.datetime.split("T")[0]);
+      return scheduleDate >= startOfWeek && scheduleDate <= endOfWeek;
+    });
+  };
+
   const createSeniorPopupHTML = (
     senior: Senior,
     priority: "HIGH" | "MEDIUM" | "LOW",
@@ -685,10 +722,11 @@ export function InteractiveMap({
           </div>
           <div class="flex-1">
             <h3 class="font-semibold text-base text-gray-900">${escapeHtml(
-      senior.name || senior.uid
-    )}</h3>
-            <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${priorityStyles[priority]
-      }">
+              senior.name || senior.uid
+            )}</h3>
+            <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
+              priorityStyles[priority]
+            }">
               ${priority} Priority
             </span>
           </div>
@@ -705,27 +743,29 @@ export function InteractiveMap({
             <h4 class="text-sm font-medium text-gray-700 mb-2">Wellbeing Status</h4>
             <div class="space-y-2">
               ${wellbeingItems
-        .map(
-          (item) => `
+                .map(
+                  (item) => `
                 <div class="flex items-center justify-between">
                   <span class="text-sm text-gray-600 flex items-center gap-2">
                     ${item.icon} ${item.label}
                   </span>
                   <span class="text-sm font-medium">
-                    ${item.value !== undefined
-              ? wellbeingLabels[item.value]
-              : "Unknown"
-            }
+                    ${
+                      item.value !== undefined
+                        ? wellbeingLabels[item.value]
+                        : "Unknown"
+                    }
                   </span>
                 </div>
               `
-        )
-        .join("")}
+                )
+                .join("")}
             </div>
           </div>
           
-          ${senior.cluster
-        ? `
+          ${
+            senior.cluster
+              ? `
           <div class="pt-2 border-t border-gray-100">
             <div class="flex items-center justify-between">
               <span class="text-sm text-gray-600 flex items-center gap-2">
@@ -735,8 +775,8 @@ export function InteractiveMap({
             </div>
           </div>
           `
-        : ""
-      }
+              : ""
+          }
         </div>
       </div>
     </div>
@@ -747,10 +787,7 @@ export function InteractiveMap({
     volunteer: Volunteer,
     assignment?: Assignment
   ) => {
-    const available =
-      typeof volunteer.available === "boolean"
-        ? volunteer.available
-        : Array.isArray(volunteer.available) && volunteer.available.length > 0;
+    const isActive = isVolunteerActiveThisWeek(volunteer.vid);
 
     const escapeHtml = (text: string) => {
       const div = document.createElement("div");
@@ -758,10 +795,10 @@ export function InteractiveMap({
       return div.innerHTML;
     };
 
-    const availabilityStyle = available
+    const availabilityStyle = isActive
       ? "bg-green-100 text-green-800"
-      : "bg-red-100 text-red-800";
-    const availabilityText = available ? "Available" : "Unavailable";
+      : "bg-gray-100 text-gray-800";
+    const availabilityText = isActive ? "Active" : "Inactive";
 
     const skillIcon = (skill: number) => {
       if (skill >= 3) return "⭐";
@@ -778,8 +815,8 @@ export function InteractiveMap({
           </div>
           <div class="flex-1">
             <h3 class="font-semibold text-base text-gray-900">${escapeHtml(
-      volunteer.name || volunteer.vid
-    )}</h3>
+              volunteer.name || volunteer.vid
+            )}</h3>
             <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${availabilityStyle}">
               ${availabilityText}
             </span>
@@ -803,14 +840,16 @@ export function InteractiveMap({
                   📍 Assignment
                 </span>
                 <span class="text-sm font-medium">
-                  ${assignment
-        ? `Cluster ${assignment.cluster}`
-        : "Not Assigned"
-      }
+                  ${
+                    assignment
+                      ? `Cluster ${assignment.cluster}`
+                      : "Not Assigned"
+                  }
                 </span>
               </div>
-              ${assignment && assignment.weighted_distance
-        ? `
+              ${
+                assignment && assignment.weighted_distance
+                  ? `
               <div class="flex items-center justify-between">
                 <span class="text-sm text-gray-600 flex items-center gap-2">
                   📏 Distance
@@ -820,8 +859,8 @@ export function InteractiveMap({
                 </span>
               </div>
               `
-        : ""
-      }
+                  : ""
+              }
             </div>
           </div>
         </div>
