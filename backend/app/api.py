@@ -1,4 +1,4 @@
-# from routers import assignment, availability, schedule 
+from routers import availability 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 import uvicorn
@@ -20,7 +20,7 @@ app.add_middleware(
 
 # # Include routers
 # app.include_router(assignment.router)
-# app.include_router(availability.router)
+app.include_router(availability.router)
 # app.include_router(schedule.router)
 
 
