@@ -16,23 +16,14 @@ import { useRef } from "react"
 
 interface Senior {
   uid: string
-  name?: string
+  name: string
   coords: { lat: number; lng: number }
   physical?: number
   mental?: number
   community?: number
   last_visit?: string
   cluster?: number
-  overall_wellbeing?: 1 | 2 | 3
-}
-
-interface Volunteer {
-  vid: string
-  email?: string
-  name?: string
-  coords: { lat: number; lng: number }
-  skill?: number
-  available?: string[]
+  overall_wellbeing: 1 | 2 | 3
 }
 
 interface Assessment {
@@ -43,17 +34,30 @@ interface Assessment {
 }
 
 interface Assignment {
-  volunteer: string
-  cluster: number
-  weighted_distance: number
+    volunteer: string;
+    cluster: string;
+    distance: number;
 }
+
+
+
+interface Volunteer {
+    vid: string;
+    name: string;
+    coords: { lat: number; lng: number };
+    skill: number;
+    available: boolean | string[];
+}
+
 
 interface Schedule {
   volunteer: string
   senior: string
   cluster: number
-  datetime: string
-  duration: number
+  date: string
+  start_time: string
+  end_time: string
+  priority_score: number
 }
 
 export default function VolunteerDashboard() {
@@ -202,8 +206,9 @@ export default function VolunteerDashboard() {
 
   const highPrioritySeniors = seniors.filter((s) => levels[s.overall_wellbeing] === "LOW")
   const highRiskCount = highPrioritySeniors.length
-  const activeVolunteers = volunteers.filter((v) => v.available && v.available.length > 0).length
-  const todaySchedules = schedules.filter((s) => new Date(s.datetime).toDateString() === new Date().toDateString())
+  const activeVolunteers = volunteers.filter((v) => Array.isArray(v.available) && v.available.length > 0
+  ).length
+  const todaySchedules = schedules.filter((s) => new Date(s.start_time).toDateString() === new Date().toDateString())
 
   // if (!isLoaded) {
   //     return <div className="flex justify-center items-center min-h-screen">Loading...</div>
@@ -360,10 +365,10 @@ export default function VolunteerDashboard() {
           {!isMapCollapsed && (
             <CardContent>
               <InteractiveMap
-                seniors={seniors}
-                volunteers={volunteers}
-                assignments={assignments}
-                schedules={schedules}
+                // seniors={seniors}
+                // volunteers={volunteers}
+                // assignments={assignments}
+                // schedules={schedules}
                 highlightedSeniorId={highlightedSeniorId}
                 highlightedVolunteerId={highlightedVolunteerId}
                 onMapUnfocus={() => {

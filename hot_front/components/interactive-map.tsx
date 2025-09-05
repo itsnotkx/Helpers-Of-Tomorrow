@@ -9,23 +9,21 @@ interface Coord {
   lat: number
   lng: number
 }
-
 interface Senior {
   uid: string
-  name?: string
-  coords: Coord
-  physical: number
-  mental: number
-  community: number
+  name: string
+  coords: { lat: number; lng: number }
+  physical?: number
+  mental?: number
+  community?: number
   last_visit?: string
   cluster?: number
-  overall_wellbeing?: number
+  overall_wellbeing: 1 | 2 | 3
 }
-
 interface Volunteer {
   vid: string
-  name?: string
-  coords: Coord
+  name: string
+  coords: { lat: number; lng: number }
   skill: number
   available: boolean | string[]
 }
@@ -44,6 +42,7 @@ interface Schedule {
 }
 
 interface Cluster {
+  [x: string]: any
   center: Coord
   seniors: Senior[]
   radius: number
@@ -164,16 +163,17 @@ export function InteractiveMap({
     map.current.on("load", () => {
       setMapLoaded(true)
       // Add cluster circle source and layer
-      map.current.setMaxBounds(singaporeBounds);
-      map.current.setMinZoom(10);
-      map.current!.addSource("cluster-circles", {
-        type: "geojson",
-        data: {
-          type: "FeatureCollection",
-          features: [],
-        },
-      })
-
+      if (map.current) {
+        map.current.setMaxBounds(singaporeBounds);
+        map.current.setMinZoom(10);
+        map.current.addSource("cluster-circles", {
+          type: "geojson",
+          data: {
+            type: "FeatureCollection",
+            features: [],
+          },
+        });
+      }
       // Add circle layer for cluster boundaries
       map.current!.addLayer({
         id: "cluster-circles-layer",
@@ -273,7 +273,7 @@ export function InteractiveMap({
       const levels = { 1: "HIGH", 2: "MEDIUM", 3: "LOW" }
       const assessment = levels[s.overall_wellbeing] || "LOW"
       const isHighlighted = s.uid === highlightedSeniorId
-      const colorClass = priorityColors[assessment || "LOW"]
+      const colorClass = priorityColors[(assessment || "LOW") as "HIGH" | "MEDIUM" | "LOW"]
       const sizeClass = "w-6 h-6"
       const borderClass = isHighlighted ? "border-4 border-purple-500" : "border-2 border-white"
       const boxShadow = isHighlighted ? "0 0 10px #a855f7" : "0 0 4px #888"
@@ -288,6 +288,8 @@ export function InteractiveMap({
         setHighlightedCluster(null)
         showSeniorPopup(s, assessment)
         if (onSeniorClick) onSeniorClick(s.uid)
+        showSeniorPopup(s, assessment as "HIGH" | "MEDIUM" | "LOW")
+        if (onSeniorClick) onSeniorClick(s.uid) // <-- Call the callback here
       })
 
       const marker = new mapboxgl.Marker(el).setLngLat([s.coords.lng, s.coords.lat]).addTo(map.current!)
@@ -329,8 +331,24 @@ export function InteractiveMap({
   }, [seniors, volunteers, clusters, highlightedSeniorId, highlightedVolunteerId, mapLoaded, highlightedCluster, onMapUnfocus, onSeniorClick])
 
   // --- Helper function to create circle polygon ---
-  const createCirclePolygon = (center, radiusKm, points = 64) => {
-    const coords = []
+  interface CircleCenter {
+    0: number // lng
+    1: number // lat
+    length: 2
+  }
+
+  type CirclePolygon = [number, number][]
+
+  interface CreateCirclePolygonFn {
+    (
+      center: CircleCenter,
+      radiusKm: number,
+      points?: number
+    ): CirclePolygon
+  }
+
+  const createCirclePolygon: CreateCirclePolygonFn = (center, radiusKm, points = 64) => {
+    const coords: CirclePolygon = []
     const distanceX = radiusKm / (111.32 * Math.cos((center[1] * Math.PI) / 180))
     const distanceY = radiusKm / 110.54
 
@@ -349,9 +367,9 @@ export function InteractiveMap({
     if (!map.current || !mapLoaded) return
 
     const features = clusters.map((cluster) => ({
-      type: "Feature",
+      type: "Feature" as const,
       geometry: {
-        type: "Polygon",
+        type: "Polygon" as const,
         coordinates: [
           createCirclePolygon(
             [cluster.center.lng, cluster.center.lat],
@@ -367,8 +385,8 @@ export function InteractiveMap({
     }))
 
     const source = map.current.getSource("cluster-circles")
-    if (source) {
-      source.setData({
+    if (source && "setData" in source) {
+      (source as mapboxgl.GeoJSONSource).setData({
         type: "FeatureCollection",
         features: features,
       })
@@ -455,6 +473,9 @@ export function InteractiveMap({
       const sizeClass = isInHighlightedCluster || isHighlighted ? "w-8 h-8" : "w-6 h-6"
       const borderClass = isHighlighted ? "border-4 border-purple-500" : isInHighlightedCluster ? "border-4 border-purple-500" : "border-2 border-white"
       const boxShadow = isHighlighted ? "0 0 10px #a855f7" : "0 0 4px #888"
+      const colorClass = priorityColors[(assessment || "LOW") as "HIGH" | "MEDIUM" | "LOW"]
+      const sizeClass = isInHighlightedCluster ? "w-8 h-8" : "w-6 h-6"
+      const borderClass = isInHighlightedCluster ? "border-4 border-purple-500" : "border-2 border-white"
 
       const el = document.createElement("div")
       el.className = `${sizeClass} ${colorClass} rounded-full ${borderClass} shadow-md cursor-pointer flex items-center justify-center text-xs relative z-20`
@@ -470,6 +491,7 @@ export function InteractiveMap({
         setHighlightedCluster(null)
         showSeniorPopup(s, assessment)
         if (onSeniorClick) onSeniorClick(s.uid)
+        showSeniorPopup(s, assessment as "HIGH" | "MEDIUM" | "LOW")
       })
       markersRef.current.push(marker)
     })
@@ -505,16 +527,17 @@ export function InteractiveMap({
 
   // --- Popups ---
   const showSeniorPopup = (s: Senior, assessment?: string) => {
+  const showSeniorPopup = (s: Senior, priority?: "HIGH" | "MEDIUM" | "LOW") => {
     if (!map.current) return
-
+  
     if (popupRef.current) {
       popupRef.current.remove()
       popupRef.current = null
     }
-
+  
     const lastVisit = s.last_visit ? new Date(s.last_visit).toLocaleDateString() : "N/A"
-    const priority = assessment || "LOW"
-
+    const displayPriority = priority || "LOW"
+  
     popupRef.current = new mapboxgl.Popup({
       closeOnClick: false, // Disable auto-close to prevent conflicts
       closeButton: true, // Show close button instead
@@ -525,16 +548,16 @@ export function InteractiveMap({
         <div class="p-3 min-w-[200px]">
           <h3 class="font-semibold text-sm mb-1">${s.name || s.uid}</h3>
           <div class="space-y-1 mb-2">
-          <div>🏥 Physical: ${wellbeingLabels[6 - s.physical] || "Unknown"}</div>
-          <div>🧠 Mental: ${wellbeingLabels[6 - s.mental] || "Unknown"}</div>
-          <div>👥 Community: ${wellbeingLabels[6- s.community] || "Unknown"}</div>
+          <div>🏥 Physical: ${s.physical !== undefined ? wellbeingLabels[6 - s.physical] : "Unknown"}</div>
+          <div>🧠 Mental: ${s.mental !== undefined ? wellbeingLabels[6 - s.mental] : "Unknown"}</div>
+          <div>👥 Community: ${s.community !== undefined ? wellbeingLabels[6 - s.community] : "Unknown"}</div>
           <div>📅 Last Visit: ${lastVisit}</div>
           </div>
-          <div class="px-2 py-1 bg-gray-100 rounded text-xs">${priority} priority</div>
+          <div class="px-2 py-1 bg-gray-100 rounded text-xs">${displayPriority} priority</div>
         </div>
       `)
       .addTo(map.current)
-
+  
     popupRef.current.on("close", () => {
       popupRef.current = null
     })
