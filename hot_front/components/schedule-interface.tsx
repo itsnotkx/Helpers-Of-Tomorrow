@@ -33,6 +33,13 @@ interface ScheduleProps {
 }
 
 export function ScheduleInterface({ assignments }: ScheduleProps) {
+  // helper: tell the map to zoom & highlight a volunteer
+  const focusVolunteerOnMap = (vid: string) => {
+    window.dispatchEvent(
+      new CustomEvent("focus-volunteer", { detail: { vid } })
+    );
+  };
+
   const [schedules, setSchedules] = useState<
     Array<{
       volunteer: string;
@@ -489,13 +496,12 @@ export function ScheduleInterface({ assignments }: ScheduleProps) {
                   .map((volunteer) => (
                     <Button
                       key={volunteer.vid}
-                      variant={
-                        selectedVolunteer === volunteer.vid
-                          ? "default"
-                          : "outline"
-                      }
+                      variant={selectedVolunteer === volunteer.vid ? "default" : "outline"}
                       size="sm"
-                      onClick={() => setSelectedVolunteer(volunteer.vid)}
+                      onClick={() => {
+                        setSelectedVolunteer(volunteer.vid);
+                        focusVolunteerOnMap(volunteer.vid); // NEW
+                      }}
                     >
                       {volunteer.name}
                     </Button>

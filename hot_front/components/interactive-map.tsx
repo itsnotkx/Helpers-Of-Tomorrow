@@ -92,6 +92,9 @@ export function InteractiveMap({
   const [schedules, setSchedules] = useState<Schedule[]>([]);
   const [clusters, setClusters] = useState<Cluster[]>([]);
 
+  // NEW: local focused senior id (for clicks from map or external events)
+  const [locallyFocusedSeniorId, setLocallyFocusedSeniorId] = useState<string | null>(null); // NEW
+
   const wellbeingLabels: Record<number, string> = {
     1: "Very Poor",
     2: "Poor",
@@ -284,6 +287,8 @@ export function InteractiveMap({
     });
     return () => map.current?.remove();
   }, []);
+
+  // Focus when highlightedSeniorId prop changes (e.g., from high-priority dashboard)
   useEffect(() => {
     if (!map.current || !mapLoaded) return;
     if (!highlightedSeniorId) return;
@@ -293,17 +298,65 @@ export function InteractiveMap({
 
     // Cancel any cluster focus while we're focusing a single senior
     setHighlightedCluster(null);
+    setLocallyFocusedSeniorId(s.uid); // NEW: ensure purple border even if parent doesn't re-render markers immediately
 
     // Open the senior popup (optional but nice)
     const levels = { 1: "HIGH", 2: "MEDIUM", 3: "LOW" } as const;
     const assessment = (levels[s.overall_wellbeing] || "LOW") as "HIGH" | "MEDIUM" | "LOW";
     showSeniorPopup(s, assessment);
 
-    // Focus the map on the senior (keeps your zoom/radius code untouched elsewhere)
-    // Using fitBounds with maxZoom to avoid over-zooming
+    // Focus the map on the senior (fitBounds prevents over-zoom)
     const bounds = new mapboxgl.LngLatBounds().extend([s.coords.lng, s.coords.lat]);
     map.current.fitBounds(bounds, { padding: 80, maxZoom: 15 });
   }, [highlightedSeniorId, mapLoaded, seniors]);
+
+  // NEW: listen for cross-component focus events (from dashboards)
+  useEffect(() => {
+    if (!mapLoaded) return;
+
+    const onFocusSenior = (e: any) => {
+      const uid = e?.detail?.uid as string | undefined;
+      if (!uid) return;
+      const s = seniors.find((x) => x.uid === uid);
+      if (!s?.coords) return;
+
+      setHighlightedCluster(null);
+      setLocallyFocusedSeniorId(s.uid);
+
+      const levels = { 1: "HIGH", 2: "MEDIUM", 3: "LOW" } as const;
+      const assessment = (levels[s.overall_wellbeing] || "LOW") as "HIGH" | "MEDIUM" | "LOW";
+      showSeniorPopup(s, assessment);
+
+      map.current?.flyTo({
+        center: [s.coords.lng, s.coords.lat],
+        zoom: Math.max(map.current!.getZoom(), 15),
+        essential: true,
+      });
+    };
+
+    const onFocusVolunteer = (e: any) => {
+      const vid = e?.detail?.vid as string | undefined;
+      if (!vid) return;
+      const v = volunteers.find((x) => x.vid === vid);
+      if (!v?.coords) return;
+
+      setHighlightedCluster(null);
+      setLocallyFocusedSeniorId(null);
+
+      map.current?.flyTo({
+        center: [v.coords.lng, v.coords.lat],
+        zoom: Math.max(map.current!.getZoom(), 14),
+        essential: true,
+      });
+    };
+
+    window.addEventListener("focus-senior", onFocusSenior as EventListener);
+    window.addEventListener("focus-volunteer", onFocusVolunteer as EventListener);
+    return () => {
+      window.removeEventListener("focus-senior", onFocusSenior as EventListener);
+      window.removeEventListener("focus-volunteer", onFocusVolunteer as EventListener);
+    };
+  }, [mapLoaded, seniors, volunteers]);
 
   // --- Re-render markers when data changes ---
   useEffect(() => {
@@ -354,7 +407,7 @@ export function InteractiveMap({
 
       el.addEventListener("click", () => {
         setHighlightedCluster(idx);
-        console.log(cluster);
+        setLocallyFocusedSeniorId(null); // NEW: clear single focus when cluster focus starts
 
         if (popupRef.current) {
           popupRef.current.remove();
@@ -378,31 +431,29 @@ export function InteractiveMap({
     });
 
     // Senior markers
-    // Senior markers
     seniors.forEach((s) => {
       if (!s.coords) return;
       const levels = { 1: "HIGH", 2: "MEDIUM", 3: "LOW" } as const;
       const assessment = levels[s.overall_wellbeing] || "LOW";
 
-      // NEW: highlight seniors inside the focused cluster
+      // highlight seniors inside the focused cluster
       const isInHighlightedCluster =
         highlightedCluster !== null &&
         clusters[highlightedCluster]?.seniors?.some(
           (clusterSenior) => clusterSenior.uid === s.uid
         );
 
-      // existing single-senior highlight (from prop)
+      // existing single-senior highlight (from prop) + NEW local focus
       const isIndividuallyHighlighted = s.uid === highlightedSeniorId;
+      const isLocallyFocused = s.uid === locallyFocusedSeniorId; // NEW
 
-      // use purple border if either case is true
-      const focused = isInHighlightedCluster || isIndividuallyHighlighted;
+      // purple border if any of the above is true
+      const focused = isInHighlightedCluster || isIndividuallyHighlighted || isLocallyFocused; // NEW
 
       const colorClass =
         priorityColors[(assessment || "LOW") as "HIGH" | "MEDIUM" | "LOW"];
 
-      // slight size bump when focused (optional; delete if you don’t want it)
       const sizeClass = focused ? "w-8 h-8" : "w-6 h-6";
-
       const borderClass = focused
         ? "border-4 border-purple-500"
         : "border-2 border-white";
@@ -416,8 +467,18 @@ export function InteractiveMap({
 
       el.addEventListener("click", (e) => {
         e.stopPropagation();
-        setHighlightedCluster(null); // clicking a senior cancels cluster focus (keeps your behavior)
+        setHighlightedCluster(null); // clicking a senior cancels cluster focus
+        setLocallyFocusedSeniorId(s.uid); // NEW: ensure purple border on this one
+
         showSeniorPopup(s, assessment as "HIGH" | "MEDIUM" | "LOW");
+
+        // NEW: focus/zoom camera on this senior
+        map.current?.flyTo({
+          center: [s.coords.lng, s.coords.lat],
+          zoom: Math.max(map.current!.getZoom(), 15),
+          essential: true,
+        });
+
         if (onSeniorClick) onSeniorClick(s.uid);
       });
 
@@ -426,7 +487,6 @@ export function InteractiveMap({
         .addTo(map.current!);
       markersRef.current.push(marker);
     });
-
 
     // Volunteer markers
     volunteers.forEach((v) => {
@@ -441,6 +501,7 @@ export function InteractiveMap({
       el.addEventListener("click", (e) => {
         e.stopPropagation();
         setHighlightedCluster(null);
+        setLocallyFocusedSeniorId(null); // NEW: clear single-senior focus when focusing a volunteer
         showVolunteerPopup(v);
       });
       markersRef.current.push(marker);
@@ -448,7 +509,10 @@ export function InteractiveMap({
     
     // Clicking elsewhere on the map unfocuses
     if (map.current && onMapUnfocus) {
-      map.current.on("click", onMapUnfocus);
+      map.current.on("click", () => {
+        setLocallyFocusedSeniorId(null); // NEW: clear local focus on map click
+        onMapUnfocus();
+      });
     }
     return () => {
       if (map.current && onMapUnfocus) {
@@ -464,6 +528,7 @@ export function InteractiveMap({
     highlightedCluster,
     onMapUnfocus,
     onSeniorClick,
+    locallyFocusedSeniorId, // NEW
   ]);
 
   // --- Helper function to create circle polygon ---
@@ -614,7 +679,7 @@ export function InteractiveMap({
         1: "HIGH",
         2: "MEDIUM",
         3: "LOW",
-      };
+      } as const;
       const assessment = levels[s.overall_wellbeing] || "LOW";
       const isInHighlightedCluster =
         highlightedCluster !== null &&
@@ -622,10 +687,15 @@ export function InteractiveMap({
           (clusterSenior) => clusterSenior.uid === s.uid
         );
 
+      // NEW: include local focus + prop focus
+      const isIndividuallyHighlighted = s.uid === highlightedSeniorId;
+      const isLocallyFocused = s.uid === locallyFocusedSeniorId;
+      const focused = isInHighlightedCluster || isIndividuallyHighlighted || isLocallyFocused; // NEW
+
       const colorClass =
         priorityColors[(assessment || "LOW") as "HIGH" | "MEDIUM" | "LOW"];
-      const sizeClass = isInHighlightedCluster ? "w-8 h-8" : "w-6 h-6";
-      const borderClass = isInHighlightedCluster
+      const sizeClass = focused ? "w-8 h-8" : "w-6 h-6";
+      const borderClass = focused
         ? "border-4 border-purple-500"
         : "border-2 border-white";
 
@@ -641,7 +711,17 @@ export function InteractiveMap({
       el.addEventListener("click", (e) => {
         e.stopPropagation();
         setHighlightedCluster(null);
+        setLocallyFocusedSeniorId(s.uid); // NEW: border on this one
         showSeniorPopup(s, assessment as "HIGH" | "MEDIUM" | "LOW");
+
+        // NEW: focus now
+        map.current?.flyTo({
+          center: [s.coords.lng, s.coords.lat],
+          zoom: Math.max(map.current!.getZoom(), 15),
+          essential: true,
+        });
+
+        if (onSeniorClick) onSeniorClick(s.uid);
       });
       markersRef.current.push(marker);
     });
@@ -659,6 +739,7 @@ export function InteractiveMap({
       el.addEventListener("click", (e) => {
         e.stopPropagation();
         setHighlightedCluster(null);
+        setLocallyFocusedSeniorId(null); // NEW
         showVolunteerPopup(v);
       });
       markersRef.current.push(marker);
