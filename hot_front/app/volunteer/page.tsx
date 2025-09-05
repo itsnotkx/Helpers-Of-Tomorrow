@@ -18,7 +18,7 @@ export default function Scheduler() {
       <DashboardHeader
         title="Your Volunteer Schedule"
         subtitle="Managing care for Singapore"
-        selectedDistrict="Yishun"
+        selectedDistrict="Sembawang"
         needButton={false} 
       />
 

@@ -11,7 +11,15 @@ import {
 } from "@/components/ui/card";
 import { useUser } from "@clerk/nextjs";
 import { Button } from "@/components/ui/button";
-import { Loader2 } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import {
+  Loader2,
+  Calendar,
+  Clock,
+  MapPin,
+  User,
+  CheckCircle2,
+} from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -47,6 +55,14 @@ export default function VolunteerSchedule() {
   });
 
   const { isLoaded, isSignedIn, user } = useUser();
+
+  // Format time as HH:MM (removes seconds if present)
+  const formatTime = (timeString: string) => {
+    if (!timeString) return timeString;
+    const [hh = "", mm = ""] = timeString.split(":");
+    return `${hh}:${mm}`;
+  };
+
   useEffect(() => {
     if (user?.primaryEmailAddress?.emailAddress) {
       fetchUserSchedules(user.primaryEmailAddress.emailAddress);
@@ -103,8 +119,8 @@ export default function VolunteerSchedule() {
             return {
               aid: assignment.aid || assignment.id, // Use appropriate ID field
               date: assignment.date,
-              start_time: assignment.start_time,
-              end_time: assignment.end_time,
+              start_time: formatTime(assignment.start_time),
+              end_time: formatTime(assignment.end_time),
               is_acknowledged: assignment.is_acknowledged || false,
               senior_name: senior?.name || assignment.sid,
               address: senior?.address || "Address not available",
@@ -202,10 +218,11 @@ export default function VolunteerSchedule() {
       ) : (
         <>
           <div className="w-full mx-auto space-y-4">
-            <p className="text-lg text-center font-bold mb-4 text-red-500">
-              {" "}
-              New Assignments{" "}
-            </p>
+            <div className="flex items-center justify-center gap-2 mb-6">
+              <Badge variant="destructive" className="text-base px-4 py-2">
+                New Assignments
+              </Badge>
+            </div>
             {userSchedule.filter(
               (s: userSchedule) => s.is_acknowledged === false
             ).length > 0 ? (
@@ -213,37 +230,74 @@ export default function VolunteerSchedule() {
                 .filter((s: userSchedule) => s.is_acknowledged === false)
                 .sort((a, b) => a.date.localeCompare(b.date))
                 .map((s: userSchedule) => (
-                  <Card key={s.aid} className="shadow-md">
-                    <CardHeader>
-                      <CardTitle>{s.senior_name}</CardTitle>
-                      <CardDescription>
-                        {s.date[8]}
-                        {s.date[9]}-{s.date[5]}
-                        {s.date[6]}-{s.date[0]}
-                        {s.date[1]}
-                        {s.date[2]}
-                        {s.date[3]} | {s.start_time} - {s.end_time}
-                      </CardDescription>
+                  <Card
+                    key={s.aid}
+                    className="shadow-lg border-l-4 border-l-red-500 hover:shadow-xl transition-shadow duration-200"
+                  >
+                    <CardHeader className="pb-3">
+                      <div className="flex items-start justify-between">
+                        <div className="space-y-1">
+                          <CardTitle className="flex items-center gap-2 text-lg">
+                            <User className="h-5 w-5 text-blue-600" />
+                            {s.senior_name}
+                          </CardTitle>
+                          <CardDescription className="flex items-center gap-4 text-base">
+                            <div className="flex items-center gap-1">
+                              <Calendar className="h-4 w-4 text-gray-500" />
+                              <span>
+                                {s.date[8]}
+                                {s.date[9]}-{s.date[5]}
+                                {s.date[6]}-{s.date[0]}
+                                {s.date[1]}
+                                {s.date[2]}
+                                {s.date[3]}
+                              </span>
+                            </div>
+                            <div className="flex items-center gap-1">
+                              <Clock className="h-4 w-4 text-gray-500" />
+                              <span>
+                                {s.start_time} - {s.end_time}
+                              </span>
+                            </div>
+                          </CardDescription>
+                        </div>
+                        <Badge
+                          variant="outline"
+                          className="bg-red-50 text-red-700 border-red-200"
+                        >
+                          New
+                        </Badge>
+                      </div>
                     </CardHeader>
-                    <CardContent>
-                      <p className="text-sm">{s.address}</p>
+                    <CardContent className="py-3">
+                      <div className="flex items-start gap-2">
+                        <MapPin className="h-4 w-4 text-green-600 mt-0.5 flex-shrink-0" />
+                        <p className="text-sm text-gray-700 leading-relaxed">
+                          {s.address}
+                        </p>
+                      </div>
                     </CardContent>
-                    <CardFooter className="flex justify-end">
-                      <label className="flex items-center gap-2 cursor-pointer">
+                    <CardFooter className="pt-3 bg-gray-50/50">
+                      <label className="flex items-center gap-3 cursor-pointer ml-auto">
                         <input
                           type="checkbox"
                           checked={!!acknowledged[s.aid]}
                           onChange={() => handleCheckboxChange(s.aid)}
                           className="w-4 h-4 accent-blue-600 cursor-pointer"
                         />
-                        <span className="text-sm">Acknowledge</span>
+                        <span className="text-sm font-medium text-gray-700">
+                          Acknowledge Assignment
+                        </span>
                       </label>
                     </CardFooter>
                   </Card>
                 ))
             ) : (
-              <Card className="text-center ">
-                No new assignments available.
+              <Card className="text-center py-8 border-dashed border-2">
+                <CardContent>
+                  <CheckCircle2 className="h-12 w-12 text-gray-400 mx-auto mb-2" />
+                  <p className="text-gray-500">No new assignments available.</p>
+                </CardContent>
               </Card>
             )}
           </div>
@@ -267,10 +321,11 @@ export default function VolunteerSchedule() {
             </Button>
           </div>
 
-          <p className="text-lg text-center font-bold text-red-500 mb-4 mt-6">
-            {" "}
-            Outstanding Assignments
-          </p>
+          <div className="flex items-center justify-center gap-2 mb-6 mt-8">
+            <Badge variant="secondary" className="text-base px-4 py-2">
+              Outstanding Assignments
+            </Badge>
+          </div>
           <div className="w-full mx-auto space-y-4">
             {userSchedule.filter(
               (s: userSchedule) => s.is_acknowledged === true
@@ -279,26 +334,64 @@ export default function VolunteerSchedule() {
                 .filter((s: userSchedule) => s.is_acknowledged === true)
                 .sort((a, b) => a.date.localeCompare(b.date))
                 .map((s: userSchedule) => (
-                  <Card key={s.aid} className="shadow-md">
-                    <CardHeader>
-                      <CardTitle>{s.senior_name}</CardTitle>
-                      <CardDescription>
-                        {s.date[8]}
-                        {s.date[9]}-{s.date[5]}
-                        {s.date[6]}-{s.date[0]}
-                        {s.date[1]}
-                        {s.date[2]}
-                        {s.date[3]} | {s.start_time} - {s.end_time}
-                      </CardDescription>
+                  <Card
+                    key={s.aid}
+                    className="shadow-md border-l-4 border-l-green-500 hover:shadow-lg transition-shadow duration-200"
+                  >
+                    <CardHeader className="pb-3">
+                      <div className="flex items-start justify-between">
+                        <div className="space-y-1">
+                          <CardTitle className="flex items-center gap-2 text-lg">
+                            <User className="h-5 w-5 text-blue-600" />
+                            {s.senior_name}
+                          </CardTitle>
+                          <CardDescription className="flex items-center gap-4 text-base">
+                            <div className="flex items-center gap-1">
+                              <Calendar className="h-4 w-4 text-gray-500" />
+                              <span>
+                                {s.date[8]}
+                                {s.date[9]}-{s.date[5]}
+                                {s.date[6]}-{s.date[0]}
+                                {s.date[1]}
+                                {s.date[2]}
+                                {s.date[3]}
+                              </span>
+                            </div>
+                            <div className="flex items-center gap-1">
+                              <Clock className="h-4 w-4 text-gray-500" />
+                              <span>
+                                {s.start_time} - {s.end_time}
+                              </span>
+                            </div>
+                          </CardDescription>
+                        </div>
+                        <Badge
+                          variant="secondary"
+                          className="bg-green-50 text-green-700 border-green-200"
+                        >
+                          <CheckCircle2 className="h-3 w-3 mr-1" />
+                          Acknowledged
+                        </Badge>
+                      </div>
                     </CardHeader>
-                    <CardContent>
-                      <p className="text-sm">{s.address}</p>
+                    <CardContent className="py-3">
+                      <div className="flex items-start gap-2">
+                        <MapPin className="h-4 w-4 text-green-600 mt-0.5 flex-shrink-0" />
+                        <p className="text-sm text-gray-700 leading-relaxed">
+                          {s.address}
+                        </p>
+                      </div>
                     </CardContent>
                   </Card>
                 ))
             ) : (
-              <Card className="text-center ">
-                No outstanding assignments available.
+              <Card className="text-center py-8 border-dashed border-2">
+                <CardContent>
+                  <CheckCircle2 className="h-12 w-12 text-gray-400 mx-auto mb-2" />
+                  <p className="text-gray-500">
+                    No outstanding assignments available.
+                  </p>
+                </CardContent>
               </Card>
             )}
           </div>

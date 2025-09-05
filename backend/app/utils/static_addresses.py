@@ -21,21 +21,30 @@ SINGAPORE_AREAS = {
     "Jurong": (1.3404, 103.7436),
     "Clementi": (1.3162, 103.7649),
     "Queenstown": (1.2966, 103.8057),
+    "Orchard": (1.3048, 103.8318),
+    "Marina Bay": (1.2800, 103.8544),
+    "Bukit Timah": (1.3294, 103.7890),
+    "Holland Village": (1.3115, 103.7969),
+    "Novena": (1.3202, 103.8431),
+    "Little India": (1.3067, 103.8521),
+    "Chinatown": (1.2817, 103.8441),
 }
 
-def get_nearest_area(lat: float, lng: float) -> Optional[str]:
+def get_nearest_area(lat: float, lng: float) -> str:
     """Find the nearest Singapore area to given coordinates"""
     min_distance = float('inf')
-    nearest_area = None
+    nearest_area = "Singapore"  # Default fallback
     
     for area_name, (area_lat, area_lng) in SINGAPORE_AREAS.items():
-        # Simple distance calculation
+        # Calculate distance using Euclidean distance (good enough for Singapore's size)
         distance = math.sqrt((lat - area_lat)**2 + (lng - area_lng)**2)
         if distance < min_distance:
             min_distance = distance
             nearest_area = area_name
     
-    if min_distance < 0.05:  # Within reasonable distance
-        return f"{nearest_area} Area, Singapore"
+    # Much more generous threshold - Singapore is small, so even 0.2 degrees is reasonable
+    if min_distance < 0.2:  # Expanded from 0.05 to 0.2
+        return f"{nearest_area}, Singapore"
     
-    return "Singapore"
+    # Always return the nearest area even if it's far (better than generic "Singapore")
+    return f"{nearest_area}, Singapore"

@@ -49,6 +49,7 @@ export function ScheduleInterface({ assignments }: ScheduleProps) {
       start_time: string;
       end_time: string;
       priority_score: number;
+      is_acknowledged: boolean;
     }>
   >([]);
   const [volunteers, setVolunteers] = useState<
@@ -79,6 +80,16 @@ export function ScheduleInterface({ assignments }: ScheduleProps) {
     if (!timeString) return timeString;
     const [hh = "", mm = ""] = timeString.split(":");
     return `${hh}:${mm}`;
+  };
+
+  // Format date as DD-MM-YYYY
+  const formatDate = (dateString: string) => {
+    if (!dateString) return dateString;
+    const date = new Date(dateString);
+    const day = date.getDate().toString().padStart(2, "0");
+    const month = (date.getMonth() + 1).toString().padStart(2, "0");
+    const year = date.getFullYear();
+    return `${day}-${month}-${year}`;
   };
 
   // Generate time slots (9 AM to 6 PM)
@@ -124,6 +135,7 @@ export function ScheduleInterface({ assignments }: ScheduleProps) {
           start_time: formatTime(assignment.start_time || "09:00"),
           end_time: formatTime(assignment.end_time || "10:00"),
           priority_score: assignment.priority_score || 1,
+          is_acknowledged: assignment.is_acknowledged || false,
         }));
 
         setSchedules(mappedSchedules);
@@ -448,6 +460,31 @@ export function ScheduleInterface({ assignments }: ScheduleProps) {
                                         </div>
                                       </div>
                                     </div>
+
+                                    {/* Acknowledgement Status */}
+                                    <div className="mt-3 pt-3 border-t border-border/20">
+                                      <div className="flex items-center justify-between">
+                                        <span className="text-xs text-muted-foreground">
+                                          Acknowledgement Status:
+                                        </span>
+                                        <Badge
+                                          variant={
+                                            schedule.is_acknowledged
+                                              ? "default"
+                                              : "secondary"
+                                          }
+                                          className={
+                                            schedule.is_acknowledged
+                                              ? "bg-green-600 hover:bg-green-700 text-white"
+                                              : "bg-orange-100 text-orange-700 border-orange-200"
+                                          }
+                                        >
+                                          {schedule.is_acknowledged
+                                            ? "Acknowledged"
+                                            : "Pending"}
+                                        </Badge>
+                                      </div>
+                                    </div>
                                   </div>
                                 ))}
                               </div>
@@ -574,7 +611,7 @@ export function ScheduleInterface({ assignments }: ScheduleProps) {
                                   <div className="flex items-center gap-2">
                                     <Calendar className="h-4 w-4 text-muted-foreground" />
                                     <span className="text-sm">
-                                      {schedule.date}
+                                      {formatDate(schedule.date)}
                                     </span>
                                     <Clock className="h-4 w-4 text-muted-foreground ml-2" />
                                     <span className="text-sm">
@@ -588,6 +625,22 @@ export function ScheduleInterface({ assignments }: ScheduleProps) {
                                   <div className="flex items-center gap-2">
                                     <Badge variant="outline">
                                       Cluster: {schedule.cluster}
+                                    </Badge>
+                                    <Badge
+                                      variant={
+                                        schedule.is_acknowledged
+                                          ? "default"
+                                          : "secondary"
+                                      }
+                                      className={
+                                        schedule.is_acknowledged
+                                          ? "bg-green-600 hover:bg-green-700 text-white"
+                                          : "bg-orange-100 text-orange-700 border-orange-200"
+                                      }
+                                    >
+                                      {schedule.is_acknowledged
+                                        ? "Acknowledged"
+                                        : "Pending"}
                                     </Badge>
                                   </div>
                                 </div>
