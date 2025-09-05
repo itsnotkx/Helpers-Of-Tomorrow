@@ -1,0 +1,1001 @@
+age,physical,mental,dl_intervention,rece_gov_sup,community,making_ends_meet,living_situation,overall_wellbeing
+88,5,3,No,Yes,Medium,Manageable,With Family,High
+74,3,2,No,No,Low,Manageable,Assisted Living,Low
+67,5,3,No,Yes,High,Manageable,With Spouse,High
+80,3,2,No,Yes,Medium,Manageable,Assisted Living,Medium
+78,4,3,Yes,No,High,Struggling,Alone,Low
+82,5,2,No,Yes,High,Comfortable,With Family,High
+70,4,4,Yes,No,High,Comfortable,Alone,Medium
+70,2,2,No,No,Low,Comfortable,Assisted Living,Low
+83,2,2,No,Yes,Low,Manageable,With Family,Medium
+95,1,1,Yes,Yes,Low,Struggling,With Family,Low
+83,5,2,No,No,Low,Manageable,Assisted Living,Medium
+62,4,1,No,No,High,Manageable,With Family,Medium
+81,3,5,No,No,High,Comfortable,Assisted Living,High
+61,2,1,No,No,Medium,Manageable,With Family,Medium
+83,2,4,No,No,Medium,Struggling,Assisted Living,Low
+89,3,1,Yes,No,Medium,Manageable,With Family,Medium
+61,4,5,No,Yes,High,Struggling,Alone,Medium
+80,4,4,Yes,Yes,Medium,Comfortable,With Family,High
+92,5,3,No,Yes,Medium,Manageable,Alone,Medium
+71,5,3,Yes,Yes,High,Comfortable,With Family,High
+81,1,1,No,Yes,Medium,Manageable,With Family,Medium
+84,2,1,No,Yes,Medium,Struggling,With Family,Low
+86,5,5,Yes,No,Medium,Comfortable,Alone,Medium
+87,4,5,No,Yes,High,Struggling,Alone,Medium
+75,3,2,No,Yes,Medium,Comfortable,With Family,High
+74,4,5,No,Yes,High,Manageable,Assisted Living,High
+62,2,2,No,Yes,High,Struggling,With Spouse,Medium
+66,4,4,No,Yes,Medium,Struggling,With Spouse,Medium
+80,1,1,No,Yes,Medium,Comfortable,With Family,Medium
+68,2,4,Yes,Yes,High,Manageable,With Family,Medium
+77,3,5,Yes,No,Medium,Comfortable,With Spouse,Medium
+63,1,4,No,No,Medium,Struggling,With Spouse,Low
+84,2,4,No,No,Medium,Manageable,With Spouse,Medium
+73,3,4,No,No,Medium,Struggling,Assisted Living,Medium
+68,1,5,No,Yes,Medium,Manageable,Alone,Medium
+85,1,4,No,No,Medium,Struggling,With Spouse,Low
+61,2,2,No,No,High,Comfortable,Alone,Medium
+79,5,5,No,Yes,High,Struggling,With Spouse,High
+87,1,4,No,No,Medium,Struggling,With Family,Medium
+66,1,5,No,Yes,Medium,Struggling,With Spouse,Medium
+67,3,3,No,No,Medium,Manageable,Alone,Medium
+94,4,2,No,No,High,Manageable,With Family,High
+73,2,4,No,Yes,High,Struggling,Alone,Low
+76,2,3,Yes,No,Medium,Manageable,Alone,Low
+95,5,3,Yes,No,High,Manageable,Assisted Living,Medium
+63,5,5,No,No,Medium,Struggling,With Family,High
+61,2,3,No,Yes,High,Manageable,Assisted Living,Medium
+65,5,2,No,No,Medium,Manageable,Assisted Living,Medium
+63,3,2,No,Yes,Low,Struggling,With Family,Low
+88,2,1,Yes,Yes,High,Manageable,Alone,Low
+77,5,2,No,Yes,Medium,Comfortable,With Family,High
+85,2,3,No,No,High,Comfortable,Assisted Living,Medium
+93,4,2,No,No,Medium,Comfortable,With Family,High
+69,1,5,No,No,Medium,Manageable,With Family,Medium
+95,2,1,No,No,Medium,Comfortable,With Spouse,Medium
+73,1,3,Yes,Yes,Medium,Comfortable,Assisted Living,Medium
+90,5,1,No,Yes,Low,Comfortable,With Family,Medium
+74,1,3,No,Yes,High,Manageable,Assisted Living,Medium
+67,2,5,No,Yes,High,Struggling,Alone,Medium
+73,4,1,No,Yes,Low,Comfortable,With Spouse,Medium
+82,5,4,Yes,Yes,Medium,Struggling,With Spouse,Medium
+80,2,3,Yes,Yes,Low,Struggling,With Family,Low
+75,5,4,No,Yes,Medium,Struggling,Alone,Medium
+77,3,1,No,Yes,Low,Struggling,Alone,Low
+83,1,4,Yes,Yes,Medium,Manageable,Assisted Living,Medium
+85,3,4,Yes,No,Medium,Struggling,Alone,Low
+84,2,1,No,No,Low,Manageable,Assisted Living,Low
+88,4,5,Yes,No,Medium,Struggling,With Spouse,Medium
+74,5,4,No,Yes,High,Manageable,Assisted Living,High
+60,1,4,No,Yes,High,Struggling,With Family,Medium
+84,5,5,No,No,High,Manageable,Assisted Living,High
+66,2,4,Yes,Yes,High,Struggling,Assisted Living,Low
+68,5,4,Yes,Yes,High,Comfortable,Alone,Medium
+83,1,4,No,Yes,Medium,Manageable,Alone,Medium
+60,2,2,No,Yes,Medium,Manageable,With Spouse,Medium
+67,5,5,No,Yes,Medium,Manageable,With Family,High
+83,4,4,Yes,Yes,Medium,Comfortable,Assisted Living,Medium
+70,2,5,No,No,High,Struggling,With Family,Medium
+76,2,3,No,Yes,High,Struggling,With Family,Medium
+67,4,3,No,Yes,High,Manageable,Alone,Medium
+94,3,4,No,No,Medium,Struggling,Assisted Living,Medium
+94,1,5,No,Yes,High,Comfortable,Assisted Living,High
+92,3,5,No,Yes,High,Comfortable,With Spouse,High
+64,5,5,Yes,No,Medium,Struggling,With Family,Medium
+87,4,2,No,Yes,Low,Manageable,Alone,Low
+66,3,3,Yes,Yes,High,Manageable,With Family,Medium
+68,2,5,No,Yes,Medium,Manageable,With Family,High
+67,5,5,No,Yes,Medium,Manageable,Alone,High
+71,5,2,Yes,Yes,Medium,Manageable,With Spouse,Medium
+93,3,2,No,No,Low,Manageable,With Spouse,Medium
+92,3,5,Yes,Yes,High,Manageable,With Family,High
+82,4,1,No,Yes,High,Comfortable,With Family,High
+83,1,5,No,Yes,Low,Struggling,Alone,Low
+94,3,5,Yes,Yes,Medium,Comfortable,With Family,High
+81,3,2,No,No,Medium,Comfortable,With Family,Medium
+86,2,2,No,Yes,Medium,Manageable,With Spouse,Medium
+94,5,5,Yes,Yes,Medium,Comfortable,Alone,Medium
+60,1,5,Yes,Yes,Low,Manageable,With Family,Medium
+94,2,5,No,Yes,Low,Struggling,Assisted Living,Low
+73,4,2,No,Yes,Medium,Manageable,With Spouse,Medium
+62,4,5,No,No,High,Comfortable,With Spouse,High
+60,3,5,Yes,Yes,Low,Manageable,Alone,Low
+64,3,4,Yes,Yes,High,Manageable,With Family,High
+85,4,1,No,Yes,High,Comfortable,Alone,Medium
+73,3,3,Yes,No,Low,Manageable,With Spouse,Low
+86,1,1,Yes,Yes,High,Struggling,With Family,Low
+68,3,4,Yes,No,High,Comfortable,With Family,High
+74,5,3,No,No,High,Comfortable,With Spouse,High
+74,3,5,No,No,Low,Comfortable,With Spouse,Medium
+85,2,4,No,Yes,Medium,Comfortable,With Family,High
+72,1,5,No,Yes,Medium,Manageable,Alone,Medium
+91,2,2,No,No,High,Comfortable,Alone,Medium
+91,2,4,No,No,Medium,Struggling,Assisted Living,Low
+63,5,2,Yes,No,Medium,Struggling,Alone,Low
+89,1,4,No,Yes,High,Manageable,With Family,High
+82,1,4,No,Yes,Medium,Struggling,Assisted Living,Low
+74,1,2,No,Yes,High,Comfortable,With Spouse,Medium
+88,1,3,No,No,Low,Comfortable,With Spouse,Medium
+95,1,1,No,Yes,Medium,Struggling,With Family,Low
+72,5,5,Yes,Yes,Low,Manageable,Assisted Living,Medium
+91,3,4,No,No,High,Manageable,Assisted Living,Medium
+66,2,5,No,Yes,Medium,Comfortable,With Family,High
+81,1,2,No,No,Medium,Comfortable,Alone,Low
+87,3,5,No,Yes,Medium,Struggling,With Family,Medium
+61,3,2,No,Yes,Low,Manageable,With Spouse,Medium
+65,2,5,Yes,Yes,High,Struggling,With Family,Medium
+87,5,1,No,No,High,Struggling,Alone,Low
+87,4,1,Yes,Yes,Medium,Comfortable,Alone,Low
+79,4,1,No,Yes,Medium,Struggling,With Family,Medium
+89,3,1,No,No,Medium,Manageable,With Family,Medium
+70,2,1,No,Yes,High,Struggling,With Spouse,Low
+87,4,1,No,Yes,Medium,Manageable,With Spouse,Medium
+84,3,2,No,Yes,High,Comfortable,Assisted Living,Medium
+92,5,4,Yes,Yes,Medium,Manageable,With Family,High
+60,4,5,No,No,Medium,Struggling,With Spouse,Medium
+86,3,1,Yes,Yes,Medium,Manageable,Alone,Low
+72,3,2,No,Yes,High,Struggling,With Spouse,Medium
+62,1,2,Yes,Yes,Medium,Struggling,Assisted Living,Low
+65,5,2,Yes,No,High,Comfortable,With Family,High
+67,1,4,No,Yes,High,Manageable,With Family,High
+86,2,5,Yes,Yes,Medium,Manageable,With Family,Medium
+68,1,4,No,Yes,Low,Manageable,With Spouse,Medium
+92,1,3,No,Yes,High,Struggling,Assisted Living,Low
+83,4,2,Yes,Yes,Medium,Manageable,With Family,Medium
+74,3,3,No,Yes,Low,Struggling,Alone,Low
+91,5,1,Yes,No,Low,Comfortable,Alone,Low
+91,1,1,Yes,Yes,High,Comfortable,With Family,Medium
+83,5,4,No,No,Low,Struggling,Assisted Living,Medium
+71,1,5,Yes,No,High,Struggling,With Spouse,Low
+61,2,3,No,Yes,High,Manageable,Assisted Living,Medium
+62,1,5,Yes,Yes,High,Struggling,With Family,Medium
+76,4,4,Yes,Yes,Medium,Comfortable,With Spouse,High
+61,3,1,No,No,High,Manageable,Alone,Low
+61,2,5,No,Yes,High,Struggling,Alone,Medium
+87,1,5,Yes,Yes,High,Comfortable,With Family,High
+82,5,1,No,Yes,Low,Comfortable,Alone,Medium
+91,2,3,Yes,No,Low,Manageable,With Spouse,Low
+92,2,1,No,No,High,Struggling,With Family,Low
+60,1,5,No,Yes,Low,Manageable,With Family,Medium
+78,2,3,No,No,Low,Manageable,Alone,Low
+61,5,3,No,Yes,Medium,Comfortable,With Spouse,High
+85,2,1,No,Yes,High,Comfortable,With Family,Medium
+91,5,5,No,No,Medium,Comfortable,With Family,High
+65,1,4,No,Yes,Low,Manageable,Assisted Living,Medium
+91,3,5,No,Yes,Medium,Comfortable,Alone,Medium
+63,2,2,Yes,Yes,High,Struggling,Assisted Living,Low
+70,3,4,No,No,Medium,Manageable,With Family,High
+76,5,3,No,No,Medium,Struggling,With Family,Medium
+83,2,4,No,No,Medium,Manageable,With Family,Medium
+64,4,3,No,No,High,Comfortable,With Spouse,High
+93,3,3,No,Yes,High,Struggling,Alone,Low
+65,2,4,Yes,Yes,Low,Manageable,With Family,Medium
+81,3,3,Yes,Yes,Low,Manageable,With Family,Medium
+70,2,3,No,Yes,High,Manageable,With Family,High
+75,1,2,No,Yes,Low,Manageable,With Spouse,Low
+92,3,5,No,No,High,Struggling,Assisted Living,Medium
+68,4,5,No,Yes,Medium,Comfortable,With Family,High
+65,4,2,No,Yes,Medium,Manageable,Alone,Medium
+75,5,4,No,Yes,Low,Manageable,With Spouse,High
+88,2,1,Yes,Yes,Low,Struggling,With Family,Low
+62,3,1,Yes,No,High,Comfortable,With Family,Medium
+79,5,1,No,Yes,Low,Manageable,With Family,Medium
+95,3,2,No,Yes,High,Manageable,Assisted Living,Medium
+78,2,2,Yes,No,Medium,Struggling,With Spouse,Low
+85,4,3,No,Yes,Medium,Manageable,With Spouse,High
+62,1,1,No,Yes,Medium,Manageable,Assisted Living,Low
+78,4,4,No,Yes,High,Comfortable,Assisted Living,High
+79,5,4,No,Yes,Low,Struggling,With Family,Medium
+91,1,1,No,No,High,Struggling,Assisted Living,Low
+66,5,1,Yes,No,High,Comfortable,Alone,Medium
+92,2,1,No,Yes,Medium,Struggling,Assisted Living,Low
+77,1,2,No,No,Medium,Manageable,With Spouse,Medium
+60,5,2,Yes,Yes,Low,Manageable,Alone,Low
+70,2,2,No,Yes,High,Manageable,With Spouse,Medium
+87,4,5,No,Yes,High,Manageable,With Spouse,High
+84,2,4,No,Yes,Low,Struggling,With Spouse,Low
+82,3,4,No,Yes,Medium,Comfortable,With Spouse,High
+90,2,3,Yes,No,High,Comfortable,Alone,Low
+89,2,2,No,No,Medium,Struggling,With Spouse,Low
+94,3,5,No,Yes,Medium,Manageable,With Family,High
+66,5,5,No,Yes,Medium,Manageable,With Spouse,High
+75,5,4,Yes,Yes,Medium,Comfortable,With Spouse,High
+85,2,2,No,Yes,Low,Struggling,With Family,Low
+61,3,3,No,Yes,Low,Struggling,Assisted Living,Low
+60,3,2,Yes,Yes,Medium,Comfortable,With Family,Medium
+71,4,1,Yes,No,High,Comfortable,With Spouse,Medium
+64,5,2,No,Yes,Low,Comfortable,With Family,High
+91,1,1,No,Yes,Medium,Manageable,Alone,Low
+68,5,1,No,Yes,Medium,Comfortable,Alone,Medium
+94,5,3,No,Yes,High,Comfortable,With Spouse,High
+78,4,4,No,Yes,Low,Manageable,Assisted Living,Medium
+75,1,2,No,No,Medium,Struggling,With Spouse,Low
+62,4,1,Yes,Yes,High,Manageable,Alone,Low
+79,1,2,No,No,Medium,Comfortable,Alone,Low
+83,2,4,Yes,Yes,Low,Manageable,Assisted Living,Low
+92,1,4,No,Yes,High,Struggling,With Family,Medium
+83,4,5,Yes,Yes,Low,Manageable,With Spouse,Medium
+70,5,4,Yes,No,Medium,Comfortable,With Family,High
+67,1,3,No,Yes,Medium,Manageable,With Family,Medium
+95,1,1,Yes,No,High,Manageable,With Family,Low
+79,3,5,No,Yes,High,Struggling,With Spouse,Medium
+94,5,3,Yes,No,Low,Comfortable,Assisted Living,Medium
+84,2,2,No,Yes,High,Manageable,With Spouse,Medium
+94,4,1,No,No,Medium,Manageable,With Family,Medium
+84,2,4,Yes,Yes,High,Comfortable,Alone,Medium
+88,5,1,Yes,No,High,Struggling,With Spouse,Low
+77,1,2,No,Yes,High,Comfortable,With Spouse,Medium
+77,1,5,No,Yes,Medium,Manageable,With Family,High
+61,5,5,No,Yes,Low,Struggling,Alone,Medium
+94,1,5,No,No,High,Manageable,With Family,High
+75,1,4,No,Yes,High,Manageable,With Spouse,Medium
+95,1,3,Yes,No,High,Struggling,With Family,Low
+92,4,3,No,Yes,Medium,Struggling,Assisted Living,Medium
+63,4,1,No,Yes,Medium,Comfortable,With Family,High
+92,3,4,No,Yes,Low,Manageable,With Family,Medium
+73,2,5,No,No,Medium,Struggling,With Family,Medium
+80,5,5,No,No,Medium,Struggling,With Spouse,Medium
+79,5,2,No,No,High,Comfortable,Assisted Living,High
+67,5,2,No,Yes,Low,Manageable,With Spouse,Medium
+66,3,5,No,No,High,Manageable,With Family,High
+62,4,5,No,No,High,Manageable,With Family,High
+76,3,4,Yes,Yes,Medium,Struggling,With Spouse,Medium
+92,5,3,Yes,No,Medium,Manageable,With Spouse,Medium
+71,2,2,No,No,Medium,Comfortable,With Family,Medium
+81,1,3,No,No,Medium,Manageable,Assisted Living,Medium
+81,4,4,Yes,No,Medium,Comfortable,Assisted Living,Medium
+89,4,5,Yes,Yes,High,Manageable,With Family,High
+67,3,3,Yes,Yes,Low,Struggling,With Family,Low
+86,4,5,Yes,No,Medium,Comfortable,Assisted Living,Medium
+86,5,5,No,Yes,Medium,Manageable,Alone,High
+93,5,1,No,No,Medium,Comfortable,With Spouse,Medium
+80,3,3,No,No,High,Struggling,With Family,Medium
+89,5,3,No,No,Medium,Comfortable,Assisted Living,High
+92,2,5,Yes,No,Medium,Struggling,Assisted Living,Low
+87,3,4,Yes,Yes,High,Manageable,With Spouse,Medium
+92,2,1,No,Yes,Medium,Manageable,Alone,Low
+64,1,5,No,Yes,Low,Manageable,With Spouse,Medium
+78,2,2,No,Yes,Medium,Manageable,With Spouse,Medium
+63,1,2,Yes,Yes,Low,Manageable,With Spouse,Low
+94,1,1,No,Yes,High,Manageable,With Family,Medium
+76,2,4,No,No,High,Struggling,Alone,Low
+87,3,5,No,No,High,Comfortable,Assisted Living,High
+89,5,3,No,Yes,Medium,Manageable,With Spouse,High
+88,5,1,No,Yes,High,Manageable,With Family,High
+65,1,4,No,No,High,Struggling,Alone,Low
+94,1,3,Yes,Yes,Low,Manageable,With Spouse,Low
+83,3,2,Yes,Yes,Low,Manageable,Alone,Low
+88,4,2,Yes,Yes,Medium,Manageable,Assisted Living,Medium
+90,2,3,No,Yes,High,Comfortable,Assisted Living,Medium
+94,1,1,No,Yes,High,Comfortable,With Family,Medium
+92,5,2,No,No,High,Manageable,With Spouse,High
+80,3,5,Yes,Yes,Medium,Struggling,Assisted Living,Medium
+91,2,3,No,Yes,Low,Struggling,With Spouse,Low
+82,3,3,No,Yes,Medium,Struggling,Alone,Low
+92,2,2,No,Yes,High,Struggling,With Family,Medium
+62,2,1,No,No,Medium,Struggling,Assisted Living,Low
+77,1,5,No,No,High,Manageable,Alone,Medium
+84,3,1,No,No,High,Manageable,With Spouse,Medium
+90,3,4,Yes,Yes,Medium,Struggling,Assisted Living,Low
+62,5,4,No,No,Medium,Comfortable,Alone,Medium
+83,5,2,Yes,No,High,Struggling,Alone,Low
+91,1,2,Yes,No,High,Comfortable,With Family,Medium
+81,1,2,Yes,Yes,Low,Comfortable,Assisted Living,Low
+82,4,4,No,Yes,High,Manageable,With Family,High
+61,5,1,No,Yes,High,Struggling,Assisted Living,Medium
+86,2,1,No,No,High,Struggling,With Family,Low
+61,3,2,Yes,Yes,High,Comfortable,Alone,Medium
+85,1,5,No,Yes,High,Comfortable,Assisted Living,High
+76,3,1,No,No,Low,Struggling,With Spouse,Low
+92,3,4,No,No,High,Manageable,With Spouse,High
+68,4,3,No,No,Medium,Comfortable,With Family,High
+88,5,3,Yes,Yes,Medium,Manageable,With Spouse,Medium
+85,1,3,No,No,Medium,Comfortable,Alone,Low
+94,3,5,No,Yes,Low,Comfortable,Alone,Medium
+84,1,2,Yes,Yes,Low,Manageable,With Spouse,Low
+83,2,4,No,Yes,High,Struggling,Assisted Living,Medium
+72,4,5,No,Yes,Medium,Struggling,With Family,High
+66,2,4,No,Yes,Medium,Struggling,Assisted Living,Medium
+95,1,4,Yes,No,Low,Manageable,With Spouse,Low
+79,1,2,Yes,Yes,Medium,Comfortable,With Spouse,Medium
+60,5,3,Yes,No,Low,Comfortable,Alone,Low
+67,3,2,No,Yes,Medium,Comfortable,Alone,Medium
+75,3,5,No,Yes,High,Manageable,With Spouse,High
+73,2,5,Yes,Yes,Medium,Comfortable,With Family,High
+71,4,5,No,Yes,Low,Comfortable,Assisted Living,High
+82,3,2,No,Yes,Low,Manageable,Assisted Living,Medium
+74,5,4,Yes,Yes,High,Manageable,With Spouse,High
+87,2,4,No,Yes,Medium,Manageable,Assisted Living,Medium
+93,2,1,No,Yes,High,Comfortable,With Spouse,Medium
+61,5,5,Yes,Yes,High,Struggling,Alone,Medium
+91,4,4,Yes,No,Medium,Comfortable,Assisted Living,Medium
+82,5,1,No,Yes,High,Manageable,With Family,High
+81,4,4,No,No,Low,Comfortable,Alone,Medium
+84,5,5,No,No,High,Manageable,With Spouse,High
+81,5,3,No,No,Low,Manageable,With Spouse,Medium
+81,1,5,Yes,No,High,Struggling,With Family,Medium
+65,2,2,Yes,Yes,High,Manageable,With Family,Medium
+74,5,4,No,No,High,Comfortable,Assisted Living,High
+92,5,4,Yes,No,High,Manageable,Alone,Medium
+67,3,2,Yes,Yes,High,Struggling,With Spouse,Low
+64,2,2,No,Yes,High,Struggling,With Family,Medium
+63,3,3,No,Yes,Medium,Struggling,With Family,Medium
+65,2,4,No,No,High,Manageable,With Spouse,Medium
+91,3,4,No,No,Medium,Manageable,With Family,High
+89,5,3,Yes,Yes,High,Comfortable,Assisted Living,High
+94,5,1,No,Yes,Low,Manageable,Assisted Living,Medium
+75,1,3,Yes,Yes,Low,Comfortable,Assisted Living,Low
+72,3,5,No,Yes,Medium,Comfortable,Assisted Living,High
+89,4,4,No,No,High,Manageable,With Family,High
+78,1,2,No,Yes,High,Manageable,Assisted Living,Medium
+76,3,5,No,Yes,Low,Struggling,With Spouse,Medium
+78,3,4,No,Yes,High,Comfortable,With Spouse,High
+87,1,3,Yes,No,High,Comfortable,With Spouse,Medium
+85,5,5,No,Yes,High,Struggling,With Family,High
+85,3,4,No,No,High,Comfortable,With Spouse,High
+82,5,1,Yes,Yes,High,Manageable,Assisted Living,Medium
+68,1,1,No,Yes,Medium,Comfortable,With Spouse,Medium
+71,5,2,No,Yes,High,Comfortable,Alone,Medium
+60,2,4,Yes,Yes,Medium,Manageable,With Family,Medium
+60,4,1,No,Yes,High,Manageable,Alone,Medium
+93,3,3,No,No,High,Manageable,Alone,Medium
+91,4,4,No,No,Low,Manageable,With Spouse,Medium
+84,5,3,No,No,High,Comfortable,With Family,High
+60,3,3,No,Yes,Low,Manageable,With Spouse,Medium
+75,5,1,No,No,Medium,Manageable,With Family,Medium
+64,2,4,No,Yes,High,Manageable,With Family,High
+81,1,5,Yes,Yes,Low,Comfortable,With Spouse,Medium
+88,3,1,No,Yes,High,Struggling,With Spouse,Medium
+62,2,1,No,Yes,Low,Struggling,With Spouse,Low
+71,2,4,Yes,No,High,Manageable,With Family,Medium
+85,3,4,No,Yes,Low,Comfortable,Alone,Medium
+75,5,3,No,Yes,High,Comfortable,Alone,High
+81,2,4,Yes,No,Medium,Manageable,With Family,Medium
+88,4,3,No,Yes,Medium,Manageable,With Family,High
+73,2,1,No,Yes,Low,Manageable,Alone,Low
+87,5,2,No,Yes,Low,Manageable,With Spouse,Medium
+64,5,5,Yes,No,Low,Struggling,Assisted Living,Low
+89,4,1,Yes,No,Low,Comfortable,Assisted Living,Low
+64,2,4,No,Yes,High,Struggling,With Family,Medium
+71,5,5,No,Yes,High,Comfortable,With Family,High
+75,3,2,Yes,Yes,High,Struggling,With Family,Medium
+85,1,2,No,No,High,Comfortable,Assisted Living,Medium
+85,1,3,Yes,Yes,High,Comfortable,Assisted Living,Medium
+80,1,5,No,Yes,Medium,Manageable,With Spouse,Medium
+95,2,3,No,Yes,High,Manageable,Assisted Living,Medium
+92,4,1,No,Yes,Medium,Struggling,Alone,Low
+89,5,5,Yes,Yes,High,Manageable,With Spouse,High
+82,3,1,No,No,High,Manageable,With Family,Medium
+69,3,3,Yes,Yes,Medium,Struggling,With Spouse,Low
+64,2,5,No,Yes,Medium,Comfortable,Assisted Living,High
+95,1,3,No,No,Medium,Struggling,Alone,Low
+93,2,5,Yes,No,Medium,Comfortable,With Family,Medium
+90,4,3,Yes,Yes,High,Struggling,Assisted Living,Medium
+69,4,2,No,Yes,Medium,Comfortable,Assisted Living,Medium
+78,5,3,No,Yes,High,Struggling,Alone,Medium
+91,5,2,No,No,High,Comfortable,With Spouse,High
+60,4,3,Yes,Yes,Medium,Struggling,With Family,Medium
+64,4,5,No,No,High,Struggling,Alone,Medium
+63,4,5,No,No,High,Struggling,Assisted Living,Medium
+75,2,5,No,Yes,Low,Struggling,Assisted Living,Low
+83,4,4,No,Yes,Low,Manageable,Alone,Medium
+75,3,1,No,Yes,High,Manageable,Alone,Medium
+61,1,5,No,Yes,High,Manageable,Alone,Medium
+87,4,2,No,Yes,High,Comfortable,Assisted Living,High
+91,1,5,No,No,High,Manageable,Alone,Medium
+86,2,4,No,No,Low,Manageable,With Spouse,Medium
+79,1,2,Yes,Yes,High,Comfortable,With Spouse,Medium
+83,2,4,No,No,Medium,Manageable,With Family,Medium
+71,3,2,No,Yes,High,Struggling,Alone,Low
+94,2,3,No,Yes,Low,Manageable,With Spouse,Medium
+92,2,1,Yes,Yes,High,Comfortable,Assisted Living,Medium
+92,5,1,Yes,No,Medium,Comfortable,Assisted Living,Medium
+71,4,4,No,No,High,Comfortable,With Family,High
+62,4,1,Yes,No,Medium,Struggling,Alone,Low
+60,3,4,No,Yes,High,Comfortable,With Spouse,High
+92,3,4,Yes,Yes,High,Manageable,With Family,High
+69,4,4,Yes,Yes,Low,Manageable,With Spouse,Medium
+88,5,1,Yes,Yes,Low,Manageable,Assisted Living,Low
+72,4,4,Yes,No,Low,Struggling,With Family,Low
+71,5,1,No,No,Medium,Struggling,Alone,Low
+90,3,4,Yes,No,Low,Struggling,Assisted Living,Low
+61,1,5,No,Yes,High,Manageable,Assisted Living,Medium
+94,3,4,No,Yes,High,Struggling,Alone,Medium
+82,3,2,No,Yes,High,Comfortable,With Family,High
+76,2,4,No,Yes,Medium,Struggling,With Spouse,Medium
+85,2,3,No,Yes,High,Comfortable,With Spouse,High
+67,2,4,No,No,High,Manageable,Alone,Medium
+88,2,2,Yes,No,Medium,Comfortable,With Family,Medium
+85,5,2,No,Yes,Low,Struggling,Assisted Living,Low
+69,4,1,No,Yes,High,Manageable,With Family,High
+85,1,5,No,Yes,High,Manageable,Alone,Medium
+93,3,4,No,Yes,High,Struggling,With Family,Medium
+66,5,1,No,No,High,Comfortable,With Spouse,High
+63,1,5,No,Yes,High,Struggling,Assisted Living,Medium
+70,5,4,No,Yes,Medium,Manageable,With Spouse,High
+88,5,3,No,Yes,Medium,Comfortable,Alone,Medium
+95,3,4,Yes,No,Medium,Struggling,Alone,Low
+84,4,2,No,Yes,High,Struggling,With Family,Medium
+80,2,2,Yes,Yes,Low,Struggling,With Spouse,Low
+95,4,3,No,Yes,High,Manageable,With Family,High
+69,3,1,No,No,Medium,Struggling,With Spouse,Low
+68,3,5,Yes,No,Low,Manageable,With Spouse,Medium
+83,3,4,Yes,Yes,High,Comfortable,With Family,High
+94,1,2,Yes,No,High,Struggling,Assisted Living,Low
+94,4,1,No,No,Low,Struggling,Assisted Living,Low
+95,4,3,No,No,High,Struggling,With Spouse,Medium
+77,5,2,No,No,Medium,Comfortable,With Spouse,High
+91,5,3,No,No,High,Comfortable,Alone,Medium
+83,5,4,No,Yes,Medium,Struggling,With Family,High
+82,3,5,No,No,High,Comfortable,With Family,High
+91,4,2,No,Yes,High,Struggling,Assisted Living,Medium
+71,3,2,No,No,Medium,Struggling,Assisted Living,Low
+72,1,4,No,Yes,High,Manageable,With Spouse,Medium
+82,5,1,Yes,No,High,Struggling,With Family,Medium
+84,3,5,No,No,High,Manageable,Assisted Living,High
+94,3,2,No,Yes,High,Comfortable,Assisted Living,Medium
+89,1,5,Yes,No,High,Manageable,Alone,Low
+76,2,2,No,Yes,High,Comfortable,With Spouse,Medium
+79,4,5,Yes,No,Low,Struggling,With Spouse,Low
+84,2,3,Yes,Yes,High,Struggling,With Spouse,Low
+81,5,2,No,Yes,Medium,Struggling,Alone,Low
+72,3,5,Yes,No,High,Manageable,Alone,Medium
+78,1,1,No,Yes,High,Manageable,With Family,Medium
+95,1,3,No,No,Low,Manageable,With Spouse,Low
+71,4,3,Yes,Yes,High,Struggling,Alone,Low
+78,2,1,No,Yes,Low,Struggling,With Spouse,Low
+71,4,5,Yes,Yes,High,Comfortable,Assisted Living,High
+68,3,4,No,Yes,Medium,Manageable,Assisted Living,Medium
+66,4,1,No,Yes,Medium,Manageable,With Family,Medium
+87,1,5,Yes,Yes,Low,Struggling,With Spouse,Low
+73,1,1,Yes,Yes,Medium,Comfortable,Assisted Living,Low
+90,5,1,No,Yes,Medium,Comfortable,With Spouse,High
+78,5,2,No,No,High,Struggling,With Spouse,Medium
+75,3,5,Yes,No,High,Struggling,With Spouse,Medium
+64,2,4,No,Yes,Low,Manageable,Alone,Low
+94,4,2,No,No,High,Comfortable,With Spouse,High
+71,3,1,No,Yes,High,Struggling,Assisted Living,Low
+84,5,1,No,No,Medium,Manageable,With Family,Medium
+80,4,1,No,No,High,Struggling,With Spouse,Medium
+95,5,5,No,No,Low,Manageable,Assisted Living,Medium
+82,4,5,No,Yes,Medium,Comfortable,Alone,High
+75,2,2,No,No,Medium,Manageable,With Spouse,Medium
+73,3,4,Yes,Yes,Low,Struggling,With Family,Low
+90,4,2,No,No,High,Manageable,With Family,High
+64,1,3,No,Yes,High,Comfortable,Alone,Medium
+94,1,1,No,No,Medium,Comfortable,With Spouse,Medium
+82,4,1,No,No,High,Struggling,With Family,Medium
+88,4,1,No,No,Medium,Struggling,With Family,Medium
+70,4,2,No,Yes,Low,Comfortable,With Family,Medium
+77,1,2,No,No,Medium,Manageable,With Spouse,Medium
+71,1,1,No,Yes,High,Manageable,Alone,Low
+68,4,2,Yes,No,Low,Manageable,With Spouse,Low
+69,5,5,No,Yes,Medium,Comfortable,Alone,High
+76,5,5,No,Yes,Medium,Manageable,Assisted Living,High
+66,2,2,Yes,Yes,High,Comfortable,With Family,Medium
+72,3,1,No,Yes,Low,Struggling,With Spouse,Low
+68,5,2,No,Yes,Medium,Manageable,With Family,High
+86,1,2,No,Yes,Medium,Manageable,With Family,Medium
+61,5,2,Yes,Yes,Low,Manageable,With Spouse,Medium
+64,2,3,Yes,No,High,Struggling,Assisted Living,Low
+88,2,5,No,No,Medium,Manageable,Assisted Living,Medium
+78,3,4,Yes,Yes,Low,Manageable,With Family,Medium
+67,5,4,No,Yes,High,Comfortable,Alone,High
+60,1,3,No,Yes,Medium,Comfortable,With Family,Medium
+81,1,2,Yes,Yes,Low,Manageable,With Family,Low
+76,4,3,No,No,Medium,Manageable,Alone,Medium
+66,1,3,No,No,Medium,Manageable,With Spouse,Medium
+84,3,1,No,Yes,Low,Struggling,Assisted Living,Low
+63,3,5,No,Yes,Low,Comfortable,Alone,Medium
+95,1,4,No,Yes,High,Manageable,With Family,High
+65,1,2,No,No,High,Manageable,With Family,Medium
+90,4,4,No,No,Medium,Comfortable,With Spouse,High
+78,1,4,No,Yes,Medium,Struggling,Alone,Low
+86,4,5,No,Yes,Medium,Manageable,Assisted Living,High
+69,4,4,No,No,Medium,Struggling,With Spouse,Medium
+85,1,4,No,No,High,Manageable,With Family,Medium
+78,2,3,No,Yes,Medium,Manageable,With Family,Medium
+62,2,5,Yes,Yes,High,Comfortable,With Family,High
+72,4,1,No,Yes,Medium,Comfortable,Assisted Living,Medium
+87,1,2,Yes,Yes,Medium,Struggling,With Family,Low
+79,2,4,No,Yes,High,Comfortable,With Spouse,High
+87,1,2,No,Yes,High,Struggling,Assisted Living,Low
+67,1,1,No,Yes,Medium,Comfortable,With Family,Medium
+60,1,2,No,Yes,Medium,Struggling,With Spouse,Low
+62,5,1,No,No,High,Comfortable,Alone,Medium
+72,1,3,No,Yes,Low,Comfortable,Assisted Living,Medium
+87,5,4,No,Yes,Medium,Manageable,With Spouse,High
+84,4,1,No,Yes,Low,Comfortable,With Family,Medium
+92,2,2,No,Yes,Medium,Comfortable,With Family,Medium
+65,2,4,No,No,Medium,Comfortable,Alone,Medium
+91,2,3,Yes,Yes,Low,Manageable,With Family,Medium
+80,2,4,No,Yes,Medium,Comfortable,Alone,Medium
+75,2,1,No,No,Medium,Comfortable,With Spouse,Medium
+80,2,3,No,Yes,High,Manageable,With Family,High
+70,2,2,Yes,No,Medium,Comfortable,With Spouse,Medium
+95,4,3,No,Yes,High,Manageable,With Family,High
+94,1,3,Yes,Yes,High,Manageable,Assisted Living,Medium
+78,3,5,No,Yes,High,Struggling,With Family,High
+79,5,3,No,Yes,High,Struggling,Alone,Medium
+77,3,3,No,No,Low,Struggling,Alone,Low
+73,3,4,Yes,No,High,Manageable,With Family,Medium
+74,1,2,No,Yes,Medium,Comfortable,Assisted Living,Medium
+90,1,4,No,Yes,Low,Manageable,Assisted Living,Medium
+60,1,4,No,No,Medium,Manageable,Assisted Living,Medium
+62,2,1,No,No,High,Manageable,With Spouse,Medium
+75,4,4,Yes,Yes,Medium,Struggling,With Spouse,Medium
+82,2,5,No,Yes,Medium,Comfortable,With Family,High
+70,4,5,No,Yes,Medium,Struggling,Alone,Medium
+71,4,1,No,No,Medium,Comfortable,Alone,Medium
+69,3,2,Yes,Yes,Low,Manageable,Assisted Living,Low
+91,3,2,No,Yes,Medium,Struggling,With Spouse,Medium
+75,4,4,No,No,High,Struggling,With Spouse,Medium
+67,4,4,No,Yes,Medium,Struggling,Alone,Medium
+71,2,4,Yes,Yes,High,Manageable,Assisted Living,Medium
+83,2,2,No,Yes,Low,Struggling,With Family,Low
+87,3,3,Yes,Yes,High,Struggling,With Family,Medium
+67,1,5,No,Yes,High,Comfortable,Assisted Living,High
+87,4,3,Yes,Yes,Low,Struggling,With Spouse,Low
+95,2,3,No,Yes,Medium,Manageable,With Family,Medium
+85,3,2,No,Yes,High,Struggling,Alone,Low
+67,2,3,No,No,Medium,Manageable,Alone,Low
+87,4,1,Yes,No,Low,Comfortable,Assisted Living,Low
+87,4,4,No,Yes,High,Struggling,With Family,High
+95,5,1,No,Yes,Low,Manageable,With Spouse,Medium
+86,1,5,No,Yes,High,Comfortable,With Spouse,High
+76,5,4,No,Yes,Medium,Struggling,With Family,High
+68,3,3,Yes,Yes,Low,Manageable,Alone,Low
+92,2,5,No,No,High,Struggling,With Spouse,Medium
+79,3,4,Yes,Yes,Medium,Manageable,With Spouse,Medium
+72,4,3,No,Yes,High,Comfortable,With Spouse,High
+87,5,1,Yes,Yes,Medium,Comfortable,Assisted Living,Medium
+88,5,4,No,No,Medium,Comfortable,With Spouse,High
+72,5,3,No,Yes,Medium,Struggling,Alone,Medium
+94,3,1,No,No,High,Struggling,With Family,Medium
+65,4,5,No,Yes,High,Comfortable,Assisted Living,High
+77,2,5,No,No,High,Manageable,With Spouse,High
+64,2,5,No,No,High,Struggling,Alone,Low
+84,3,5,Yes,Yes,Medium,Struggling,With Spouse,Medium
+61,5,2,No,Yes,Low,Manageable,With Family,Medium
+69,1,4,Yes,Yes,Medium,Struggling,With Family,Low
+89,3,4,No,Yes,Medium,Comfortable,Assisted Living,High
+64,3,2,No,No,Low,Comfortable,Assisted Living,Medium
+92,4,3,No,No,Medium,Manageable,With Family,High
+60,2,3,Yes,No,Low,Manageable,With Family,Low
+77,3,5,No,No,Medium,Manageable,With Family,High
+91,3,1,No,Yes,High,Comfortable,Alone,Medium
+70,5,3,No,Yes,High,Manageable,Assisted Living,High
+80,5,1,No,No,Medium,Comfortable,With Spouse,Medium
+85,1,4,No,Yes,High,Manageable,Alone,Medium
+84,4,1,Yes,No,High,Struggling,With Family,Low
+81,1,4,No,Yes,Medium,Manageable,With Spouse,Medium
+86,5,2,No,Yes,Medium,Comfortable,With Family,High
+72,2,2,Yes,No,Medium,Manageable,With Family,Medium
+92,5,5,Yes,Yes,High,Struggling,With Spouse,Medium
+93,4,3,Yes,No,High,Manageable,Assisted Living,Medium
+94,5,5,No,No,Medium,Comfortable,With Spouse,High
+60,4,4,No,No,Low,Comfortable,With Spouse,Medium
+80,4,5,Yes,No,Medium,Manageable,With Family,High
+65,4,1,No,Yes,Low,Comfortable,With Family,Medium
+87,4,4,Yes,No,Medium,Struggling,With Family,Medium
+76,4,2,No,Yes,Medium,Manageable,With Spouse,Medium
+64,2,3,Yes,Yes,High,Struggling,With Family,Medium
+90,1,4,No,No,Medium,Manageable,Alone,Low
+64,3,4,No,Yes,Medium,Comfortable,Assisted Living,High
+62,1,1,No,Yes,Medium,Comfortable,With Spouse,Medium
+82,4,3,No,Yes,Medium,Manageable,With Family,High
+69,2,2,No,Yes,Medium,Struggling,Alone,Low
+69,5,4,No,No,High,Comfortable,With Spouse,High
+78,2,4,Yes,Yes,Medium,Comfortable,With Family,Medium
+76,4,1,Yes,No,High,Struggling,Assisted Living,Low
+80,2,5,No,No,Low,Comfortable,With Family,Medium
+73,2,2,Yes,No,High,Struggling,Assisted Living,Low
+68,4,3,Yes,Yes,High,Manageable,With Family,High
+60,2,4,No,No,Medium,Comfortable,With Family,High
+72,3,4,No,Yes,Medium,Struggling,Alone,Low
+63,3,2,No,No,Medium,Struggling,Assisted Living,Low
+60,2,5,Yes,Yes,High,Struggling,With Spouse,Medium
+91,5,4,Yes,No,Medium,Comfortable,Assisted Living,Medium
+93,4,2,No,No,High,Comfortable,Assisted Living,Medium
+87,3,1,Yes,Yes,Low,Struggling,Assisted Living,Low
+90,5,5,Yes,Yes,Low,Manageable,With Family,High
+67,2,3,No,No,Medium,Struggling,With Family,Medium
+85,5,4,No,Yes,High,Struggling,With Family,High
+93,1,2,No,No,Medium,Manageable,Alone,Low
+62,3,1,Yes,Yes,High,Comfortable,With Family,Medium
+71,2,3,Yes,Yes,Medium,Struggling,Alone,Low
+60,4,2,No,No,High,Manageable,With Family,High
+64,2,2,Yes,No,Low,Manageable,Alone,Low
+89,4,3,No,No,High,Manageable,Alone,Medium
+89,2,1,No,Yes,Medium,Comfortable,With Spouse,Medium
+76,5,1,No,No,Medium,Manageable,With Spouse,Medium
+82,5,5,No,Yes,Medium,Manageable,With Family,High
+74,5,4,Yes,No,High,Struggling,Alone,Low
+80,1,3,No,No,Low,Manageable,With Family,Medium
+73,4,3,No,Yes,Medium,Manageable,Alone,Medium
+61,5,3,No,Yes,Medium,Manageable,With Family,High
+70,1,1,Yes,Yes,High,Struggling,With Family,Low
+93,4,4,Yes,No,Medium,Struggling,With Family,Medium
+93,2,5,No,Yes,Medium,Manageable,With Family,High
+77,1,2,No,No,High,Struggling,With Spouse,Low
+89,3,2,No,Yes,High,Comfortable,With Family,High
+74,1,3,Yes,No,Low,Manageable,With Spouse,Low
+86,1,4,No,No,High,Manageable,With Family,Medium
+93,4,1,No,Yes,High,Manageable,With Family,High
+92,2,4,No,Yes,Medium,Struggling,Alone,Low
+83,3,4,No,Yes,Medium,Comfortable,With Family,High
+74,5,1,Yes,No,High,Manageable,With Family,Medium
+89,5,3,No,No,Medium,Comfortable,With Spouse,High
+76,1,4,Yes,Yes,High,Manageable,Alone,Low
+64,4,2,No,No,High,Struggling,Alone,Low
+88,4,1,No,Yes,High,Comfortable,Assisted Living,Medium
+63,5,5,No,Yes,Low,Manageable,With Family,High
+69,3,3,No,No,High,Struggling,Alone,Low
+76,2,1,Yes,Yes,High,Manageable,With Spouse,Medium
+69,3,5,No,Yes,Medium,Comfortable,With Family,High
+76,2,5,No,Yes,Low,Manageable,Assisted Living,Medium
+79,5,4,Yes,Yes,High,Comfortable,Alone,Medium
+83,2,4,Yes,Yes,Medium,Manageable,With Spouse,Medium
+64,4,4,No,Yes,High,Comfortable,Assisted Living,High
+93,1,1,Yes,No,Medium,Manageable,Alone,Low
+65,1,1,No,Yes,Medium,Comfortable,With Spouse,Medium
+61,5,3,No,Yes,Medium,Manageable,Assisted Living,High
+72,4,4,No,Yes,High,Comfortable,With Family,High
+70,3,5,Yes,Yes,High,Manageable,With Spouse,High
+82,4,2,No,No,High,Manageable,Alone,Medium
+75,1,3,No,No,High,Struggling,Alone,Low
+90,1,1,Yes,Yes,High,Manageable,With Spouse,Low
+70,4,3,No,No,Medium,Manageable,Assisted Living,Medium
+75,4,3,No,Yes,Low,Comfortable,With Spouse,Medium
+67,1,3,No,Yes,Low,Comfortable,With Family,Medium
+63,3,3,Yes,Yes,Low,Manageable,Assisted Living,Low
+63,5,2,No,Yes,Medium,Comfortable,With Spouse,High
+84,5,4,Yes,Yes,Medium,Struggling,Alone,Low
+62,4,5,Yes,No,High,Manageable,With Family,High
+91,5,3,No,Yes,Medium,Comfortable,Assisted Living,High
+62,1,3,No,No,Medium,Struggling,Assisted Living,Low
+86,1,3,Yes,Yes,Medium,Comfortable,Alone,Low
+88,4,4,Yes,Yes,Medium,Manageable,With Family,High
+91,4,1,Yes,No,High,Struggling,With Family,Low
+78,4,1,Yes,Yes,High,Manageable,Assisted Living,Medium
+80,3,2,Yes,Yes,Low,Manageable,Alone,Low
+64,5,1,Yes,No,High,Manageable,With Family,Medium
+77,4,3,No,No,Medium,Comfortable,Assisted Living,Medium
+87,2,3,No,No,Low,Comfortable,With Spouse,Medium
+81,2,3,No,No,Medium,Comfortable,With Family,Medium
+80,1,2,No,No,Medium,Struggling,Alone,Low
+65,5,3,Yes,No,High,Manageable,With Spouse,Medium
+60,4,1,No,Yes,High,Manageable,With Spouse,Medium
+64,2,4,No,Yes,Low,Manageable,Assisted Living,Medium
+71,5,4,No,Yes,Medium,Manageable,With Spouse,High
+85,1,5,No,Yes,Medium,Comfortable,With Family,High
+93,3,1,No,No,High,Struggling,With Family,Medium
+73,5,3,No,No,High,Manageable,Alone,Medium
+85,5,4,Yes,Yes,Low,Manageable,With Family,Medium
+86,3,1,No,Yes,High,Manageable,With Family,Medium
+68,5,4,No,No,Medium,Struggling,Assisted Living,Medium
+85,1,3,No,Yes,High,Comfortable,With Family,High
+81,1,4,No,No,Medium,Struggling,With Family,Medium
+89,3,5,Yes,Yes,Low,Comfortable,Alone,Medium
+76,4,5,No,Yes,Medium,Struggling,Assisted Living,Medium
+85,2,4,No,Yes,High,Manageable,Alone,Medium
+95,4,1,No,Yes,Medium,Manageable,With Family,Medium
+60,5,1,No,No,Medium,Comfortable,With Spouse,Medium
+67,2,1,Yes,No,Medium,Comfortable,Assisted Living,Low
+94,3,4,No,No,Low,Manageable,With Family,Medium
+74,3,1,No,Yes,Medium,Struggling,With Family,Medium
+81,2,3,No,Yes,Low,Struggling,With Spouse,Low
+73,1,5,No,No,Medium,Struggling,With Spouse,Medium
+85,2,3,No,No,High,Comfortable,With Family,High
+87,5,1,No,Yes,High,Struggling,With Family,Medium
+82,1,3,Yes,Yes,High,Struggling,Alone,Low
+73,3,1,No,No,Low,Manageable,Assisted Living,Low
+83,2,4,No,Yes,Medium,Manageable,Assisted Living,Medium
+61,4,3,No,Yes,Medium,Manageable,With Spouse,High
+85,4,4,No,Yes,High,Manageable,Assisted Living,High
+73,5,4,No,Yes,High,Comfortable,With Family,High
+66,4,2,Yes,No,Medium,Comfortable,With Family,Medium
+62,2,1,No,No,Medium,Manageable,With Spouse,Medium
+82,2,5,Yes,Yes,High,Comfortable,With Family,High
+77,4,1,No,Yes,Medium,Manageable,With Family,Medium
+94,2,5,Yes,Yes,High,Manageable,With Spouse,Medium
+74,5,1,No,Yes,High,Manageable,With Family,High
+84,1,4,No,Yes,Medium,Manageable,With Family,Medium
+87,5,3,Yes,No,High,Manageable,With Family,High
+69,5,3,No,Yes,Low,Struggling,Alone,Low
+76,2,2,No,Yes,High,Struggling,Assisted Living,Low
+81,1,5,Yes,Yes,High,Comfortable,With Family,High
+85,2,5,No,Yes,High,Manageable,With Spouse,High
+84,3,5,No,Yes,Medium,Manageable,With Spouse,High
+76,2,4,No,Yes,Medium,Manageable,With Family,High
+72,2,5,Yes,No,Medium,Struggling,Assisted Living,Low
+79,2,3,Yes,Yes,High,Manageable,With Spouse,Medium
+84,1,4,Yes,Yes,High,Comfortable,With Family,Medium
+63,2,1,Yes,No,Medium,Struggling,Alone,Low
+69,1,5,Yes,No,Low,Struggling,With Family,Low
+62,4,5,No,Yes,Low,Struggling,Assisted Living,Medium
+77,3,1,No,No,High,Manageable,With Family,Medium
+95,1,5,No,Yes,Medium,Manageable,With Spouse,Medium
+81,4,1,No,Yes,Low,Manageable,With Family,Medium
+93,1,4,Yes,Yes,High,Struggling,With Spouse,Low
+67,1,3,Yes,No,Low,Manageable,With Spouse,Low
+78,3,1,No,No,High,Manageable,With Family,Medium
+65,5,2,Yes,Yes,Low,Comfortable,With Family,Medium
+85,5,1,No,Yes,Medium,Manageable,With Spouse,Medium
+93,1,5,No,No,Low,Comfortable,Assisted Living,Medium
+65,2,4,No,Yes,Medium,Comfortable,With Family,High
+92,4,4,No,Yes,High,Manageable,With Spouse,High
+81,2,1,No,No,Low,Manageable,With Family,Low
+80,2,3,No,No,High,Manageable,With Family,Medium
+65,1,2,No,No,High,Struggling,With Family,Low
+65,1,4,No,No,Medium,Struggling,With Family,Medium
+63,1,5,No,Yes,Medium,Comfortable,With Family,High
+89,1,5,No,No,Low,Comfortable,Alone,Low
+70,5,3,No,No,High,Struggling,Assisted Living,Medium
+89,1,4,No,Yes,Medium,Manageable,With Family,Medium
+90,5,1,No,Yes,Medium,Manageable,Alone,Medium
+83,5,5,No,Yes,High,Comfortable,With Family,High
+68,1,3,Yes,Yes,High,Manageable,Assisted Living,Medium
+62,3,4,No,No,High,Manageable,Assisted Living,Medium
+90,4,4,No,No,High,Comfortable,With Spouse,High
+95,2,4,No,Yes,Low,Struggling,Alone,Low
+83,5,4,Yes,Yes,Medium,Comfortable,With Family,High
+90,4,4,No,No,Medium,Struggling,Alone,Low
+65,3,5,No,Yes,Low,Manageable,Assisted Living,Medium
+61,2,3,No,Yes,High,Comfortable,Alone,Medium
+79,2,4,No,Yes,Low,Manageable,With Spouse,Medium
+87,5,2,No,Yes,Medium,Manageable,With Spouse,High
+70,1,2,No,Yes,Low,Struggling,With Spouse,Low
+63,3,3,No,Yes,High,Manageable,With Family,High
+74,5,1,Yes,Yes,Low,Struggling,With Family,Low
+65,3,1,No,Yes,High,Manageable,Alone,Medium
+89,1,1,Yes,Yes,High,Struggling,With Spouse,Low
+61,1,2,No,Yes,Medium,Manageable,With Family,Medium
+74,5,1,Yes,No,High,Comfortable,Alone,Medium
+70,1,5,Yes,No,Medium,Comfortable,With Family,Medium
+67,4,4,Yes,Yes,Medium,Manageable,With Family,High
+85,2,2,Yes,Yes,Medium,Manageable,With Family,Medium
+64,5,3,No,No,High,Manageable,Assisted Living,High
+65,3,3,No,Yes,High,Manageable,Assisted Living,Medium
+85,4,4,No,Yes,High,Comfortable,Assisted Living,High
+63,5,2,Yes,No,Medium,Comfortable,With Spouse,Medium
+78,1,1,Yes,No,High,Manageable,Alone,Low
+79,1,1,Yes,No,High,Manageable,With Spouse,Low
+92,1,5,Yes,Yes,High,Manageable,Assisted Living,Medium
+79,1,5,No,No,High,Struggling,Assisted Living,Medium
+71,3,1,Yes,Yes,Medium,Manageable,Assisted Living,Low
+60,4,3,No,No,Low,Comfortable,Alone,Medium
+85,2,3,Yes,Yes,High,Comfortable,Assisted Living,Medium
+73,3,5,Yes,Yes,Medium,Manageable,With Spouse,Medium
+70,3,4,No,No,Medium,Struggling,Alone,Low
+95,2,1,No,Yes,Medium,Comfortable,With Spouse,Medium
+72,2,5,Yes,Yes,Medium,Struggling,Alone,Low
+62,1,5,Yes,No,Medium,Manageable,With Family,Medium
+92,3,1,No,Yes,Medium,Manageable,With Spouse,Medium
+65,5,1,Yes,Yes,High,Comfortable,With Family,High
+69,2,3,Yes,Yes,Medium,Struggling,With Family,Low
+64,2,4,No,No,Medium,Struggling,Assisted Living,Low
+82,4,4,No,No,High,Comfortable,With Family,High
+69,5,1,No,Yes,High,Comfortable,With Spouse,High
+61,5,2,No,No,Low,Comfortable,Assisted Living,Medium
+72,2,5,No,Yes,Medium,Manageable,Assisted Living,Medium
+61,1,5,No,No,Medium,Struggling,Alone,Low
+79,4,1,No,Yes,Low,Comfortable,With Family,Medium
+60,5,2,No,Yes,Medium,Comfortable,With Spouse,High
+68,2,3,Yes,No,Medium,Struggling,Alone,Low
+76,5,1,No,Yes,Medium,Manageable,With Family,High
+68,4,1,No,Yes,Low,Comfortable,Assisted Living,Medium
+70,4,5,No,Yes,Medium,Comfortable,Alone,High
+74,3,1,No,No,Medium,Manageable,Assisted Living,Medium
+83,2,1,No,Yes,High,Struggling,Assisted Living,Low
+94,4,1,Yes,Yes,Low,Manageable,Assisted Living,Low
+89,3,5,No,Yes,Medium,Manageable,With Spouse,High
+90,3,3,Yes,Yes,High,Manageable,Assisted Living,Medium
+64,5,3,No,Yes,Low,Struggling,With Spouse,Medium
+73,5,1,Yes,No,Medium,Struggling,With Family,Low
+70,3,5,No,No,High,Struggling,Alone,Medium
+68,5,3,Yes,Yes,Medium,Struggling,Alone,Low
+93,4,3,No,Yes,Medium,Comfortable,With Family,High
+71,1,3,No,Yes,Low,Manageable,With Spouse,Medium
+94,4,5,Yes,Yes,High,Manageable,With Spouse,High
+94,3,5,No,No,Low,Comfortable,Alone,Medium
+60,3,1,No,Yes,Medium,Manageable,With Family,Medium
+81,4,4,Yes,Yes,High,Comfortable,Alone,Medium
+88,5,3,No,No,Low,Comfortable,Assisted Living,Medium
+67,5,4,Yes,Yes,Medium,Struggling,Alone,Low
+70,3,5,No,No,High,Comfortable,Alone,Medium
+73,2,5,No,Yes,Medium,Manageable,With Spouse,High
+89,5,5,No,No,Low,Manageable,With Family,High
+94,4,4,No,No,High,Struggling,With Spouse,Medium
+80,5,5,Yes,No,High,Manageable,With Spouse,High
+64,4,1,Yes,No,High,Comfortable,Assisted Living,Medium
+78,3,5,No,Yes,High,Manageable,With Family,High
+73,5,2,No,Yes,Medium,Struggling,Alone,Low
+85,4,4,No,No,Medium,Struggling,With Spouse,Medium
+63,3,2,No,Yes,High,Struggling,Assisted Living,Medium
+84,2,5,No,Yes,High,Manageable,With Spouse,High
+84,4,1,No,Yes,High,Manageable,Alone,Medium
+77,2,3,No,Yes,Low,Comfortable,With Family,Medium
+67,2,5,No,Yes,High,Manageable,With Family,High
+73,1,1,No,Yes,Low,Comfortable,With Family,Medium
+91,5,4,Yes,No,Medium,Struggling,Alone,Low
+92,4,2,No,Yes,High,Comfortable,Alone,Medium
+82,2,2,No,Yes,Low,Comfortable,With Family,Medium
+74,1,2,No,Yes,Medium,Manageable,With Spouse,Medium
+92,3,4,Yes,Yes,Medium,Struggling,With Family,Medium
+84,4,1,No,No,Low,Comfortable,With Family,Medium
+76,2,4,No,Yes,High,Struggling,With Spouse,Medium
+92,5,2,No,Yes,High,Comfortable,Assisted Living,High
+61,1,5,Yes,No,Medium,Struggling,Assisted Living,Low
+73,2,3,Yes,Yes,High,Manageable,With Family,Medium
+65,5,4,No,Yes,High,Manageable,Alone,High
+65,2,4,No,Yes,High,Comfortable,Alone,Medium
+62,4,1,No,No,High,Manageable,With Family,Medium
+66,4,1,No,Yes,Medium,Comfortable,Alone,Medium
+67,4,4,Yes,Yes,High,Comfortable,Assisted Living,High
+74,1,2,No,Yes,Medium,Manageable,Alone,Low
+88,4,3,Yes,Yes,Medium,Manageable,With Family,Medium
+92,5,1,No,Yes,Medium,Comfortable,With Spouse,High
+89,2,2,No,Yes,High,Manageable,With Family,Medium
+86,3,5,No,Yes,Medium,Comfortable,Alone,Medium
+95,5,1,No,No,High,Struggling,With Spouse,Medium
+88,5,2,No,No,Medium,Struggling,With Spouse,Medium
+92,4,2,No,Yes,Low,Comfortable,Assisted Living,Medium
+86,1,3,Yes,No,Medium,Manageable,Alone,Low
+92,2,3,No,Yes,Medium,Struggling,Assisted Living,Low
+63,1,5,No,Yes,Medium,Manageable,Assisted Living,Medium
+81,2,2,Yes,No,High,Manageable,With Spouse,Medium
+61,2,2,No,No,Low,Struggling,With Family,Low
+69,1,3,No,No,Low,Comfortable,Alone,Low
+64,5,1,No,Yes,High,Manageable,Assisted Living,Medium
+69,2,1,No,No,Medium,Struggling,With Family,Low
+92,1,4,No,Yes,Low,Struggling,With Spouse,Low
+72,2,3,Yes,No,Low,Manageable,With Spouse,Low
+90,3,4,Yes,No,Medium,Manageable,Alone,Low
+95,5,3,No,Yes,Medium,Comfortable,Assisted Living,High
+83,4,5,No,No,High,Comfortable,Alone,High
+74,2,2,Yes,Yes,Low,Struggling,With Family,Low
+88,3,5,No,Yes,High,Struggling,With Spouse,Medium
+67,4,3,No,Yes,Medium,Manageable,Assisted Living,Medium
+64,4,2,No,Yes,High,Struggling,With Spouse,Medium
+88,2,1,Yes,No,High,Struggling,With Family,Low
+63,1,1,No,No,Medium,Struggling,With Family,Low
+71,2,4,No,Yes,Low,Manageable,With Family,Medium
+61,3,3,No,No,High,Manageable,Alone,Medium
+86,4,3,No,No,Medium,Manageable,Alone,Medium
+90,2,1,No,Yes,High,Comfortable,With Spouse,Medium
+95,1,5,No,No,High,Struggling,With Family,Medium
+95,2,2,Yes,Yes,Medium,Struggling,Alone,Low
+85,5,5,No,No,Medium,Manageable,With Family,High
+86,1,5,No,Yes,High,Manageable,With Spouse,High
+64,3,1,No,Yes,High,Comfortable,Assisted Living,Medium
+79,4,1,Yes,Yes,High,Struggling,Assisted Living,Low
+70,2,1,Yes,No,High,Struggling,With Family,Low
+69,1,4,No,Yes,Low,Manageable,With Spouse,Medium
+65,5,5,No,Yes,Low,Comfortable,With Spouse,High
+67,1,3,No,Yes,High,Manageable,Alone,Medium
+82,5,2,No,No,Medium,Manageable,With Spouse,Medium
+85,3,4,No,Yes,Low,Struggling,With Family,Medium
+71,4,3,No,Yes,High,Manageable,With Family,High
+85,3,5,No,Yes,Low,Manageable,Assisted Living,Medium
+72,2,1,No,Yes,Low,Struggling,With Spouse,Low
+77,1,5,No,No,High,Struggling,With Family,Medium
+84,5,2,Yes,No,High,Comfortable,With Family,High
+92,5,4,No,Yes,Low,Struggling,With Family,Medium
+71,1,4,No,Yes,Medium,Manageable,With Spouse,Medium
+95,1,2,Yes,No,High,Manageable,With Family,Medium
+63,2,3,Yes,Yes,High,Comfortable,With Family,Medium
+64,3,3,No,No,Medium,Struggling,With Family,Medium
+67,5,4,Yes,No,Medium,Comfortable,Assisted Living,Medium
+87,2,4,Yes,No,Medium,Manageable,With Spouse,Medium
+90,3,1,No,Yes,Low,Struggling,Alone,Low
+68,2,3,No,Yes,High,Manageable,With Family,High
+88,5,2,No,No,Medium,Struggling,With Family,Medium
+73,1,3,Yes,Yes,Medium,Comfortable,Alone,Low
+81,1,1,Yes,No,Medium,Comfortable,With Family,Low
+70,3,4,No,Yes,High,Struggling,Assisted Living,Medium
+82,4,4,No,No,Low,Struggling,Assisted Living,Low
+60,3,1,No,Yes,Low,Comfortable,Alone,Low
+80,4,2,No,Yes,Medium,Struggling,Assisted Living,Medium
+85,2,4,No,Yes,Medium,Manageable,With Family,High
+95,2,5,Yes,No,High,Struggling,With Family,Medium
+82,5,4,No,No,Medium,Manageable,With Family,High
+60,4,5,Yes,Yes,Medium,Struggling,Assisted Living,Medium
+74,5,1,No,Yes,Medium,Struggling,With Family,Medium
+80,1,1,No,No,Low,Struggling,With Spouse,Low
+68,4,4,No,Yes,Medium,Manageable,With Family,High
+68,3,3,Yes,Yes,High,Manageable,With Family,Medium
+69,1,5,Yes,Yes,Medium,Struggling,Alone,Low
+85,1,2,No,Yes,High,Comfortable,Assisted Living,Medium
+94,3,4,Yes,Yes,High,Struggling,With Family,Medium
+84,1,2,No,Yes,High,Manageable,With Family,Medium
+85,4,4,Yes,Yes,Medium,Comfortable,Alone,Medium
+70,5,3,No,Yes,Medium,Comfortable,With Family,High
+61,1,3,No,Yes,Medium,Manageable,Alone,Low
+66,4,3,No,Yes,Medium,Manageable,Alone,Medium
+77,2,3,No,Yes,Medium,Comfortable,With Family,High
+86,4,1,Yes,No,High,Comfortable,With Spouse,Medium
+93,5,1,Yes,Yes,Low,Comfortable,With Family,Medium
+86,4,5,No,Yes,High,Comfortable,Alone,High
+76,3,2,No,Yes,High,Struggling,With Spouse,Medium
+83,5,4,No,Yes,Medium,Struggling,Alone,Medium
+84,2,4,Yes,Yes,High,Manageable,Assisted Living,Medium
+66,3,1,Yes,Yes,High,Manageable,With Family,Medium
+65,4,4,Yes,No,Medium,Struggling,With Family,Medium
+83,5,1,No,Yes,Medium,Struggling,With Spouse,Medium
+92,2,5,Yes,No,Medium,Struggling,Alone,Low
+88,3,2,No,Yes,Low,Comfortable,Assisted Living,Medium
+81,2,5,Yes,Yes,Medium,Manageable,With Spouse,Medium
+85,4,3,No,Yes,Low,Struggling,With Spouse,Medium
+87,2,3,No,Yes,High,Manageable,With Family,High
+80,1,3,No,Yes,Medium,Struggling,Alone,Low
+66,3,5,No,No,Low,Comfortable,Assisted Living,Medium
+76,2,4,No,Yes,Medium,Struggling,With Family,Medium
+79,4,2,No,No,Medium,Comfortable,With Spouse,Medium
+79,4,3,No,No,High,Manageable,Alone,Medium
+81,2,3,No,Yes,High,Struggling,Alone,Low
+87,4,3,No,Yes,Medium,Manageable,Assisted Living,Medium
+66,5,2,Yes,Yes,High,Struggling,With Family,Medium
+60,5,3,No,Yes,Low,Comfortable,With Spouse,High
+91,5,2,Yes,Yes,High,Struggling,Alone,Low
+72,1,3,Yes,Yes,Low,Comfortable,With Family,Medium
+89,2,5,No,Yes,Low,Manageable,With Family,Medium
+82,1,5,No,Yes,High,Comfortable,With Spouse,High
+78,4,2,No,No,High,Manageable,With Spouse,Medium
+91,1,5,No,No,Low,Comfortable,With Spouse,Medium
+89,4,2,No,No,Low,Manageable,With Family,Medium
+88,4,5,No,Yes,Medium,Manageable,Assisted Living,High
+88,3,5,Yes,Yes,High,Struggling,Alone,Low
+89,5,2,Yes,Yes,Medium,Comfortable,With Family,High
+75,4,4,No,Yes,Medium,Manageable,With Spouse,High
+78,3,5,Yes,Yes,High,Manageable,With Spouse,High
+77,5,3,Yes,No,Medium,Comfortable,With Spouse,Medium
+60,4,4,No,No,High,Manageable,Assisted Living,High
+73,4,2,No,Yes,High,Manageable,With Family,High
+61,1,4,No,Yes,High,Struggling,With Family,Medium
+87,1,1,No,Yes,High,Manageable,With Spouse,Medium
+89,5,1,No,Yes,High,Comfortable,Alone,Medium
+63,4,5,Yes,Yes,Medium,Comfortable,Alone,Medium
+60,2,5,Yes,Yes,High,Struggling,With Family,Medium
+67,1,3,No,Yes,High,Comfortable,Alone,Medium
+88,5,4,No,No,High,Struggling,With Family,High
+62,4,1,No,Yes,Low,Manageable,With Spouse,Medium
+91,4,5,Yes,No,Medium,Manageable,With Spouse,Medium
+69,2,4,No,Yes,Medium,Struggling,With Family,Medium
+69,5,5,No,Yes,Medium,Manageable,With Spouse,High
+78,4,5,No,Yes,Low,Comfortable,Alone,Medium
+93,1,1,No,Yes,High,Comfortable,With Spouse,Medium
+92,2,1,No,Yes,Medium,Manageable,With Family,Medium
+82,5,5,No,No,Medium,Struggling,With Family,High
+87,2,2,No,No,Medium,Comfortable,With Spouse,Medium
+91,1,5,No,Yes,High,Comfortable,With Family,High
+66,5,5,No,Yes,Medium,Comfortable,Alone,High
+88,2,3,No,No,High,Struggling,With Spouse,Medium
+67,3,3,No,Yes,Medium,Comfortable,Alone,Medium
+60,1,3,No,Yes,Medium,Struggling,Assisted Living,Low
+62,1,2,Yes,Yes,High,Struggling,With Spouse,Low
+83,1,2,No,No,Low,Manageable,With Spouse,Low
+82,3,5,No,No,High,Manageable,With Spouse,High
+67,3,3,No,Yes,Low,Struggling,Alone,Low
+62,4,2,No,No,Medium,Manageable,With Family,Medium
+92,2,1,No,No,High,Manageable,Alone,Low
+87,4,5,Yes,Yes,High,Comfortable,Alone,Medium
+67,2,4,No,Yes,Low,Manageable,With Family,Medium
+93,3,5,No,Yes,High,Struggling,With Spouse,Medium
+94,3,4,No,No,High,Struggling,With Family,Medium
+91,4,3,No,Yes,High,Comfortable,With Family,High
+83,5,4,No,No,Medium,Struggling,With Spouse,Medium
+73,4,3,No,Yes,Medium,Manageable,With Family,High
+91,2,1,Yes,No,High,Struggling,Alone,Low
+75,4,4,No,Yes,High,Comfortable,With Family,High
+63,1,5,No,Yes,High,Comfortable,With Spouse,High
+80,2,3,No,No,High,Struggling,With Spouse,Medium
+73,2,5,No,No,Medium,Manageable,With Family,High
+90,5,2,No,No,Medium,Comfortable,Assisted Living,Medium
+77,3,3,Yes,Yes,High,Manageable,Assisted Living,Medium
+66,2,4,No,No,High,Struggling,With Family,Medium
+69,3,3,No,Yes,High,Struggling,With Spouse,Medium
+66,4,5,No,Yes,Low,Manageable,With Spouse,High
+92,1,1,No,Yes,Low,Manageable,With Spouse,Low
+82,5,3,Yes,Yes,Low,Manageable,With Family,Medium

@@ -164,6 +164,9 @@ def classify_seniors(data: dict):
         logger.error(f"Error in classify_seniors: {str(e)}", exc_info=True)
         return {"error": str(e), "assessments": []}
 
+
+
+
 @app.get("/get_slots/{email}")
 def get_slots(email: str):
     """Fetch volunteer availability slots"""
