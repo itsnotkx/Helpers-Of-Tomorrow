@@ -6,7 +6,16 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Input } from "@/components/ui/input";
-import { Calendar, Clock, User, MapPin, X } from "lucide-react";
+import {
+  CalendarDays, // new icon for "Weekly Overview"
+  Calendar,
+  Clock,
+  User,
+  MapPin,
+  X,
+  ChevronLeft,
+  ChevronRight,
+} from "lucide-react";
 import {
   Sheet,
   SheetContent,
@@ -50,24 +59,22 @@ export function ScheduleInterface({ assignments }: ScheduleProps) {
       name: string;
     }>
   >([]);
+
   const [selectedDay, setSelectedDay] = useState<string | null>(null);
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
-  const [selectedVolunteer, setSelectedVolunteer] = useState<string | null>(
-    null
-  );
+  const [selectedVolunteer, setSelectedVolunteer] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
 
-  // Helper function to format time as HH:MM
+  // Format time as HH:MM (supports HH:MM:SS)
   const formatTime = (timeString: string) => {
     if (!timeString) return timeString;
-    // Handle both HH:MM:SS and HH:MM formats
-    const timeParts = timeString.split(":");
-    return `${timeParts[0]}:${timeParts[1]}`;
+    const [hh = "", mm = ""] = timeString.split(":");
+    return `${hh}:${mm}`;
   };
 
   // Generate time slots (9 AM to 6 PM)
   const timeSlots = useMemo(() => {
-    const slots = [];
+    const slots: string[] = [];
     for (let hour = 9; hour <= 18; hour++) {
       slots.push(`${hour.toString().padStart(2, "0")}:00`);
       if (hour < 18) slots.push(`${hour.toString().padStart(2, "0")}:30`);
@@ -75,46 +82,26 @@ export function ScheduleInterface({ assignments }: ScheduleProps) {
     return slots;
   }, []);
 
-  // Fetch all data from backend
+  // Fetch from backend
   useEffect(() => {
     const fetchData = async () => {
       try {
-        console.log("Fetching data from backend...");
-
-        // Fetch schedules/assignments
-        const schedulesResponse = await fetch(
-          "http://localhost:8000/assignments"
-        );
-
+        const schedulesResponse = await fetch("http://localhost:8000/assignments");
         if (!schedulesResponse.ok) {
           console.error("Failed to fetch schedules:", schedulesResponse.status);
           return;
         }
-
         const schedulesData = await schedulesResponse.json();
-        console.log("Raw schedules data:", schedulesData);
 
-        // Fetch volunteers
-        const volunteersResponse = await fetch(
-          "http://localhost:8000/volunteers"
-        );
+        const volunteersResponse = await fetch("http://localhost:8000/volunteers");
         const volunteersData = await volunteersResponse.json();
-        console.log("Volunteers data:", volunteersData);
 
-        // Fetch seniors
         const seniorsResponse = await fetch("http://localhost:8000/seniors");
         const seniorsData = await seniorsResponse.json();
-        console.log("Seniors data:", seniorsData);
 
-        // Map database fields to component interface - handle different possible structures
-        let mappedSchedules = [];
-
-        // Check if schedulesData has assignments array or is directly an array
-        const assignmentsArray =
-          schedulesData.assignments || schedulesData || [];
-        console.log("Processing assignments:", assignmentsArray);
-
-        mappedSchedules = assignmentsArray.map((assignment: any) => ({
+        // Map database fields to component interface
+        const assignmentsArray = schedulesData.assignments || schedulesData || [];
+        const mappedSchedules = assignmentsArray.map((assignment: any) => ({
           volunteer:
             assignment.vid || assignment.volunteer_id || assignment.volunteer,
           senior: assignment.sid || assignment.senior_id || assignment.senior,
@@ -124,8 +111,6 @@ export function ScheduleInterface({ assignments }: ScheduleProps) {
           end_time: formatTime(assignment.end_time || "10:00"),
           priority_score: assignment.priority_score || 1,
         }));
-
-        console.log("Mapped schedules:", mappedSchedules);
 
         setSchedules(mappedSchedules);
         setVolunteers(volunteersData.volunteers || volunteersData || []);
@@ -147,7 +132,7 @@ export function ScheduleInterface({ assignments }: ScheduleProps) {
 
   // Week days (7 days from today)
   const weekDays = useMemo(() => {
-    const days = [];
+    const days: Date[] = [];
     const today = new Date();
     for (let i = 0; i < 7; i++) {
       const date = new Date(today);
@@ -157,19 +142,25 @@ export function ScheduleInterface({ assignments }: ScheduleProps) {
     return days;
   }, []);
 
+  const weekRangeLabel = useMemo(() => {
+    const start = weekDays[0];
+    const end = weekDays[weekDays.length - 1];
+    if (!start || !end) return "";
+    const fmt = (d: Date) =>
+      d.toLocaleDateString("en-SG", { day: "numeric", month: "short" });
+    return `${fmt(start)} – ${fmt(end)}`;
+  }, [weekDays]);
+
   // Schedules grouped by date
   const weekSchedules = useMemo(() => {
-    console.log("Grouping schedules by week:", schedules);
     const weekData: Record<string, typeof schedules> = {};
     weekDays.forEach((day) => {
       const dayKey = day.toISOString().split("T")[0];
       weekData[dayKey] = schedules.filter((s) => {
-        // Handle different date formats
         const scheduleDate = s.date;
         return scheduleDate === dayKey || scheduleDate?.startsWith(dayKey);
       });
     });
-    console.log("Week schedules grouped:", weekData);
     return weekData;
   }, [schedules, weekDays]);
 
@@ -177,6 +168,23 @@ export function ScheduleInterface({ assignments }: ScheduleProps) {
     setSelectedDay(dayKey);
     setIsDrawerOpen(true);
   };
+
+  // Drawer day navigation (within this week)
+  const changeDay = (delta: number) => {
+    if (!selectedDay) return;
+    const idx = weekDays.findIndex(
+      (d) => d.toISOString().split("T")[0] === selectedDay
+    );
+    if (idx === -1) return;
+    const newIdx = idx + delta;
+    if (newIdx < 0 || newIdx >= weekDays.length) return;
+    setSelectedDay(weekDays[newIdx].toISOString().split("T")[0]);
+  };
+
+  const selectedDateObj = selectedDay ? new Date(selectedDay) : null;
+  const selectedIndex = selectedDay
+    ? weekDays.findIndex((d) => d.toISOString().split("T")[0] === selectedDay)
+    : -1;
 
   return (
     <div className="">
@@ -191,21 +199,21 @@ export function ScheduleInterface({ assignments }: ScheduleProps) {
           <Card className="rounded-t-none border-none">
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
-                <Calendar className="h-5 w-5" /> Weekly Overview
+                <CalendarDays className="h-5 w-5" />
+                Weekly Overview
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="grid grid-cols-7 gap-2">
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-7 gap-2">
                 {weekDays.map((day, index) => {
                   const dayKey = day.toISOString().split("T")[0];
                   const daySchedules = weekSchedules[dayKey] || [];
-                  const isToday =
-                    day.toDateString() === new Date().toDateString();
+                  const isToday = day.toDateString() === new Date().toDateString();
 
                   return (
                     <Card
                       key={index}
-                      className={`p-3 border rounded-lg cursor-pointer transition-all ${
+                      className={`p-3 border rounded-lg cursor-pointer transition-all hover:shadow-sm ${
                         isToday ? "bg-primary/10 border-primary" : "bg-card"
                       }`}
                       onClick={() => openDayDrawer(dayKey)}
@@ -260,83 +268,122 @@ export function ScheduleInterface({ assignments }: ScheduleProps) {
           <Sheet open={isDrawerOpen} onOpenChange={setIsDrawerOpen}>
             <SheetContent
               side="right"
-              className="w-full sm:max-w-lg overflow-y-auto"
+              // Full-screen drawer + clean padding
+              className="w-screen sm:max-w-[100vw] p-0 overflow-y-auto"
             >
-              <SheetHeader>
-                <SheetTitle className="flex items-center justify-between">
-                  <span>
-                    {selectedDay &&
-                      new Date(selectedDay).toLocaleDateString("en-SG", {
-                        weekday: "long",
-                        day: "numeric",
-                        month: "short",
-                      })}
-                  </span>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => setIsDrawerOpen(false)}
-                  >
-                    <X className="h-4 w-4" />
-                  </Button>
-                </SheetTitle>
-              </SheetHeader>
-
-              <div className="mt-4 space-y-2">
-                {selectedDay &&
-                  timeSlots.map((timeSlot) => {
-                    const schedulesAtTime = (
-                      weekSchedules[selectedDay] || []
-                    ).filter((s) => formatTime(s.start_time) === timeSlot);
-                    return (
-                      <div
-                        key={timeSlot}
-                        className="flex items-start gap-4 p-2 border-b border-border/50"
-                      >
-                        <div className="w-16 text-sm font-medium text-muted-foreground flex items-center gap-1">
-                          <Clock className="h-3 w-3" />
-                          {timeSlot}
-                        </div>
-                        <div className="flex-1">
-                          {schedulesAtTime.length === 0 ? (
-                            <div className="text-sm text-muted-foreground italic">
-                              No visits scheduled
-                            </div>
-                          ) : (
-                            <div className="space-y-2">
-                              {schedulesAtTime.map((schedule, idx) => (
-                                <div
-                                  key={idx}
-                                  className="flex items-center justify-between p-3 bg-muted/50 rounded-lg"
-                                >
-                                  <div className="flex items-center gap-3">
-                                    <div className="flex items-center gap-2">
-                                      <User className="h-4 w-4 text-chart-4" />
-                                      <span className="font-medium">
-                                        {getVolunteerName(schedule.volunteer)}
-                                      </span>
-                                    </div>
-                                    <div className="flex items-center gap-2">
-                                      <MapPin className="h-4 w-4 text-chart-2" />
-                                      <span className="text-sm">
-                                        Cluster {schedule.cluster}
-                                      </span>
-                                    </div>
-                                  </div>
-                                  <div className="flex items-center gap-2">
-                                    <span className="text-sm">
-                                      {formatTime(schedule.start_time)} -{" "}
-                                      {formatTime(schedule.end_time)}
-                                    </span>
-                                  </div>
-                                </div>
-                              ))}
-                            </div>
-                          )}
+              {/* Sticky header inside drawer */}
+              <div className="sticky top-0 z-10 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+                <div className="mx-auto max-w-3xl px-4 md:px-6">
+                  <SheetHeader>
+                    <SheetTitle className="flex items-center justify-between py-4">
+                      <div className="flex items-center gap-2">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="mr-1"
+                          onClick={() => changeDay(-1)}
+                          disabled={selectedIndex <= 0}
+                        >
+                          <ChevronLeft className="h-4 w-4" />
+                        </Button>
+                        <div className="flex flex-col">
+                          <span className="text-base md:text-lg font-semibold">
+                            {selectedDateObj &&
+                              selectedDateObj.toLocaleDateString("en-SG", {
+                                weekday: "long",
+                                day: "numeric",
+                                month: "short",
+                              })}
+                          </span>
+                          <span className="text-xs text-muted-foreground">
+                            {weekRangeLabel}
+                            {selectedVolunteer
+                              ? ` • ${getVolunteerName(selectedVolunteer)}`
+                              : ""}
+                          </span>
                         </div>
                       </div>
-                    );
-                  })}
+
+                      <div className="flex items-center gap-2">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => changeDay(1)}
+                          disabled={selectedIndex >= weekDays.length - 1}
+                        >
+                          <ChevronRight className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => setIsDrawerOpen(false)}
+                        >
+                          <X className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </SheetTitle>
+                  </SheetHeader>
+                </div>
+              </div>
+
+              {/* Drawer body */}
+              <div className="mx-auto w-full max-w-3xl px-4 md:px-6 pb-12 pt-4">
+                <div className="space-y-2">
+                  {selectedDay &&
+                    timeSlots.map((timeSlot) => {
+                      const schedulesAtTime = (weekSchedules[selectedDay] || []).filter(
+                        (s) => formatTime(s.start_time) === timeSlot
+                      );
+                      return (
+                        <div
+                          key={timeSlot}
+                          className="flex items-start gap-4 p-3 md:p-4 border-b border-border/50"
+                        >
+                          <div className="w-16 text-sm font-medium text-muted-foreground flex items-center gap-1">
+                            <Clock className="h-3 w-3" />
+                            {timeSlot}
+                          </div>
+                          <div className="flex-1">
+                            {schedulesAtTime.length === 0 ? (
+                              <div className="text-sm text-muted-foreground italic">
+                                No visits scheduled
+                              </div>
+                            ) : (
+                              <div className="space-y-2">
+                                {schedulesAtTime.map((schedule, idx) => (
+                                  <div
+                                    key={idx}
+                                    className="flex items-center justify-between p-3 bg-muted/40 rounded-lg hover:bg-muted/60 transition-colors"
+                                  >
+                                    <div className="flex items-center gap-3">
+                                      <div className="flex items-center gap-2">
+                                        <User className="h-4 w-4 text-chart-4" />
+                                        <span className="font-medium">
+                                          {getVolunteerName(schedule.volunteer)}
+                                        </span>
+                                      </div>
+                                      <div className="flex items-center gap-2">
+                                        <MapPin className="h-4 w-4 text-chart-2" />
+                                        <span className="text-sm">
+                                          Cluster {schedule.cluster}
+                                        </span>
+                                      </div>
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                      <span className="text-sm">
+                                        {formatTime(schedule.start_time)} –{" "}
+                                        {formatTime(schedule.end_time)}
+                                      </span>
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+                </div>
               </div>
             </SheetContent>
           </Sheet>
@@ -377,9 +424,7 @@ export function ScheduleInterface({ assignments }: ScheduleProps) {
                     <Button
                       key={volunteer.vid}
                       variant={
-                        selectedVolunteer === volunteer.vid
-                          ? "default"
-                          : "outline"
+                        selectedVolunteer === volunteer.vid ? "default" : "outline"
                       }
                       size="sm"
                       onClick={() => setSelectedVolunteer(volunteer.vid)}
@@ -394,8 +439,7 @@ export function ScheduleInterface({ assignments }: ScheduleProps) {
                 {volunteers
                   .filter(
                     (vol) =>
-                      (selectedVolunteer === null ||
-                        vol.vid === selectedVolunteer) &&
+                      (selectedVolunteer === null || vol.vid === selectedVolunteer) &&
                       vol.name.toLowerCase().includes(searchQuery.toLowerCase())
                   )
                   .map((volunteer) => {
@@ -415,24 +459,14 @@ export function ScheduleInterface({ assignments }: ScheduleProps) {
                                 <User className="h-4 w-4 text-white" />
                               </div>
                               <div>
-                                <h4 className="font-medium">
-                                  {volunteer.name}
-                                </h4>
+                                <h4 className="font-medium">{volunteer.name}</h4>
                                 <p className="text-sm text-muted-foreground">
-                                  {assignment
-                                    ? `Assigned to ${assignment.cluster}`
-                                    : "No assignment"}
+                                  {assignment ? `Assigned to ${assignment.cluster}` : "No assignment"}
                                 </p>
                               </div>
                             </div>
-                            <Badge
-                              variant={
-                                volunteer.available ? "default" : "secondary"
-                              }
-                            >
-                              {volunteer.available
-                                ? "Available"
-                                : "Unavailable"}
+                            <Badge variant={volunteer.available ? "default" : "secondary"}>
+                              {volunteer.available ? "Available" : "Unavailable"}
                             </Badge>
                           </div>
                         </CardHeader>
@@ -450,9 +484,7 @@ export function ScheduleInterface({ assignments }: ScheduleProps) {
                                 >
                                   <div className="flex items-center gap-2">
                                     <Calendar className="h-4 w-4 text-muted-foreground" />
-                                    <span className="text-sm">
-                                      {schedule.date}
-                                    </span>
+                                    <span className="text-sm">{schedule.date}</span>
                                     <Clock className="h-4 w-4 text-muted-foreground ml-2" />
                                     <span className="text-sm">
                                       {formatTime(schedule.start_time)}
