@@ -40,5 +40,11 @@ def get_volunteers():  # This was correct but adding logging
     logger.info(f"Fetched {len(response.data)} volunteers")
     return {"volunteers": response.data}
 
+@app.get("/dl/{user_email}")
+def get_user_schedules(user_email: str):
+    response = supabase.table("volunteers").select("*, constituency(centre_lat, centre_long)").eq("email", user_email).execute()
+    logger.info(f"Fetched DL information for user {user_email}")
+    return {"dl_info": response.data}
+
 if __name__ == "__main__":
     uvicorn.run("api:app", port=8000, reload=True)

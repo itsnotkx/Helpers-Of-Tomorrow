@@ -10,35 +10,9 @@ import { InteractiveMap } from "@/components/interactive-map"
 import { ScheduleInterface } from "@/components/schedule-interface"
 import { DashboardHeader } from "@/components/dashboard-header"
 import { useRef } from "react"
+import { useUser } from "@clerk/nextjs"
 // import { useOrganization } from "@clerk/nextjs"
 // import { useRouter } from "next/navigation"
-
-// Add neighbourhood mapping
-const SINGAPORE_NEIGHBOURHOODS = {
-  yishun: [103.8454, 1.4382],
-  tampines: [103.9568, 1.3496],
-  jurong: [103.7436, 1.3404],
-  bedok: [103.9273, 1.3236],
-  hougang: [103.8924, 1.3612],
-  sembawang: [103.8184, 1.4491],
-  woodlands: [103.7890, 1.4382],
-  angMoKio: [103.8454, 1.3691],
-  bishan: [103.8454, 1.3506],
-  punggol: [103.9021, 1.4043],
-  toapayoh: [103.8476, 1.3343],
-  clementi: [103.7649, 1.3162],
-  pasirRis: [103.9492, 1.3721],
-  serangoon: [103.8698, 1.3554],
-  bukit_batok: [103.7437, 1.3587],
-  choa_chu_kang: [103.7444, 1.3840],
-  bukit_panjang: [103.7718, 1.3774],
-  queenstown: [103.8057, 1.2966],
-  kallang: [103.8614, 1.3111],
-  marine_parade: [103.9057, 1.3017]
-} as const
-
-type NeighbourhoodKey = keyof typeof SINGAPORE_NEIGHBOURHOODS
-
 
 interface Senior {
   uid: string
@@ -86,34 +60,9 @@ interface Schedule {
   priority_score: number
 }
 
-const getNeighbourhoodDisplayName = (key: NeighbourhoodKey): string => {
-  const names: Record<NeighbourhoodKey, string> = {
-    yishun: "Yishun",
-    tampines: "Tampines",
-    jurong: "Jurong",
-    bedok: "Bedok",
-    hougang: "Hougang",
-    sembawang: "Sembawang",
-    woodlands: "Woodlands",
-    angMoKio: "Ang Mo Kio",
-    bishan: "Bishan",
-    punggol: "Punggol",
-    toapayoh: "Toa Payoh",
-    clementi: "Clementi",
-    pasirRis: "Pasir Ris",
-    serangoon: "Serangoon",
-    bukit_batok: "Bukit Batok",
-    choa_chu_kang: "Choa Chu Kang",
-    bukit_panjang: "Bukit Panjang",
-    queenstown: "Queenstown",
-    kallang: "Kallang",
-    marine_parade: "Marine Parade"
-  }
-  return names[key]
-}
-
 export default function VolunteerDashboard() {
-  const [selectedNeighbourhood, setSelectedNeighbourhood] = useState<NeighbourhoodKey>("sembawang")
+  const [userCoordinates, setUserCoordinates] = useState<[number, number] | null>(null)
+  const [constituency_name, setConstituencyName] = useState<string | null>(null)
   const [seniors, setSeniors] = useState<Senior[]>([])
   const [volunteers, setVolunteers] = useState<Volunteer[]>([])
   const [assignments, setAssignments] = useState<Assignment[]>([])
@@ -129,17 +78,9 @@ export default function VolunteerDashboard() {
   const [seniorMarkerElements, setSeniorMarkerElements] = useState<Map<string, HTMLElement>>(new Map())
   const [volunteerMarkerElements, setVolunteerMarkerElements] = useState<Map<string, HTMLElement>>(new Map())
   const mapRef = useRef<mapboxgl.Map | null>(null)
-  // const { isLoaded, membership } = useOrganization()
-  // const router = useRouter()
-  const wellbeingLabels: Record<number, string> = {
-    1: "Very Poor",
-    2: "Poor",
-    3: "Normal",
-    4: "Good",
-    5: "Very Good",
-  }
 
-  const loadDashboardData = async () => {
+
+    const loadDashboardData = async () => {
     try {
       setLoading(true)
       const BASE_URL = "http://localhost:8000"
@@ -171,6 +112,73 @@ export default function VolunteerDashboard() {
       setLoading(false)
     }
   }
+
+  useEffect(() => {
+    loadDashboardData()
+  }, [])
+
+  const { isLoaded, isSignedIn, user } = useUser();
+  const [dlisLoading, setDLIsLoading] = useState(true)
+  const [userSchedule, setUserSchedule] = useState<Volunteer>();
+    useEffect(() => {
+        if (user?.primaryEmailAddress?.emailAddress) {
+            fetch_dl_details(user.primaryEmailAddress.emailAddress)
+        } 
+    }, [isLoaded, isSignedIn, user])
+
+  async function fetch_dl_details(email: string ) {
+    try {
+        setDLIsLoading(true)
+        const BASE_URL = "http://localhost:8000"
+        console.log(email)
+        if (email != "") {
+            const res = await fetch(`${BASE_URL}/dl/${email}`, {
+            method: "GET",
+            headers: {
+                "Content-Type": "application/json",
+            },
+        }).then((res) => res.json())
+
+        console.log("Fetched user information:", res.dl_info[0])
+        if (res.dl_info[0] != null) {
+            if (res.dl_info[0].coords) {
+                setUserCoordinates([res.dl_info[0].coords.lng, res.dl_info[0].coords.lat])
+            }
+            if (res.dl_info[0].constituency_name) {
+                setConstituencyName(res.dl_info[0].constituency_name)
+            }
+        }
+        
+    }
+    } catch (error) {
+        console.error("Error fetching schedules:", error)
+    } finally {
+        setDLIsLoading(false)
+    }
+}
+
+    if (!isLoaded || dlisLoading) {
+    return (
+        <div className="flex justify-center items-center min-h-screen">
+            <div className="text-center">
+                <h1 className="text-2xl font-bold mb-4">Loading Dashboard...</h1>
+                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-gray-900 mx-auto"></div>
+            </div>
+        </div>
+    )
+  }
+  
+   // const { isLoaded, membership } = useOrganization()
+  // const router = useRouter()
+  const wellbeingLabels: Record<number, string> = {
+    1: "Very Poor",
+    2: "Poor",
+    3: "Normal",
+    4: "Good",
+    5: "Very Good",
+  }
+
+
 
   // Function to handle volunteer card click
   const handleVolunteerCardClick = (volunteerId: string) => {
@@ -246,9 +254,7 @@ export default function VolunteerDashboard() {
   //   }
   // }, [isLoaded, membership])
 
-  useEffect(() => {
-    loadDashboardData()
-  }, [])
+
 
   const levels: Record<1 | 2 | 3, string> = {
     1: "LOW",
@@ -270,12 +276,14 @@ export default function VolunteerDashboard() {
   //   return <div className="flex justify-center items-center min-h-screen">You are not a member of this organization.</div>
   // }
 
+
+
   return (
     <div className="min-h-screen bg-background">
       <DashboardHeader
         title="Senior Care Volunteer Dashboard"
-        subtitle={`Managing care for ${getNeighbourhoodDisplayName(selectedNeighbourhood)}`}
-        selectedDistrict={getNeighbourhoodDisplayName(selectedNeighbourhood)}
+        subtitle={`Managing care for ${constituency_name ? constituency_name : "Unknown Constituency"}`}
+        selectedDistrict={constituency_name ? constituency_name : "Unknown Constituency"}
         needButton={true}
         textToInput="Refresh Data"
         onRefresh={loadDashboardData}
@@ -427,7 +435,7 @@ export default function VolunteerDashboard() {
                   setHighlightedSeniorId(null)
                   setHighlightedVolunteerId(null)
                 }}
-                centerCoordinates={selectedNeighbourhood ? SINGAPORE_NEIGHBOURHOODS[selectedNeighbourhood] as [number, number] : undefined}
+                centerCoordinates={userCoordinates ? userCoordinates : undefined}
                 // onSeniorClick={() => setExpandedDay(null)} // <-- This closes the expanded card
                 // seniorMarkerElements={seniorMarkerElements}
                 // setSeniorMarkerElements={setSeniorMarkerElements}

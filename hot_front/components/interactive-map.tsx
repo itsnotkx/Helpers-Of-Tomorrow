@@ -148,7 +148,7 @@ export function InteractiveMap({
       style: "mapbox://styles/wzinl/cmf5f4has01rh01pj8ajb1993",
       center: centerCoordinates,
       zoom: 13
-      
+
     })
     map.current.on("load", () => {
       setMapLoaded(true)
@@ -238,7 +238,7 @@ export function InteractiveMap({
 
       el.addEventListener("click", () => {
         setHighlightedCluster(idx)
-
+        
         if (popupRef.current) {
           popupRef.current.remove()
           popupRef.current = null
