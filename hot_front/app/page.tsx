@@ -26,8 +26,6 @@ import { DashboardHeader } from "@/components/dashboard-header";
 import { useRef } from "react";
 import { useUser } from "@clerk/nextjs";
 
-
-
 interface Senior {
   uid: string;
   name: string;
@@ -73,7 +71,6 @@ interface Schedule {
 }
 
 export default function VolunteerDashboard() {
-
   const [seniors, setSeniors] = useState<Senior[]>([]);
   const [volunteers, setVolunteers] = useState<Volunteer[]>([]);
   const [assignments, setAssignments] = useState<Assignment[]>([]);
@@ -178,7 +175,7 @@ export default function VolunteerDashboard() {
     try {
       setDLIsLoading(true);
       const BASE_URL = "http://localhost:8000";
-       if (email != "") {
+      if (email != "") {
         const res = await fetch(`${BASE_URL}/dl/${email}`, {
           method: "GET",
           headers: {
@@ -188,12 +185,15 @@ export default function VolunteerDashboard() {
 
         console.log("Fetched user information:", res.dl_info[0]);
         if (res.dl_info[0] != null) {
-          if (res.dl_info[0].constituency.centre_lat && res.dl_info[0].constituency.centre_long) {
+          if (
+            res.dl_info[0].constituency.centre_lat &&
+            res.dl_info[0].constituency.centre_long
+          ) {
             setUserCoordinates([
               res.dl_info[0].constituency.centre_long,
               res.dl_info[0].constituency.centre_lat,
             ]);
-            console.log("Set user coordinates to:", userCoordinates)
+            console.log("Set user coordinates to:", userCoordinates);
           }
           if (res.dl_info[0].constituency_name) {
             setConstituencyName(res.dl_info[0].constituency_name);
@@ -365,10 +365,8 @@ export default function VolunteerDashboard() {
     <div className="min-h-screen bg-background">
       <DashboardHeader
         title="Senior Care Volunteer Dashboard"
-        subtitle={`Managing care for ${(
-          constituencyName)}`}
+        subtitle={`Managing care for ${constituencyName}`}
         selectedDistrict={constituencyName}
-
       />
 
       <div className="container mx-auto px-6 py-6">
@@ -388,40 +386,12 @@ export default function VolunteerDashboard() {
             </CardContent>
           </Card>
 
-          <Card>
-            <CardHeader className="flex justify-between pb-2">
-              <CardTitle className="text-sm font-medium">
-                Active Volunteers
-              </CardTitle>
-              <Activity className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{activeVolunteers}</div>
-              <p className="text-xs text-muted-foreground">
-                of {volunteers.length} total
-              </p>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="flex justify-between pb-2">
-              <CardTitle className="text-sm font-medium">
-                Today's Visits
-              </CardTitle>
-              <Calendar className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{todaySchedules.length}</div>
-              <p className="text-xs text-muted-foreground">scheduled visits</p>
-            </CardContent>
-          </Card>
-
           <Dialog open={showHighRiskModal} onOpenChange={setShowHighRiskModal}>
             <DialogTrigger asChild>
               <Card className="cursor-pointer hover:bg-muted/50 transition-colors">
                 <CardHeader className="flex justify-between pb-2">
                   <CardTitle className="text-sm font-medium">
-                    High Priority
+                    High Risk Seniors
                   </CardTitle>
                   <AlertTriangle className="h-4 w-4 text-destructive" />
                 </CardHeader>
@@ -558,8 +528,36 @@ export default function VolunteerDashboard() {
               </div>
             </DialogContent>
           </Dialog>
+
+          <Card>
+            <CardHeader className="flex justify-between pb-2">
+              <CardTitle className="text-sm font-medium">
+                Active Volunteers
+              </CardTitle>
+              <Activity className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{activeVolunteers}</div>
+              <p className="text-xs text-muted-foreground">
+                of {volunteers.length} total
+              </p>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="flex justify-between pb-2">
+              <CardTitle className="text-sm font-medium">
+                Today's Visits
+              </CardTitle>
+              <Calendar className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{todaySchedules.length}</div>
+              <p className="text-xs text-muted-foreground">scheduled visits</p>
+            </CardContent>
+          </Card>
         </div>
-        
+
         <div className="lg:col-span-2 mb-8">
           <CardHeader className="flex justify-between">
             <CardTitle className="flex items-center gap-2">
@@ -587,10 +585,7 @@ export default function VolunteerDashboard() {
                 }}
                 centerCoordinates={
                   userCoordinates
-                    ? (userCoordinates as [
-                      number,
-                      number
-                    ])
+                    ? (userCoordinates as [number, number])
                     : undefined
                 }
               />
