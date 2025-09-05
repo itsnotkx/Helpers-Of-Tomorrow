@@ -308,7 +308,7 @@ export function InteractiveMap({
       });
 
       const marker = new mapboxgl.Marker(el)
-        .setLngLat([cluster.center.lng, cluster.center.lat])
+        .setLngLat([cluster.centroid.lng, cluster.centroid.lat])
         .addTo(map.current!);
 
       el.addEventListener("click", () => {
@@ -447,7 +447,7 @@ export function InteractiveMap({
         type: "Polygon" as const,
         coordinates: [
           createCirclePolygon(
-            [cluster.center.lng, cluster.center.lat],
+            [cluster.centroid.lng, cluster.centroid.lat],
             cluster.radius // Now properly converted to km
           ),
         ],
@@ -514,7 +514,7 @@ export function InteractiveMap({
       });
 
       const marker = new mapboxgl.Marker(el)
-        .setLngLat([cluster.center.lng, cluster.center.lat])
+        .setLngLat([cluster.centroid.lng, cluster.centroid.lat])
         .addTo(map.current!);
 
       el.addEventListener("click", () => {

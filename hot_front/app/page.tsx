@@ -259,7 +259,7 @@ export default function VolunteerDashboard() {
     }
   }
 
-  if (!isLoaded || dlisLoading) {
+  if (!isLoaded && dlisLoading) {
     return (
       <div className="flex justify-center items-center min-h-screen">
         <div className="text-center">
