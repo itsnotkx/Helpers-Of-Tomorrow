@@ -1,18 +1,12 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Input } from "@/components/ui/input";
-import {
-  Calendar,
-  Clock,
-  User,
-  MapPin,
-  X,
-} from "lucide-react";
+import { Calendar, Clock, User, MapPin, X } from "lucide-react";
 import {
   Sheet,
   SheetContent,
@@ -22,26 +16,6 @@ import {
 
 // Interfaces remain unchanged
 interface ScheduleProps {
-  schedules: Array<{
-    volunteer: string;
-    senior: string;
-    cluster: number | string;
-    date: string;
-    start_time: string;
-    end_time: string;
-    priority_score: number;
-  }>;
-  volunteers: Array<{
-    vid: string;
-    name: string;
-    coords: { lat: number; lng: number };
-    skill: number;
-    available: boolean | string[];
-  }>;
-  seniors: Array<{
-    uid: string;
-    name: string;
-  }>;
   assignments: Array<{
     volunteer: string;
     cluster: string;
@@ -49,18 +23,47 @@ interface ScheduleProps {
   }>;
 }
 
-export function ScheduleInterface({
-  schedules,
-  volunteers,
-  seniors = [],
-  assignments,
-}: ScheduleProps) {
+export function ScheduleInterface({ assignments }: ScheduleProps) {
+  const [schedules, setSchedules] = useState<
+    Array<{
+      volunteer: string;
+      senior: string;
+      cluster: number | string;
+      date: string;
+      start_time: string;
+      end_time: string;
+      priority_score: number;
+    }>
+  >([]);
+  const [volunteers, setVolunteers] = useState<
+    Array<{
+      vid: string;
+      name: string;
+      coords: { lat: number; lng: number };
+      skill: number;
+      available: boolean | string[];
+    }>
+  >([]);
+  const [seniors, setSeniors] = useState<
+    Array<{
+      uid: string;
+      name: string;
+    }>
+  >([]);
   const [selectedDay, setSelectedDay] = useState<string | null>(null);
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const [selectedVolunteer, setSelectedVolunteer] = useState<string | null>(
     null
   );
   const [searchQuery, setSearchQuery] = useState("");
+
+  // Helper function to format time as HH:MM
+  const formatTime = (timeString: string) => {
+    if (!timeString) return timeString;
+    // Handle both HH:MM:SS and HH:MM formats
+    const timeParts = timeString.split(":");
+    return `${timeParts[0]}:${timeParts[1]}`;
+  };
 
   // Generate time slots (9 AM to 6 PM)
   const timeSlots = useMemo(() => {
@@ -70,6 +73,69 @@ export function ScheduleInterface({
       if (hour < 18) slots.push(`${hour.toString().padStart(2, "0")}:30`);
     }
     return slots;
+  }, []);
+
+  // Fetch all data from backend
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        console.log("Fetching data from backend...");
+
+        // Fetch schedules/assignments
+        const schedulesResponse = await fetch(
+          "http://localhost:8000/assignments"
+        );
+
+        if (!schedulesResponse.ok) {
+          console.error("Failed to fetch schedules:", schedulesResponse.status);
+          return;
+        }
+
+        const schedulesData = await schedulesResponse.json();
+        console.log("Raw schedules data:", schedulesData);
+
+        // Fetch volunteers
+        const volunteersResponse = await fetch(
+          "http://localhost:8000/volunteers"
+        );
+        const volunteersData = await volunteersResponse.json();
+        console.log("Volunteers data:", volunteersData);
+
+        // Fetch seniors
+        const seniorsResponse = await fetch("http://localhost:8000/seniors");
+        const seniorsData = await seniorsResponse.json();
+        console.log("Seniors data:", seniorsData);
+
+        // Map database fields to component interface - handle different possible structures
+        let mappedSchedules = [];
+
+        // Check if schedulesData has assignments array or is directly an array
+        const assignmentsArray =
+          schedulesData.assignments || schedulesData || [];
+        console.log("Processing assignments:", assignmentsArray);
+
+        mappedSchedules = assignmentsArray.map((assignment: any) => ({
+          volunteer:
+            assignment.vid || assignment.volunteer_id || assignment.volunteer,
+          senior: assignment.sid || assignment.senior_id || assignment.senior,
+          cluster: assignment.cluster_id || assignment.cluster,
+          date: assignment.date || assignment.scheduled_date,
+          start_time: formatTime(assignment.start_time || "09:00"),
+          end_time: formatTime(assignment.end_time || "10:00"),
+          priority_score: assignment.priority_score || 1,
+        }));
+
+        console.log("Mapped schedules:", mappedSchedules);
+
+        setSchedules(mappedSchedules);
+        setVolunteers(volunteersData.volunteers || volunteersData || []);
+        setSeniors(seniorsData.seniors || seniorsData || []);
+      } catch (error) {
+        console.error("Failed to fetch data:", error);
+      }
+    };
+
+    fetchData();
   }, []);
 
   // Helpers
@@ -93,11 +159,17 @@ export function ScheduleInterface({
 
   // Schedules grouped by date
   const weekSchedules = useMemo(() => {
+    console.log("Grouping schedules by week:", schedules);
     const weekData: Record<string, typeof schedules> = {};
     weekDays.forEach((day) => {
       const dayKey = day.toISOString().split("T")[0];
-      weekData[dayKey] = schedules.filter((s) => s.date === dayKey);
+      weekData[dayKey] = schedules.filter((s) => {
+        // Handle different date formats
+        const scheduleDate = s.date;
+        return scheduleDate === dayKey || scheduleDate?.startsWith(dayKey);
+      });
     });
+    console.log("Week schedules grouped:", weekData);
     return weekData;
   }, [schedules, weekDays]);
 
@@ -164,7 +236,7 @@ export function ScheduleInterface({
                               key={idx}
                               className="text-xs p-1 bg-muted rounded text-center"
                             >
-                              <div>{schedule.start_time}</div>
+                              <div>{formatTime(schedule.start_time)}</div>
                               <div className="text-muted-foreground">
                                 {getSeniorName(schedule.senior)}
                               </div>
@@ -186,7 +258,10 @@ export function ScheduleInterface({
 
           {/* Drawer for daily details */}
           <Sheet open={isDrawerOpen} onOpenChange={setIsDrawerOpen}>
-            <SheetContent side="right" className="w-full sm:max-w-lg overflow-y-auto">
+            <SheetContent
+              side="right"
+              className="w-full sm:max-w-lg overflow-y-auto"
+            >
               <SheetHeader>
                 <SheetTitle className="flex items-center justify-between">
                   <span>
@@ -210,9 +285,9 @@ export function ScheduleInterface({
               <div className="mt-4 space-y-2">
                 {selectedDay &&
                   timeSlots.map((timeSlot) => {
-                    const schedulesAtTime = (weekSchedules[selectedDay] || []).filter(
-                      (s) => s.start_time === timeSlot
-                    );
+                    const schedulesAtTime = (
+                      weekSchedules[selectedDay] || []
+                    ).filter((s) => formatTime(s.start_time) === timeSlot);
                     return (
                       <div
                         key={timeSlot}
@@ -250,7 +325,8 @@ export function ScheduleInterface({
                                   </div>
                                   <div className="flex items-center gap-2">
                                     <span className="text-sm">
-                                      {schedule.start_time} - {schedule.end_time}
+                                      {formatTime(schedule.start_time)} -{" "}
+                                      {formatTime(schedule.end_time)}
                                     </span>
                                   </div>
                                 </div>
@@ -339,7 +415,9 @@ export function ScheduleInterface({
                                 <User className="h-4 w-4 text-white" />
                               </div>
                               <div>
-                                <h4 className="font-medium">{volunteer.name}</h4>
+                                <h4 className="font-medium">
+                                  {volunteer.name}
+                                </h4>
                                 <p className="text-sm text-muted-foreground">
                                   {assignment
                                     ? `Assigned to ${assignment.cluster}`
@@ -377,16 +455,17 @@ export function ScheduleInterface({
                                     </span>
                                     <Clock className="h-4 w-4 text-muted-foreground ml-2" />
                                     <span className="text-sm">
-                                      {schedule.start_time}
+                                      {formatTime(schedule.start_time)}
+                                    </span>
+                                    <User className="h-4 w-4 text-muted-foreground ml-2" />
+                                    <span className="text-sm">
+                                      {getSeniorName(schedule.senior)}
                                     </span>
                                   </div>
                                   <div className="flex items-center gap-2">
                                     <Badge variant="outline">
                                       Cluster: {schedule.cluster}
                                     </Badge>
-                                    <span className="text-xs text-muted-foreground">
-                                      Senior: {getSeniorName(schedule.senior)}
-                                    </span>
                                   </div>
                                 </div>
                               ))}

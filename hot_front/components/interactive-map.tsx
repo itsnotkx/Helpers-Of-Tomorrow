@@ -1,64 +1,64 @@
-"use client"
+"use client";
 
-import { useState, useEffect, useRef } from "react"
-import mapboxgl from "mapbox-gl"
-import "mapbox-gl/dist/mapbox-gl.css"
+import { useState, useEffect, useRef } from "react";
+import mapboxgl from "mapbox-gl";
+import "mapbox-gl/dist/mapbox-gl.css";
 
 // --- TypeScript interfaces ---
 interface Coord {
-  lat: number
-  lng: number
+  lat: number;
+  lng: number;
 }
 export interface Senior {
-  uid: string
-  name: string
-  coords: { lat: number; lng: number }
-  physical?: number
-  mental?: number
-  community?: number
-  last_visit?: string
-  cluster?: number
-  overall_wellbeing: 1 | 2 | 3
+  uid: string;
+  name: string;
+  coords: { lat: number; lng: number };
+  physical?: number;
+  mental?: number;
+  community?: number;
+  last_visit?: string;
+  cluster?: number;
+  overall_wellbeing: 1 | 2 | 3;
 }
 export interface Volunteer {
-  vid: string
-  name: string
-  coords: { lat: number; lng: number }
-  skill: number
-  available: boolean | string[]
+  vid: string;
+  name: string;
+  coords: { lat: number; lng: number };
+  skill: number;
+  available: boolean | string[];
 }
 
 export interface Assignment {
-  volunteer: string
-  cluster: number
-  weighted_distance?: number
+  volunteer: string;
+  cluster: number;
+  weighted_distance?: number;
 }
 
 interface Schedule {
-  volunteer: string
-  cluster: number
-  datetime: string
-  duration: number
+  volunteer: string;
+  cluster: number;
+  datetime: string;
+  duration: number;
 }
 
 interface Cluster {
-  [x: string]: any
-  center: Coord
-  seniors: Senior[]
-  radius: number
+  id: number;
+  centroid: { lat: number; lng: number };
+  radius: number;
+  seniors?: Senior[];
 }
 
 interface ScheduleResponse {
-  schedules: Schedule[]
-  clusters: Cluster[]
-  cluster_density: Record<string, number>
+  schedules: Schedule[];
+  clusters: Cluster[];
+  cluster_density: Record<string, number>;
 }
 
 const priorityColors: Record<"HIGH" | "MEDIUM" | "LOW", string> = {
   HIGH: "bg-red-500",
   MEDIUM: "bg-yellow-500",
   LOW: "bg-green-500",
-}
+};
 
 export function InteractiveMap({
   highlightedSeniorId,
@@ -67,28 +67,28 @@ export function InteractiveMap({
   centerCoordinates = [103.8198, 1.3521], // Default to Singapore center
   initialZoom = 11,
 }: {
-  highlightedSeniorId?: string | null
-  onMapUnfocus?: () => void
-  onSeniorClick?: (seniorId: string) => void
-  centerCoordinates?: [number, number]
-  initialZoom?: number
+  highlightedSeniorId?: string | null;
+  onMapUnfocus?: () => void;
+  onSeniorClick?: (seniorId: string) => void;
+  centerCoordinates?: [number, number];
+  initialZoom?: number;
 }) {
+  const mapContainer = useRef<HTMLDivElement>(null);
+  const map = useRef<mapboxgl.Map | null>(null);
+  const markersRef = useRef<mapboxgl.Marker[]>([]);
+  const popupRef = useRef<mapboxgl.Popup | null>(null);
 
+  const [mapLoaded, setMapLoaded] = useState(false);
+  const [mapError, setMapError] = useState<string | null>(null);
+  const [highlightedCluster, setHighlightedCluster] = useState<number | null>(
+    null
+  );
 
-  const mapContainer = useRef<HTMLDivElement>(null)
-  const map = useRef<mapboxgl.Map | null>(null)
-  const markersRef = useRef<mapboxgl.Marker[]>([])
-  const popupRef = useRef<mapboxgl.Popup | null>(null)
-
-  const [mapLoaded, setMapLoaded] = useState(false)
-  const [mapError, setMapError] = useState<string | null>(null)
-  const [highlightedCluster, setHighlightedCluster] = useState<number | null>(null)
-
-  const [seniors, setSeniors] = useState<Senior[]>([])
-  const [volunteers, setVolunteers] = useState<Volunteer[]>([])
-  const [assignments, setAssignments] = useState<Assignment[]>([])
-  const [schedules, setSchedules] = useState<Schedule[]>([])
-  const [clusters, setClusters] = useState<Cluster[]>([])
+  const [seniors, setSeniors] = useState<Senior[]>([]);
+  const [volunteers, setVolunteers] = useState<Volunteer[]>([]);
+  const [assignments, setAssignments] = useState<Assignment[]>([]);
+  const [schedules, setSchedules] = useState<Schedule[]>([]);
+  const [clusters, setClusters] = useState<Cluster[]>([]);
 
   const wellbeingLabels: Record<number, string> = {
     1: "Very Poor",
@@ -96,62 +96,127 @@ export function InteractiveMap({
     3: "Normal",
     4: "Good",
     5: "Very Good",
-    }
-
+  };
 
   // --- Fetch all data from backend ---
   useEffect(() => {
     async function loadData() {
       try {
-        const [sRes, vRes, scRes] = await Promise.all([
+        const [sRes, vRes, aRes, cRes] = await Promise.all([
           fetch("http://localhost:8000/seniors").catch(() => null),
           fetch("http://localhost:8000/volunteers").catch(() => null),
-          fetch("http://localhost:8000/schedules").catch(() => null),
-        ])
+          fetch("http://localhost:8000/assignments").catch(() => null),
+          fetch("http://localhost:8000/clusters").catch(() => null),
+        ]);
 
-        if (sRes && vRes && scRes) {
-          const seniorsData: Senior[] = (await sRes.json()).seniors || []
-          const volunteersData: Volunteer[] = (await vRes.json()).volunteers || []
-          const scheduleData: ScheduleResponse = await scRes.json()
+        if (sRes && vRes && aRes && cRes) {
+          const seniorsData: Senior[] = (await sRes.json()).seniors || [];
+          const volunteersData: Volunteer[] =
+            (await vRes.json()).volunteers || [];
+          const assignmentsData = (await aRes.json()).assignments || [];
+          const clustersData = (await cRes.json()).clusters || [];
 
-          setSeniors(seniorsData)
-          setVolunteers(volunteersData)
-          setAssignments(scheduleData.schedules.map((s) => ({ volunteer: s.volunteer, cluster: s.cluster })))
-          setSchedules(scheduleData.schedules)
-          setClusters(scheduleData.clusters)
+          // Filter seniors: only show those who haven't been visited this year
+          const currentYear = new Date().getFullYear();
+          const filteredSeniors = seniorsData.filter((senior) => {
+            if (!senior.last_visit) return true; // Never visited
+            const lastVisitDate = new Date(senior.last_visit);
+            const lastVisitYear = lastVisitDate.getFullYear();
+            return lastVisitYear < currentYear; // Not visited this year
+          });
+
+          // Filter volunteers: only show those with assignments
+          const volunteersWithAssignments = volunteersData.filter((volunteer) =>
+            assignmentsData.some(
+              (assignment: any) =>
+                assignment.vid === volunteer.vid ||
+                assignment.volunteer_id === volunteer.vid ||
+                assignment.volunteer === volunteer.vid
+            )
+          );
+
+          // Process assignments data
+          const schedulesFromAssignments = assignmentsData.map(
+            (assignment: any) => ({
+              volunteer: assignment.vid,
+              cluster: assignment.cluster_id,
+              datetime: `${assignment.date}T${assignment.start_time}`,
+              duration: 60, // Default duration
+            })
+          );
+
+          const assignmentsFromData = assignmentsData.map(
+            (assignment: any) => ({
+              volunteer: assignment.vid,
+              cluster: assignment.cluster_id,
+              weighted_distance: assignment.distance || 0,
+            })
+          );
+
+          // Process clusters data and convert radius to km
+          const processedClusters = clustersData.map((cluster: any) => {
+            const centroid =
+              typeof cluster.centroid === "string"
+                ? JSON.parse(cluster.centroid)
+                : cluster.centroid;
+
+            // Convert coordinate-based radius to kilometers
+            // Approximate conversion: 1 degree ≈ 111 km at equator
+            const radiusInKm = cluster.radius * 111;
+
+            // Group filtered seniors by cluster
+            const clusterSeniors = filteredSeniors.filter(
+              (senior) => senior.cluster === cluster.id
+            );
+
+            return {
+              id: cluster.id,
+              center: centroid,
+              radius: radiusInKm,
+              seniors: clusterSeniors,
+            };
+          });
+
+          setSeniors(filteredSeniors);
+          setVolunteers(volunteersWithAssignments);
+          setAssignments(assignmentsFromData);
+          setSchedules(schedulesFromAssignments);
+          setClusters(processedClusters);
         }
       } catch (err) {
-        console.error("Failed to fetch data", err)
+        console.error("Failed to fetch data", err);
       }
     }
-    loadData()
-  }, [])
+    loadData();
+  }, []);
 
   // --- Initialize Mapbox ---
   useEffect(() => {
+    if (!mapContainer.current) return;
 
-    if (!mapContainer.current) return
-
-    const mapboxToken = process.env.NEXT_PUBLIC_MAPBOX_TOKEN
+    const mapboxToken = process.env.NEXT_PUBLIC_MAPBOX_TOKEN;
     if (!mapboxToken) {
-      setMapError("Mapbox token is required. Please set NEXT_PUBLIC_MAPBOX_TOKEN in your environment variables.")
-      return
+      setMapError(
+        "Mapbox token is required. Please set NEXT_PUBLIC_MAPBOX_TOKEN in your environment variables."
+      );
+      return;
     }
 
-    mapboxgl.accessToken = mapboxToken
+    mapboxgl.accessToken = mapboxToken;
     const singaporeBounds: [number, number, number, number] = [
-      103.605, 1.214, // west, south
-      104.045, 1.478  // east, north
+      103.605,
+      1.214, // west, south
+      104.045,
+      1.478, // east, north
     ];
     map.current = new mapboxgl.Map({
       container: mapContainer.current,
       style: "mapbox://styles/wzinl/cmf5f4has01rh01pj8ajb1993",
       center: centerCoordinates,
-      zoom: 13
-
-    })
+      zoom: 13,
+    });
     map.current.on("load", () => {
-      setMapLoaded(true)
+      setMapLoaded(true);
       // Add cluster circle source and layer
       if (map.current) {
         map.current.setMaxBounds(singaporeBounds);
@@ -174,7 +239,7 @@ export function InteractiveMap({
           "fill-opacity": 0.2,
           "fill-outline-color": "#8B5CF6",
         },
-      })
+      });
 
       // Add circle outline layer
       map.current!.addLayer({
@@ -186,32 +251,32 @@ export function InteractiveMap({
           "line-width": 2,
           "line-opacity": 0.8,
         },
-      })
+      });
 
-      renderMarkers()
-    })
+      renderMarkers();
+    });
     map.current.on("error", (e) => {
-      console.error("Map error:", e)
-      setMapError((e as any).message || "Failed to load map")
-    })
-    return () => map.current?.remove()
-  }, [])
+      console.error("Map error:", e);
+      setMapError((e as any).message || "Failed to load map");
+    });
+    return () => map.current?.remove();
+  }, []);
 
   // --- Re-render markers when data changes ---
   useEffect(() => {
-    if (!map.current) return
-    if (!mapLoaded) return
-    markersRef.current.forEach((m) => m.remove())
-    markersRef.current = []
+    if (!map.current) return;
+    if (!mapLoaded) return;
+    markersRef.current.forEach((m) => m.remove());
+    markersRef.current = [];
 
-    updateClusterCircles()
+    updateClusterCircles();
 
     // Cluster markers
     clusters.forEach((cluster, idx) => {
-      const el = document.createElement("div")
+      const el = document.createElement("div");
       el.className =
-        "w-10 h-10 bg-purple-500 rounded-full flex items-center justify-center text-white font-bold shadow-lg cursor-pointer relative z-10"
-      el.innerText = cluster.seniors.length.toString()
+        "w-10 h-10 bg-purple-500 rounded-full flex items-center justify-center text-white font-bold shadow-lg cursor-pointer relative z-10";
+      el.innerText = cluster.id.toString(); // Show actual cluster ID instead of senior count
 
       // Add hover effect to highlight corresponding circle
       el.addEventListener("mouseenter", () => {
@@ -220,132 +285,161 @@ export function InteractiveMap({
           ["==", ["get", "clusterId"], cluster.id],
           0.4, // Highlighted opacity
           0.2, // Default opacity
-        ])
+        ]);
         map.current?.setPaintProperty("cluster-circles-outline", "line-width", [
           "case",
           ["==", ["get", "clusterId"], cluster.id],
           3, // Highlighted width
           2, // Default width
-        ])
-      })
+        ]);
+      });
 
       el.addEventListener("mouseleave", () => {
-        map.current?.setPaintProperty("cluster-circles-layer", "fill-opacity", 0.2)
-        map.current?.setPaintProperty("cluster-circles-outline", "line-width", 2)
-      })
+        map.current?.setPaintProperty(
+          "cluster-circles-layer",
+          "fill-opacity",
+          0.2
+        );
+        map.current?.setPaintProperty(
+          "cluster-circles-outline",
+          "line-width",
+          2
+        );
+      });
 
-      const marker = new mapboxgl.Marker(el).setLngLat([cluster.center.lng, cluster.center.lat]).addTo(map.current!)
+      const marker = new mapboxgl.Marker(el)
+        .setLngLat([cluster.center.lng, cluster.center.lat])
+        .addTo(map.current!);
 
       el.addEventListener("click", () => {
-        setHighlightedCluster(idx)
-        
+        setHighlightedCluster(idx);
+
         if (popupRef.current) {
-          popupRef.current.remove()
-          popupRef.current = null
+          popupRef.current.remove();
+          popupRef.current = null;
         }
 
-        // Fit map to cluster bounds
-        const bounds = new mapboxgl.LngLatBounds()
-        cluster.seniors.forEach((senior) => {
-          if (senior.coords) {
-            bounds.extend([senior.coords.lng, senior.coords.lat])
-          }
-        })
-        map.current?.fitBounds(bounds, { padding: 50 })
-      })
+        // Fit map to cluster bounds if seniors exist
+        if (cluster.seniors && cluster.seniors.length > 0) {
+          const bounds = new mapboxgl.LngLatBounds();
+          cluster.seniors.forEach((senior) => {
+            if (senior.coords) {
+              bounds.extend([senior.coords.lng, senior.coords.lat]);
+            }
+          });
+          map.current?.fitBounds(bounds, { padding: 50 });
+        }
+      });
 
-      markersRef.current.push(marker)
-    })
+      markersRef.current.push(marker);
+    });
 
     // Senior markers
     seniors.forEach((s) => {
-      if (!s.coords) return
-      const levels = { 1: "HIGH", 2: "MEDIUM", 3: "LOW" }
-      const assessment = levels[s.overall_wellbeing] || "LOW"
-      const isHighlighted = s.uid === highlightedSeniorId
-      const colorClass = priorityColors[(assessment || "LOW") as "HIGH" | "MEDIUM" | "LOW"]
-      const sizeClass = "w-6 h-6"
-      const borderClass = isHighlighted ? "border-4 border-purple-500" : "border-2 border-white"
-      const boxShadow = isHighlighted ? "0 0 10px #a855f7" : "0 0 4px #888"
+      if (!s.coords) return;
+      const levels = { 1: "HIGH", 2: "MEDIUM", 3: "LOW" };
+      const assessment = levels[s.overall_wellbeing] || "LOW";
+      const isHighlighted = s.uid === highlightedSeniorId;
+      const colorClass =
+        priorityColors[(assessment || "LOW") as "HIGH" | "MEDIUM" | "LOW"];
+      const sizeClass = "w-6 h-6";
+      const borderClass = isHighlighted
+        ? "border-4 border-purple-500"
+        : "border-2 border-white";
+      const boxShadow = isHighlighted ? "0 0 10px #a855f7" : "0 0 4px #888";
 
-      const el = document.createElement("div")
-      el.className = `${sizeClass} ${colorClass} rounded-full ${borderClass} shadow-md cursor-pointer flex items-center justify-center text-xs relative z-20`
-      el.innerText = "👤"
-      el.style.boxShadow = boxShadow
+      const el = document.createElement("div");
+      el.className = `${sizeClass} ${colorClass} rounded-full ${borderClass} shadow-md cursor-pointer flex items-center justify-center text-xs relative z-20`;
+      el.innerText = "👤";
+      el.style.boxShadow = boxShadow;
 
       el.addEventListener("click", (e) => {
-        e.stopPropagation()
-        setHighlightedCluster(null)
-        showSeniorPopup(s, assessment as "HIGH" | "MEDIUM" | "LOW")
-        if (onSeniorClick) onSeniorClick(s.uid) // <-- Call the callback here
-      })
+        e.stopPropagation();
+        setHighlightedCluster(null);
+        showSeniorPopup(s, assessment as "HIGH" | "MEDIUM" | "LOW");
+        if (onSeniorClick) onSeniorClick(s.uid); // <-- Call the callback here
+      });
 
-      const marker = new mapboxgl.Marker(el).setLngLat([s.coords.lng, s.coords.lat]).addTo(map.current!)
-      markersRef.current.push(marker)
-    })
+      const marker = new mapboxgl.Marker(el)
+        .setLngLat([s.coords.lng, s.coords.lat])
+        .addTo(map.current!);
+      markersRef.current.push(marker);
+    });
 
     // Volunteer markers
     volunteers.forEach((v) => {
-      if (!v.coords) return
-      const el = document.createElement("div")
+      if (!v.coords) return;
+      const el = document.createElement("div");
       el.className =
-        "w-6 h-6 bg-blue-500 rounded-full border-2 border-white shadow-md flex items-center justify-center text-xs relative z-20"
-      el.innerText = "🙋"
-      const marker = new mapboxgl.Marker(el).setLngLat([v.coords.lng, v.coords.lat]).addTo(map.current!)
+        "w-6 h-6 bg-blue-500 rounded-full border-2 border-white shadow-md flex items-center justify-center text-xs relative z-20";
+      el.innerText = "🙋";
+      const marker = new mapboxgl.Marker(el)
+        .setLngLat([v.coords.lng, v.coords.lat])
+        .addTo(map.current!);
       el.addEventListener("click", (e) => {
-        e.stopPropagation()
-        setHighlightedCluster(null)
-        showVolunteerPopup(v)
-      })
-      markersRef.current.push(marker)
-    })
+        e.stopPropagation();
+        setHighlightedCluster(null);
+        showVolunteerPopup(v);
+      });
+      markersRef.current.push(marker);
+    });
 
     // Clicking elsewhere on the map unfocuses
     if (map.current && onMapUnfocus) {
-      map.current.on("click", onMapUnfocus)
+      map.current.on("click", onMapUnfocus);
     }
     return () => {
       if (map.current && onMapUnfocus) {
-        map.current.off("click", onMapUnfocus)
+        map.current.off("click", onMapUnfocus);
       }
-    }
-  }, [seniors, volunteers, clusters, highlightedSeniorId, mapLoaded, highlightedCluster, onMapUnfocus, onSeniorClick])
+    };
+  }, [
+    seniors,
+    volunteers,
+    clusters,
+    highlightedSeniorId,
+    mapLoaded,
+    highlightedCluster,
+    onMapUnfocus,
+    onSeniorClick,
+  ]);
 
   // --- Helper function to create circle polygon ---
   interface CircleCenter {
-    0: number // lng
-    1: number // lat
-    length: 2
+    0: number; // lng
+    1: number; // lat
+    length: 2;
   }
 
-  type CirclePolygon = [number, number][]
+  type CirclePolygon = [number, number][];
 
   interface CreateCirclePolygonFn {
-    (
-      center: CircleCenter,
-      radiusKm: number,
-      points?: number
-    ): CirclePolygon
+    (center: CircleCenter, radiusKm: number, points?: number): CirclePolygon;
   }
 
-  const createCirclePolygon: CreateCirclePolygonFn = (center, radiusKm, points = 64) => {
-    const coords: CirclePolygon = []
-    const distanceX = radiusKm / (111.32 * Math.cos((center[1] * Math.PI) / 180))
-    const distanceY = radiusKm / 110.54
+  const createCirclePolygon: CreateCirclePolygonFn = (
+    center,
+    radiusKm,
+    points = 64
+  ) => {
+    const coords: CirclePolygon = [];
+    const distanceX =
+      radiusKm / (111.32 * Math.cos((center[1] * Math.PI) / 180));
+    const distanceY = radiusKm / 110.54;
 
     for (let i = 0; i < points; i++) {
-      const theta = (i / points) * (2 * Math.PI)
-      const x = distanceX * Math.cos(theta)
-      const y = distanceY * Math.sin(theta)
-      coords.push([center[0] + x, center[1] + y])
+      const theta = (i / points) * (2 * Math.PI);
+      const x = distanceX * Math.cos(theta);
+      const y = distanceY * Math.sin(theta);
+      coords.push([center[0] + x, center[1] + y]);
     }
-    coords.push(coords[0]) // Close the polygon
-    return coords
-  }
+    coords.push(coords[0]); // Close the polygon
+    return coords;
+  };
 
   // --- Update cluster circles ---
   const updateClusterCircles = () => {
-    if (!map.current || !mapLoaded) return
+    if (!map.current || !mapLoaded) return;
 
     const features = clusters.map((cluster) => ({
       type: "Feature" as const,
@@ -354,41 +448,41 @@ export function InteractiveMap({
         coordinates: [
           createCirclePolygon(
             [cluster.center.lng, cluster.center.lat],
-            cluster.radius || 0.5, // Use the radius from backend, fallback to 0.5km
+            cluster.radius // Now properly converted to km
           ),
         ],
       },
       properties: {
         clusterId: cluster.id,
-        seniorCount: cluster.seniors.length,
+        seniorCount: cluster.seniors?.length || 0,
         radius: cluster.radius,
       },
-    }))
+    }));
 
-    const source = map.current.getSource("cluster-circles")
+    const source = map.current.getSource("cluster-circles");
     if (source && "setData" in source) {
       (source as mapboxgl.GeoJSONSource).setData({
         type: "FeatureCollection",
         features: features,
-      })
+      });
     }
-  }
+  };
 
   // --- Render all markers ---
   const renderMarkers = () => {
-    if (!map.current) return
-    markersRef.current.forEach((m) => m.remove())
-    markersRef.current = []
+    if (!map.current) return;
+    markersRef.current.forEach((m) => m.remove());
+    markersRef.current = [];
 
     // Update cluster circles first
-    updateClusterCircles()
+    updateClusterCircles();
 
     // Cluster markers
     clusters.forEach((cluster, idx) => {
-      const el = document.createElement("div")
+      const el = document.createElement("div");
       el.className =
-        "w-10 h-10 bg-purple-500 rounded-full flex items-center justify-center text-white font-bold shadow-lg cursor-pointer relative z-10"
-      el.innerText = cluster.seniors.length.toString()
+        "w-10 h-10 bg-purple-500 rounded-full flex items-center justify-center text-white font-bold shadow-lg cursor-pointer relative z-10";
+      el.innerText = cluster.id.toString(); // Show actual cluster ID instead of senior count
 
       // Add hover effect to highlight corresponding circle
       el.addEventListener("mouseenter", () => {
@@ -397,124 +491,168 @@ export function InteractiveMap({
           ["==", ["get", "clusterId"], cluster.id],
           0.4, // Highlighted opacity
           0.2, // Default opacity
-        ])
+        ]);
         map.current?.setPaintProperty("cluster-circles-outline", "line-width", [
           "case",
           ["==", ["get", "clusterId"], cluster.id],
           3, // Highlighted width
           2, // Default width
-        ])
-      })
+        ]);
+      });
 
       el.addEventListener("mouseleave", () => {
-        map.current?.setPaintProperty("cluster-circles-layer", "fill-opacity", 0.2)
-        map.current?.setPaintProperty("cluster-circles-outline", "line-width", 2)
-      })
+        map.current?.setPaintProperty(
+          "cluster-circles-layer",
+          "fill-opacity",
+          0.2
+        );
+        map.current?.setPaintProperty(
+          "cluster-circles-outline",
+          "line-width",
+          2
+        );
+      });
 
-      const marker = new mapboxgl.Marker(el).setLngLat([cluster.center.lng, cluster.center.lat]).addTo(map.current!)
+      const marker = new mapboxgl.Marker(el)
+        .setLngLat([cluster.center.lng, cluster.center.lat])
+        .addTo(map.current!);
 
       el.addEventListener("click", () => {
-        setHighlightedCluster(idx)
+        setHighlightedCluster(idx);
 
         if (popupRef.current) {
-          popupRef.current.remove()
-          popupRef.current = null
+          popupRef.current.remove();
+          popupRef.current = null;
         }
 
-        // Fit map to cluster bounds
-        const bounds = new mapboxgl.LngLatBounds()
-        cluster.seniors.forEach((senior) => {
-          if (senior.coords) {
-            bounds.extend([senior.coords.lng, senior.coords.lat])
-          }
-        })
-        map.current?.fitBounds(bounds, { padding: 50 })
-      })
+        // Fit map to cluster bounds if seniors exist
+        if (cluster.seniors && cluster.seniors.length > 0) {
+          const bounds = new mapboxgl.LngLatBounds();
+          cluster.seniors.forEach((senior) => {
+            if (senior.coords) {
+              bounds.extend([senior.coords.lng, senior.coords.lat]);
+            }
+          });
+          map.current?.fitBounds(bounds, { padding: 50 });
+        }
+      });
 
-      markersRef.current.push(marker)
-    })
+      markersRef.current.push(marker);
+    });
 
-    const seniorMarkerElements = new Map()
+    const seniorMarkerElements = new Map();
 
     // Senior markers
     seniors.forEach((s) => {
       // console.log(s.overall_wellbeing)
-      if (!s.coords) return
+      if (!s.coords) return;
       const levels = {
         1: "HIGH",
         2: "MEDIUM",
-        3: "LOW"
+        3: "LOW",
       };
       const assessment = levels[s.overall_wellbeing] || "LOW";
       const isInHighlightedCluster =
         highlightedCluster !== null &&
-        clusters[highlightedCluster]?.seniors.some((clusterSenior) => clusterSenior.uid === s.uid)
-      const colorClass = priorityColors[(assessment || "LOW") as "HIGH" | "MEDIUM" | "LOW"]
-      const sizeClass = isInHighlightedCluster ? "w-8 h-8" : "w-6 h-6"
-      const borderClass = isInHighlightedCluster ? "border-4 border-purple-500" : "border-2 border-white"
+        clusters[highlightedCluster]?.seniors?.some(
+          (clusterSenior) => clusterSenior.uid === s.uid
+        );
 
-      const el = document.createElement("div")
-      el.className =               
-      `${sizeClass} ${colorClass} rounded-full ${borderClass} shadow-md cursor-pointer flex items-center justify-center text-xs relative z-20`
-      el.innerText = "👤"
+      const colorClass =
+        priorityColors[(assessment || "LOW") as "HIGH" | "MEDIUM" | "LOW"];
+      const sizeClass = isInHighlightedCluster ? "w-8 h-8" : "w-6 h-6";
+      const borderClass = isInHighlightedCluster
+        ? "border-4 border-purple-500"
+        : "border-2 border-white";
+
+      const el = document.createElement("div");
+      el.className = `${sizeClass} ${colorClass} rounded-full ${borderClass} shadow-md cursor-pointer flex items-center justify-center text-xs relative z-20`;
+      el.innerText = "👤";
       // Store reference to this element for highlighting
-      seniorMarkerElements.set(s.uid, el)
+      seniorMarkerElements.set(s.uid, el);
 
-      const marker = new mapboxgl.Marker(el).setLngLat([s.coords.lng, s.coords.lat]).addTo(map.current!)
+      const marker = new mapboxgl.Marker(el)
+        .setLngLat([s.coords.lng, s.coords.lat])
+        .addTo(map.current!);
       el.addEventListener("click", (e) => {
-        e.stopPropagation()
-        setHighlightedCluster(null)
-        showSeniorPopup(s, assessment as "HIGH" | "MEDIUM" | "LOW")
-      })
-      markersRef.current.push(marker)
-    })
+        e.stopPropagation();
+        setHighlightedCluster(null);
+        showSeniorPopup(s, assessment as "HIGH" | "MEDIUM" | "LOW");
+      });
+      markersRef.current.push(marker);
+    });
 
     // Volunteer markers
     volunteers.forEach((v) => {
-      if (!v.coords) return
-      const el = document.createElement("div")
+      if (!v.coords) return;
+      const el = document.createElement("div");
       el.className =
-        "w-6 h-6 bg-blue-500 rounded-full border-2 border-white shadow-md flex items-center justify-center text-xs relative z-20"
-      el.innerText = "🙋"
-      const marker = new mapboxgl.Marker(el).setLngLat([v.coords.lng, v.coords.lat]).addTo(map.current!)
+        "w-6 h-6 bg-blue-500 rounded-full border-2 border-white shadow-md flex items-center justify-center text-xs relative z-20";
+      el.innerText = "🙋";
+      const marker = new mapboxgl.Marker(el)
+        .setLngLat([v.coords.lng, v.coords.lat])
+        .addTo(map.current!);
       el.addEventListener("click", (e) => {
-        e.stopPropagation()
-        setHighlightedCluster(null)
-        showVolunteerPopup(v)
-      })
-      markersRef.current.push(marker)
-    })
-  }
+        e.stopPropagation();
+        setHighlightedCluster(null);
+        showVolunteerPopup(v);
+      });
+      markersRef.current.push(marker);
+    });
+  };
 
-  const createSeniorPopupHTML = (senior: Senior, priority: "HIGH" | "MEDIUM" | "LOW", wellbeingLabels: Record<number, string>) => {
-  const lastVisit = senior.last_visit ? new Date(senior.last_visit).toLocaleDateString() : "N/A"
-  
-  const priorityStyles = {
-    HIGH: "bg-red-100 text-red-800",
-    MEDIUM: "bg-yellow-100 text-yellow-800",
-    LOW: "bg-green-100 text-green-800"
-  }
-  
-  const wellbeingIcon = (score: number | undefined) => {
-    if (score === undefined) return "❓"
-    if (score <= 2) return "🔴"
-    if (score <= 3) return "🟡"
-    return "🟢"
-  }
-  
-  const escapeHtml = (text: string) => {
-    const div = document.createElement('div')
-    div.textContent = text
-    return div.innerHTML
-  }
-  
-  const wellbeingItems = [
-    { icon: wellbeingIcon(senior.physical), label: 'Physical Health', value: senior.physical },
-    { icon: wellbeingIcon(senior.mental), label: 'Mental Health', value: senior.mental },
-    { icon: wellbeingIcon(senior.community), label: 'Community', value: senior.community }
-  ]
-  
-  return `
+  const createSeniorPopupHTML = (
+    senior: Senior,
+    priority: "HIGH" | "MEDIUM" | "LOW",
+    wellbeingLabels: Record<number, string>
+  ) => {
+    const lastVisit = senior.last_visit
+      ? new Date(senior.last_visit).toLocaleDateString()
+      : "Never visited";
+
+    const priorityStyles = {
+      HIGH: "bg-red-100 text-red-800",
+      MEDIUM: "bg-yellow-100 text-yellow-800",
+      LOW: "bg-green-100 text-green-800",
+    };
+
+    const wellbeingIcon = (score: number | undefined) => {
+      if (score === undefined) return "❓";
+      if (score <= 2) return "🔴";
+      if (score <= 3) return "🟡";
+      return "🟢";
+    };
+
+    const escapeHtml = (text: string) => {
+      const div = document.createElement("div");
+      div.textContent = text;
+      return div.innerHTML;
+    };
+
+    const wellbeingItems = [
+      {
+        icon: wellbeingIcon(senior.physical),
+        label: "Physical Health",
+        value: senior.physical,
+      },
+      {
+        icon: wellbeingIcon(senior.mental),
+        label: "Mental Health",
+        value: senior.mental,
+      },
+      {
+        icon: wellbeingIcon(senior.community),
+        label: "Community",
+        value: senior.community,
+      },
+    ];
+
+    // Show reason for appearing on map
+    const visitStatus = senior.last_visit
+      ? `Last visited: ${lastVisit}`
+      : "Never visited - needs attention";
+
+    return `
     <div class="w-60 p-0 bg-white rounded-lg">
       <div class="pb-1">
         <div class="flex items-center gap-3">
@@ -522,65 +660,95 @@ export function InteractiveMap({
             👤
           </div>
           <div class="flex-1">
-            <h3 class="font-semibold text-base text-gray-900">${escapeHtml(senior.name || senior.uid)}</h3>
-            <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${priorityStyles[priority]}">
+            <h3 class="font-semibold text-base text-gray-900">${escapeHtml(
+              senior.name || senior.uid
+            )}</h3>
+            <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
+              priorityStyles[priority]
+            }">
               ${priority} Priority
             </span>
           </div>
         </div>
         
         <div class="space-y-2">
+          <div class="p-2 bg-orange-50 border border-orange-200 rounded">
+            <span class="text-xs text-orange-800 font-medium">
+              📅 ${visitStatus}
+            </span>
+          </div>
+          
           <div>
             <h4 class="text-sm font-medium text-gray-700 mb-2">Wellbeing Status</h4>
             <div class="space-y-2">
-              ${wellbeingItems.map(item => `
+              ${wellbeingItems
+                .map(
+                  (item) => `
                 <div class="flex items-center justify-between">
                   <span class="text-sm text-gray-600 flex items-center gap-2">
                     ${item.icon} ${item.label}
                   </span>
                   <span class="text-sm font-medium">
-                    ${item.value !== undefined ? wellbeingLabels[6 - item.value] : "Unknown"}
+                    ${
+                      item.value !== undefined
+                        ? wellbeingLabels[6 - item.value]
+                        : "Unknown"
+                    }
                   </span>
                 </div>
-              `).join('')}
+              `
+                )
+                .join("")}
             </div>
           </div>
           
+          ${
+            senior.cluster
+              ? `
           <div class="pt-2 border-t border-gray-100">
             <div class="flex items-center justify-between">
               <span class="text-sm text-gray-600 flex items-center gap-2">
-                📅 Last Visit
+                📍 Cluster
               </span>
-              <span class="text-sm font-medium">${lastVisit}</span>
+              <span class="text-sm font-medium">${senior.cluster}</span>
             </div>
           </div>
+          `
+              : ""
+          }
         </div>
       </div>
     </div>
-  `
-}
+  `;
+  };
 
-const createVolunteerPopupHTML = (volunteer: Volunteer, assignment?: Assignment) => {
-  const available = typeof volunteer.available === "boolean" 
-    ? volunteer.available 
-    : volunteer.available.length > 0
+  const createVolunteerPopupHTML = (
+    volunteer: Volunteer,
+    assignment?: Assignment
+  ) => {
+    const available =
+      typeof volunteer.available === "boolean"
+        ? volunteer.available
+        : Array.isArray(volunteer.available) && volunteer.available.length > 0;
 
-  const escapeHtml = (text: string) => {
-    const div = document.createElement('div')
-    div.textContent = text
-    return div.innerHTML
-  }
+    const escapeHtml = (text: string) => {
+      const div = document.createElement("div");
+      div.textContent = text;
+      return div.innerHTML;
+    };
 
-  const availabilityStyle = available ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800"
-  const availabilityText = available ? "Available" : "Unavailable"
-  
-  const skillIcon = (skill: number) => {
-    if (skill >= 3) return "⭐"
-    if (skill >= 2) return "🟡"
-    return "🔴"
-  }
+    const availabilityStyle = available
+      ? "bg-green-100 text-green-800"
+      : "bg-red-100 text-red-800";
+    const availabilityText = available ? "Available" : "Unavailable";
 
-  return `
+    const skillIcon = (skill: number) => {
+      if (skill >= 3) return "⭐";
+      if (skill >= 2) return "🟡";
+      return "🔴";
+    };
+
+    return `
     <div class="w-60 p-0 bg-white rounded-lg">
       <div class="pb-1">
         <div class="flex items-center gap-3">
@@ -588,7 +756,9 @@ const createVolunteerPopupHTML = (volunteer: Volunteer, assignment?: Assignment)
             🙋
           </div>
           <div class="flex-1">
-            <h3 class="font-semibold text-base text-gray-900">${escapeHtml(volunteer.name || volunteer.vid)}</h3>
+            <h3 class="font-semibold text-base text-gray-900">${escapeHtml(
+              volunteer.name || volunteer.vid
+            )}</h3>
             <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${availabilityStyle}">
               ${availabilityText}
             </span>
@@ -607,90 +777,100 @@ const createVolunteerPopupHTML = (volunteer: Volunteer, assignment?: Assignment)
                   ${volunteer.skill}/3
                 </span>
               </div>
-              ${assignment ? `
-                <div class="flex items-center justify-between">
-                  <span class="text-sm text-gray-600 flex items-center gap-2">
-                    📍 Assignment
-                  </span>
-                  <span class="text-sm font-medium">
-                    Cluster ${assignment.cluster}
-                  </span>
-                </div>
-              ` : `
-                <div class="flex items-center justify-between">
-                  <span class="text-sm text-gray-600 flex items-center gap-2">
-                    📍 Assignment
-                  </span>
-                  <span class="text-sm font-medium">
-                    Not Assigned
-                  </span>
-                </div>
-              `}
+              <div class="flex items-center justify-between">
+                <span class="text-sm text-gray-600 flex items-center gap-2">
+                  📍 Assignment
+                </span>
+                <span class="text-sm font-medium">
+                  ${
+                    assignment
+                      ? `Cluster ${assignment.cluster}`
+                      : "Not Assigned"
+                  }
+                </span>
+              </div>
+              ${
+                assignment && assignment.weighted_distance
+                  ? `
+              <div class="flex items-center justify-between">
+                <span class="text-sm text-gray-600 flex items-center gap-2">
+                  📏 Distance
+                </span>
+                <span class="text-sm font-medium">
+                  ${assignment.weighted_distance.toFixed(1)} km
+                </span>
+              </div>
+              `
+                  : ""
+              }
             </div>
           </div>
         </div>
       </div>
     </div>
-  `
-}
-
+  `;
+  };
 
   // --- Popups ---
-const showSeniorPopup = (s: Senior, priority?: "HIGH" | "MEDIUM" | "LOW") => {
-  if (!map.current) return
+  const showSeniorPopup = (s: Senior, priority?: "HIGH" | "MEDIUM" | "LOW") => {
+    if (!map.current) return;
 
-  if (popupRef.current) {
-    popupRef.current.remove()
-    popupRef.current = null
-  }
+    if (popupRef.current) {
+      popupRef.current.remove();
+      popupRef.current = null;
+    }
 
-  const displayPriority = priority || "LOW"
-  const popupHTML = createSeniorPopupHTML(s, displayPriority, wellbeingLabels)
+    const displayPriority = priority || "LOW";
+    const popupHTML = createSeniorPopupHTML(
+      s,
+      displayPriority,
+      wellbeingLabels
+    );
 
-  popupRef.current = new mapboxgl.Popup({
-    closeButton: false,
-    closeOnClick: true,
-    closeOnMove: true,
-    focusAfterOpen: true,
-    maxWidth: "500",
-    className: ""
-  })
-    .setLngLat([s.coords.lng, s.coords.lat])
-    .setHTML(popupHTML)
-    .addTo(map.current)
+    popupRef.current = new mapboxgl.Popup({
+      closeButton: false,
+      closeOnClick: true,
+      closeOnMove: true,
+      focusAfterOpen: true,
+      maxWidth: "500",
+      className: "",
+    })
+      .setLngLat([s.coords.lng, s.coords.lat])
+      .setHTML(popupHTML)
+      .addTo(map.current);
 
-  popupRef.current.on("close", () => {
-    popupRef.current = null
-  })
-}
+    popupRef.current.on("close", () => {
+      popupRef.current = null;
+    });
+  };
 
-const showVolunteerPopup = (v: Volunteer) => {
-  if (!map.current) return
+  const showVolunteerPopup = (v: Volunteer) => {
+    if (!map.current) return;
 
-  if (popupRef.current) {
-    popupRef.current.remove()
-    popupRef.current = null
-  }
+    if (popupRef.current) {
+      popupRef.current.remove();
+      popupRef.current = null;
+    }
 
-  const assignment = assignments.find((a) => a.volunteer === v.vid)
-  const popupHTML = createVolunteerPopupHTML(v, assignment)
+    const assignment = assignments.find((a) => a.volunteer === v.vid);
+    const popupHTML = createVolunteerPopupHTML(v, assignment);
 
-  popupRef.current = new mapboxgl.Popup({
-    closeButton: false,
-    closeOnClick: true,
-    closeOnMove: true,
-    focusAfterOpen: true,
-    maxWidth: "500",
-    className: ""
-  })
-    .setLngLat([v.coords.lng, v.coords.lat])
-    .setHTML(popupHTML)
-    .addTo(map.current)
+    popupRef.current = new mapboxgl.Popup({
+      closeButton: false,
+      closeOnClick: true,
+      closeOnMove: true,
+      focusAfterOpen: true,
+      maxWidth: "500",
+      className: "",
+    })
+      .setLngLat([v.coords.lng, v.coords.lat])
+      .setHTML(popupHTML)
+      .addTo(map.current);
 
-  popupRef.current.on("close", () => {
-    popupRef.current = null
-  })
-}
+    popupRef.current.on("close", () => {
+      popupRef.current = null;
+    });
+  };
 
   return (
     <div className="w-full h-[400px] relative">
@@ -721,13 +901,17 @@ const showVolunteerPopup = (v: Volunteer) => {
         </div>
         {highlightedCluster !== null && (
           <div className="mt-2 pt-2 border-t border-gray-200">
-            <div className="text-xs text-purple-600 font-medium">Cluster {highlightedCluster + 1} highlighted</div>
-            <div className="text-xs text-gray-500">Click elsewhere to clear</div>
+            <div className="text-xs text-purple-600 font-medium">
+              Cluster {highlightedCluster + 1} highlighted
+            </div>
+            <div className="text-xs text-gray-500">
+              Click elsewhere to clear
+            </div>
           </div>
         )}
       </div>
     </div>
-  )
+  );
 }
 
 function LegendItem({ color, label }: { color: string; label: string }) {
@@ -736,5 +920,5 @@ function LegendItem({ color, label }: { color: string; label: string }) {
       <div className={`w-4 h-4 ${color} rounded-full`} />
       <span className="text-xs">{label}</span>
     </div>
-  )
+  );
 }

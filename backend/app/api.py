@@ -1,4 +1,4 @@
-from routers import assignment, availability, schedule 
+# from routers import assignment, availability, schedule 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 import uvicorn
@@ -18,10 +18,10 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Include routers
-app.include_router(assignment.router)
-app.include_router(availability.router)
-app.include_router(schedule.router)
+# # Include routers
+# app.include_router(assignment.router)
+# app.include_router(availability.router)
+# app.include_router(schedule.router)
 
 
 @app.get("/")
@@ -45,6 +45,39 @@ def get_user_schedules(user_email: str):
     response = supabase.table("volunteers").select("*, constituency(centre_lat, centre_long)").eq("email", user_email).execute()
     logger.info(f"Fetched DL information for user {user_email}")
     return {"dl_info": response.data}
+
+@app.get("/assignments")
+def get_assignments():
+    response = supabase.table("assignments").select("*").execute()
+    logger.info(f"Fetched {len(response.data)} assignments")
+    logger.info(f"Assignments data: {response.data}")
+    logger.info(f"Assignments columns: {list(response.data[0].keys()) if response.data else 'No data'}")
+    return {"assignments": response.data}
+
+@app.get("/clusters")
+def get_clusters():
+    response = supabase.table("clusters").select("*").execute()
+    logger.info(f"Fetched {len(response.data)} clusters")
+    logger.info(f"Clusters data sample: {response.data[:2] if response.data else 'No data'}")
+    return {"clusters": response.data}
+
+# Add a debug endpoint to check all table structures
+@app.get("/debug/tables")
+def debug_tables():
+    tables_info = {}
+    
+    for table_name in ["seniors", "volunteers", "assignments", "clusters"]:
+        try:
+            response = supabase.table(table_name).select("*").limit(1).execute()
+            tables_info[table_name] = {
+                "count": len(response.data),
+                "columns": list(response.data[0].keys()) if response.data else [],
+                "sample": response.data[0] if response.data else None
+            }
+        except Exception as e:
+            tables_info[table_name] = {"error": str(e)}
+    
+    return tables_info
 
 if __name__ == "__main__":
     uvicorn.run("api:app", port=8000, reload=True)
