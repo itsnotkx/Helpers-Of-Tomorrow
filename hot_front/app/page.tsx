@@ -67,7 +67,7 @@ export default function VolunteerDashboard() {
   const [schedules, setSchedules] = useState<Schedule[]>([])
   const [assessments, setAssessments] = useState<Assessment[]>([])
   const [loading, setLoading] = useState(true)
-  const [selectedDistrict, setSelectedDistrict] = useState("Central Singapore")
+  const [selectedDistrict, setSelectedDistrict] = useState("Sembawang West")
   const [isMapCollapsed, setIsMapCollapsed] = useState(false)
   const [isScheduleCollapsed, setIsScheduleCollapsed] = useState(false)
   const [isAssignmentsCollapsed, setIsAssignmentsCollapsed] = useState(false)
