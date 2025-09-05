@@ -9,7 +9,17 @@ load_dotenv('.env.local')
 # Supabase configuration
 SUPABASE_URL = os.getenv("SUPABASE_URL")
 SUPABASE_KEY = os.getenv("SUPABASE_KEY")
-supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
+
+# Validate environment variables
+if not SUPABASE_URL:
+    raise ValueError("SUPABASE_URL environment variable is required. Please check your .env.local file.")
+if not SUPABASE_KEY:
+    raise ValueError("SUPABASE_KEY environment variable is required. Please check your .env.local file.")
+
+try:
+    supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
+except Exception as e:
+    raise ValueError(f"Failed to create Supabase client: {e}")
 
 # Logging configuration
 logging.basicConfig(

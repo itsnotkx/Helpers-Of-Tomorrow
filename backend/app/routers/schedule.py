@@ -13,78 +13,78 @@ import json  # for safer coords parsing
 router = APIRouter(tags=["schedule"])
 
 
-@router.get("/schedules")
-def get_schedules():
-    try:
-        logger.info("Fetching schedule data")
-        assignments_data = get_assignments()
+# @router.get("/schedules")
+# def get_schedules():
+#     try:
+#         logger.info("Fetching schedule data")
+#         assignments_data = get_assignments()
         
-        if not assignments_data.get("assignments"):
-            logger.warning("No assignments available for scheduling")
-            return {"schedules": [], "clusters": [], "cluster_density": {}, "stats": {}}
+#         if not assignments_data.get("assignments"):
+#             logger.warning("No assignments available for scheduling")
+#             return {"schedules": [], "clusters": [], "cluster_density": {}, "stats": {}}
 
-        schedule_result = create_schedule({
-            "assignments": assignments_data["assignments"],
-            "seniors": assignments_data.get("seniors", []),
-            "volunteers": assignments_data.get("volunteers", [])
-        })
+#         schedule_result = create_schedule({
+#             "assignments": assignments_data["assignments"],
+#             "seniors": assignments_data.get("seniors", []),
+#             "volunteers": assignments_data.get("volunteers", [])
+#         })
 
-        logger.info(f"Generated {len(schedule_result.get('schedules', []))} schedules")
-        return {
-            "schedules": schedule_result.get("schedules", []),
-            "clusters": assignments_data.get("clusters", []),
-            "cluster_density": assignments_data.get("cluster_density", {}),
-            "stats": schedule_result.get("stats", {})
-        }
+#         logger.info(f"Generated {len(schedule_result.get('schedules', []))} schedules")
+#         return {
+#             "schedules": schedule_result.get("schedules", []),
+#             "clusters": assignments_data.get("clusters", []),
+#             "cluster_density": assignments_data.get("cluster_density", {}),
+#             "stats": schedule_result.get("stats", {})
+#         }
 
-    except Exception as e:
-        logger.error(f"Error in get_schedules: {str(e)}", exc_info=True)
-        return {"schedules": [], "clusters": [], "cluster_density": {}, "stats": {}}
+#     except Exception as e:
+#         logger.error(f"Error in get_schedules: {str(e)}", exc_info=True)
+#         return {"schedules": [], "clusters": [], "cluster_density": {}, "stats": {}}
 
-@router.get("/schedules/{user_email}")
-def get_user_schedules(user_email: str):
-    geolocator = Nominatim(user_agent="geoapi")
-    try:
-        schedules_resp = supabase.table("assignments").select("*, seniors:sid(name, coords)").eq("volunteer_email", user_email).execute()
+# @router.get("/schedules/{user_email}")
+# def get_user_schedules(user_email: str):
+#     geolocator = Nominatim(user_agent="geoapi")
+#     try:
+#         schedules_resp = supabase.table("assignments").select("*, seniors:sid(name, coords)").eq("volunteer_email", user_email).execute()
 
-        # logger.info(schedules_resp)
+#         # logger.info(schedules_resp)
 
-        if not schedules_resp.data:
-            logger.warning(f"No schedules found for user: {user_email}")
-            return {"schedules": []}
+#         if not schedules_resp.data:
+#             logger.warning(f"No schedules found for user: {user_email}")
+#             return {"schedules": []}
        
-        schedules = []
-        for schedule in schedules_resp.data:
-            seniors = schedule.get("seniors", {})
-            coords = seniors.get("coords")
+#         schedules = []
+#         for schedule in schedules_resp.data:
+#             seniors = schedule.get("seniors", {})
+#             coords = seniors.get("coords")
 
-            if coords:
-                try:
-                    lat, lng = coords["lat"], coords["lng"]
-                    location = geolocator.reverse((lat, lng), language="en")
-                    # Replace coords with readable string
-                    seniors["coords"] = location.address  
-                except Exception as e:
-                    seniors["coords"] = None  # fallback
+#             if coords:
+#                 try:
+#                     lat, lng = coords["lat"], coords["lng"]
+#                     location = geolocator.reverse((lat, lng), language="en")
+#                     # Replace coords with readable string
+#                     seniors["coords"] = location.address  
+#                 except Exception as e:
+#                     seniors["coords"] = None  # fallback
 
-            schedules.append({
-                "aid": schedule["aid"],
-                # "vid": schedule["vid"],
-                # "sid": schedule["sid"],
-                "date": schedule["date"],
-                "start_time": schedule["start_time"],
-                "end_time": schedule["end_time"],
-                "is_acknowledged": schedule["is_acknowledged"],
-                # "volunteer_email": schedule["volunteer_email"],
-                "senior_name": seniors["name"],
-                "address": seniors.get("coords"),
-            })
+#             schedules.append({
+#                 "aid": schedule["aid"],
+#                 # "vid": schedule["vid"],
+#                 # "sid": schedule["sid"],
+#                 "date": schedule["date"],
+#                 "start_time": schedule["start_time"],
+#                 "end_time": schedule["end_time"],
+#                 "is_acknowledged": schedule["is_acknowledged"],
+#                 # "volunteer_email": schedule["volunteer_email"],
+#                 "senior_name": seniors["name"],
+#                 "address": seniors.get("coords"),
+#             })
 
-        return {"data": schedules}
+#         return {"data": schedules}
 
-    except Exception as e:
-        logger.error(f"Error in get_user_schedules: {str(e)}", exc_info=True)
-        return {"schedules": []}
+#     except Exception as e:
+#         logger.error(f"Error in get_user_schedules: {str(e)}", exc_info=True)
+#         return {"schedules": []}
 
 
 @router.post("/schedule")
