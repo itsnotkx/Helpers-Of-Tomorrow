@@ -112,6 +112,7 @@ export function InteractiveMap({
         ]);
 
         if (sRes && vRes && aRes && cRes) {
+          console.log("All data fetched successfully");
           const seniorsData: Senior[] = (await sRes.json()).seniors || [];
           const volunteersData: Volunteer[] =
             (await vRes.json()).volunteers || [];
@@ -286,8 +287,7 @@ export function InteractiveMap({
 
   // --- Re-render markers when data changes ---
   useEffect(() => {
-    if (!map.current) return;
-    if (!mapLoaded) return;
+  if (!map.current || !mapLoaded) return;
     markersRef.current.forEach((m) => m.remove());
     markersRef.current = [];
 
