@@ -112,6 +112,7 @@ export function InteractiveMap({
         ]);
 
         if (sRes && vRes && aRes && cRes) {
+          console.log("All data fetched successfully");
           const seniorsData: Senior[] = (await sRes.json()).seniors || [];
           const volunteersData: Volunteer[] =
             (await vRes.json()).volunteers || [];
@@ -283,11 +284,30 @@ export function InteractiveMap({
     });
     return () => map.current?.remove();
   }, []);
+  useEffect(() => {
+    if (!map.current || !mapLoaded) return;
+    if (!highlightedSeniorId) return;
+
+    const s = seniors.find(x => x.uid === highlightedSeniorId);
+    if (!s?.coords) return;
+
+    // Cancel any cluster focus while we're focusing a single senior
+    setHighlightedCluster(null);
+
+    // Open the senior popup (optional but nice)
+    const levels = { 1: "HIGH", 2: "MEDIUM", 3: "LOW" } as const;
+    const assessment = (levels[s.overall_wellbeing] || "LOW") as "HIGH" | "MEDIUM" | "LOW";
+    showSeniorPopup(s, assessment);
+
+    // Focus the map on the senior (keeps your zoom/radius code untouched elsewhere)
+    // Using fitBounds with maxZoom to avoid over-zooming
+    const bounds = new mapboxgl.LngLatBounds().extend([s.coords.lng, s.coords.lat]);
+    map.current.fitBounds(bounds, { padding: 80, maxZoom: 15 });
+  }, [highlightedSeniorId, mapLoaded, seniors]);
 
   // --- Re-render markers when data changes ---
   useEffect(() => {
-    if (!map.current) return;
-    if (!mapLoaded) return;
+  if (!map.current || !mapLoaded) return;
     markersRef.current.forEach((m) => m.remove());
     markersRef.current = [];
 
@@ -358,18 +378,36 @@ export function InteractiveMap({
     });
 
     // Senior markers
+    // Senior markers
     seniors.forEach((s) => {
       if (!s.coords) return;
-      const levels = { 1: "HIGH", 2: "MEDIUM", 3: "LOW" };
+      const levels = { 1: "HIGH", 2: "MEDIUM", 3: "LOW" } as const;
       const assessment = levels[s.overall_wellbeing] || "LOW";
-      const isHighlighted = s.uid === highlightedSeniorId;
+
+      // NEW: highlight seniors inside the focused cluster
+      const isInHighlightedCluster =
+        highlightedCluster !== null &&
+        clusters[highlightedCluster]?.seniors?.some(
+          (clusterSenior) => clusterSenior.uid === s.uid
+        );
+
+      // existing single-senior highlight (from prop)
+      const isIndividuallyHighlighted = s.uid === highlightedSeniorId;
+
+      // use purple border if either case is true
+      const focused = isInHighlightedCluster || isIndividuallyHighlighted;
+
       const colorClass =
         priorityColors[(assessment || "LOW") as "HIGH" | "MEDIUM" | "LOW"];
-      const sizeClass = "w-6 h-6";
-      const borderClass = isHighlighted
+
+      // slight size bump when focused (optional; delete if you don’t want it)
+      const sizeClass = focused ? "w-8 h-8" : "w-6 h-6";
+
+      const borderClass = focused
         ? "border-4 border-purple-500"
         : "border-2 border-white";
-      const boxShadow = isHighlighted ? "0 0 10px #a855f7" : "0 0 4px #888";
+
+      const boxShadow = focused ? "0 0 10px #a855f7" : "0 0 4px #888";
 
       const el = document.createElement("div");
       el.className = `${sizeClass} ${colorClass} rounded-full ${borderClass} shadow-md cursor-pointer flex items-center justify-center text-xs relative z-20`;
@@ -378,9 +416,9 @@ export function InteractiveMap({
 
       el.addEventListener("click", (e) => {
         e.stopPropagation();
-        setHighlightedCluster(null);
+        setHighlightedCluster(null); // clicking a senior cancels cluster focus (keeps your behavior)
         showSeniorPopup(s, assessment as "HIGH" | "MEDIUM" | "LOW");
-        if (onSeniorClick) onSeniorClick(s.uid); // <-- Call the callback here
+        if (onSeniorClick) onSeniorClick(s.uid);
       });
 
       const marker = new mapboxgl.Marker(el)
@@ -388,6 +426,7 @@ export function InteractiveMap({
         .addTo(map.current!);
       markersRef.current.push(marker);
     });
+
 
     // Volunteer markers
     volunteers.forEach((v) => {
@@ -406,7 +445,7 @@ export function InteractiveMap({
       });
       markersRef.current.push(marker);
     });
-
+    
     // Clicking elsewhere on the map unfocuses
     if (map.current && onMapUnfocus) {
       map.current.on("click", onMapUnfocus);
