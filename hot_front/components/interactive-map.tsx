@@ -9,23 +9,21 @@ interface Coord {
   lat: number
   lng: number
 }
-
-interface Senior {
+export interface Senior {
   uid: string
-  name?: string
-  coords: Coord
-  physical: number
-  mental: number
-  community: number
+  name: string
+  coords: { lat: number; lng: number }
+  physical?: number
+  mental?: number
+  community?: number
   last_visit?: string
   cluster?: number
-  overall_wellbeing?: number
+  overall_wellbeing: 1 | 2 | 3
 }
-
-interface Volunteer {
+export interface Volunteer {
   vid: string
-  name?: string
-  coords: Coord
+  name: string
+  coords: { lat: number; lng: number }
   skill: number
   available: boolean | string[]
 }
@@ -44,6 +42,7 @@ interface Schedule {
 }
 
 interface Cluster {
+  [x: string]: any
   center: Coord
   seniors: Senior[]
   radius: number
@@ -63,24 +62,16 @@ const priorityColors: Record<"HIGH" | "MEDIUM" | "LOW", string> = {
 
 export function InteractiveMap({
   highlightedSeniorId,
-  highlightedVolunteerId,
   onMapUnfocus,
   onSeniorClick,
-  seniorMarkerElements,
-  setSeniorMarkerElements,
-  volunteerMarkerElements,
-  setVolunteerMarkerElements,
-  mapRef,
+  centerCoordinates = [103.8198, 1.3521], // Default to Singapore center
+  initialZoom = 11,
 }: {
   highlightedSeniorId?: string | null
-  highlightedVolunteerId?: string | null
   onMapUnfocus?: () => void
   onSeniorClick?: (seniorId: string) => void
-  seniorMarkerElements: Map<string, HTMLElement>
-  setSeniorMarkerElements: (elements: Map<string, HTMLElement>) => void
-  volunteerMarkerElements: Map<string, HTMLElement>
-  setVolunteerMarkerElements: (elements: Map<string, HTMLElement>) => void
-  mapRef: React.MutableRefObject<mapboxgl.Map | null>
+  centerCoordinates?: [number, number]
+  initialZoom?: number
 }) {
 
 
@@ -157,24 +148,22 @@ export function InteractiveMap({
       style: "mapbox://styles/wzinl/cmf5f4has01rh01pj8ajb1993",
       center: centerCoordinates,
       zoom: 13
+      
     })
-    
-    // Set map reference for parent component
-    mapRef.current = map.current
-    
     map.current.on("load", () => {
       setMapLoaded(true)
       // Add cluster circle source and layer
-      map.current.setMaxBounds(singaporeBounds);
-      map.current.setMinZoom(10);
-      map.current!.addSource("cluster-circles", {
-        type: "geojson",
-        data: {
-          type: "FeatureCollection",
-          features: [],
-        },
-      })
-
+      if (map.current) {
+        map.current.setMaxBounds(singaporeBounds);
+        map.current.setMinZoom(10);
+        map.current.addSource("cluster-circles", {
+          type: "geojson",
+          data: {
+            type: "FeatureCollection",
+            features: [],
+          },
+        });
+      }
       // Add circle layer for cluster boundaries
       map.current!.addLayer({
         id: "cluster-circles-layer",
@@ -274,7 +263,7 @@ export function InteractiveMap({
       const levels = { 1: "HIGH", 2: "MEDIUM", 3: "LOW" }
       const assessment = levels[s.overall_wellbeing] || "LOW"
       const isHighlighted = s.uid === highlightedSeniorId
-      const colorClass = priorityColors[assessment || "LOW"]
+      const colorClass = priorityColors[(assessment || "LOW") as "HIGH" | "MEDIUM" | "LOW"]
       const sizeClass = "w-6 h-6"
       const borderClass = isHighlighted ? "border-4 border-purple-500" : "border-2 border-white"
       const boxShadow = isHighlighted ? "0 0 10px #a855f7" : "0 0 4px #888"
@@ -287,8 +276,8 @@ export function InteractiveMap({
       el.addEventListener("click", (e) => {
         e.stopPropagation()
         setHighlightedCluster(null)
-        showSeniorPopup(s, assessment)
-        if (onSeniorClick) onSeniorClick(s.uid)
+        showSeniorPopup(s, assessment as "HIGH" | "MEDIUM" | "LOW")
+        if (onSeniorClick) onSeniorClick(s.uid) // <-- Call the callback here
       })
 
       const marker = new mapboxgl.Marker(el).setLngLat([s.coords.lng, s.coords.lat]).addTo(map.current!)
@@ -298,17 +287,10 @@ export function InteractiveMap({
     // Volunteer markers
     volunteers.forEach((v) => {
       if (!v.coords) return
-      const isHighlighted = v.vid === highlightedVolunteerId
-      const borderClass = isHighlighted ? "border-4 border-blue-500" : "border-2 border-white"
-      const sizeClass = isHighlighted ? "w-8 h-8" : "w-6 h-6"
-      const boxShadow = isHighlighted ? "0 0 10px #3b82f6" : "0 0 4px #888"
-      
       const el = document.createElement("div")
       el.className =
-        `${sizeClass} bg-blue-500 rounded-full ${borderClass} shadow-md flex items-center justify-center text-xs relative z-20 cursor-pointer`
+        "w-6 h-6 bg-blue-500 rounded-full border-2 border-white shadow-md flex items-center justify-center text-xs relative z-20"
       el.innerText = "🙋"
-      el.style.boxShadow = boxShadow
-      
       const marker = new mapboxgl.Marker(el).setLngLat([v.coords.lng, v.coords.lat]).addTo(map.current!)
       el.addEventListener("click", (e) => {
         e.stopPropagation()
@@ -327,11 +309,27 @@ export function InteractiveMap({
         map.current.off("click", onMapUnfocus)
       }
     }
-  }, [seniors, volunteers, clusters, highlightedSeniorId, highlightedVolunteerId, mapLoaded, highlightedCluster, onMapUnfocus, onSeniorClick])
+  }, [seniors, volunteers, clusters, highlightedSeniorId, mapLoaded, highlightedCluster, onMapUnfocus, onSeniorClick])
 
   // --- Helper function to create circle polygon ---
-  const createCirclePolygon = (center, radiusKm, points = 64) => {
-    const coords = []
+  interface CircleCenter {
+    0: number // lng
+    1: number // lat
+    length: 2
+  }
+
+  type CirclePolygon = [number, number][]
+
+  interface CreateCirclePolygonFn {
+    (
+      center: CircleCenter,
+      radiusKm: number,
+      points?: number
+    ): CirclePolygon
+  }
+
+  const createCirclePolygon: CreateCirclePolygonFn = (center, radiusKm, points = 64) => {
+    const coords: CirclePolygon = []
     const distanceX = radiusKm / (111.32 * Math.cos((center[1] * Math.PI) / 180))
     const distanceY = radiusKm / 110.54
 
@@ -350,9 +348,9 @@ export function InteractiveMap({
     if (!map.current || !mapLoaded) return
 
     const features = clusters.map((cluster) => ({
-      type: "Feature",
+      type: "Feature" as const,
       geometry: {
-        type: "Polygon",
+        type: "Polygon" as const,
         coordinates: [
           createCirclePolygon(
             [cluster.center.lng, cluster.center.lat],
@@ -368,8 +366,8 @@ export function InteractiveMap({
     }))
 
     const source = map.current.getSource("cluster-circles")
-    if (source) {
-      source.setData({
+    if (source && "setData" in source) {
+      (source as mapboxgl.GeoJSONSource).setData({
         type: "FeatureCollection",
         features: features,
       })
@@ -436,11 +434,11 @@ export function InteractiveMap({
       markersRef.current.push(marker)
     })
 
-    const newSeniorMap = new Map()
-    const newVolunteerMap = new Map()
+    const seniorMarkerElements = new Map()
 
     // Senior markers
     seniors.forEach((s) => {
+      // console.log(s.overall_wellbeing)
       if (!s.coords) return
       const levels = {
         1: "HIGH",
@@ -451,26 +449,22 @@ export function InteractiveMap({
       const isInHighlightedCluster =
         highlightedCluster !== null &&
         clusters[highlightedCluster]?.seniors.some((clusterSenior) => clusterSenior.uid === s.uid)
-      const isHighlighted = s.uid === highlightedSeniorId
-      const colorClass = priorityColors[assessment || "LOW"]
-      const sizeClass = isInHighlightedCluster || isHighlighted ? "w-8 h-8" : "w-6 h-6"
-      const borderClass = isHighlighted ? "border-4 border-purple-500" : isInHighlightedCluster ? "border-4 border-purple-500" : "border-2 border-white"
-      const boxShadow = isHighlighted ? "0 0 10px #a855f7" : "0 0 4px #888"
+      const colorClass = priorityColors[(assessment || "LOW") as "HIGH" | "MEDIUM" | "LOW"]
+      const sizeClass = isInHighlightedCluster ? "w-8 h-8" : "w-6 h-6"
+      const borderClass = isInHighlightedCluster ? "border-4 border-purple-500" : "border-2 border-white"
 
       const el = document.createElement("div")
-      el.className = `${sizeClass} ${colorClass} rounded-full ${borderClass} shadow-md cursor-pointer flex items-center justify-center text-xs relative z-20`
+      el.className =               
+      `${sizeClass} ${colorClass} rounded-full ${borderClass} shadow-md cursor-pointer flex items-center justify-center text-xs relative z-20`
       el.innerText = "👤"
-      el.style.boxShadow = boxShadow
-      
       // Store reference to this element for highlighting
-      newSeniorMap.set(s.uid, el)
+      seniorMarkerElements.set(s.uid, el)
 
       const marker = new mapboxgl.Marker(el).setLngLat([s.coords.lng, s.coords.lat]).addTo(map.current!)
       el.addEventListener("click", (e) => {
         e.stopPropagation()
         setHighlightedCluster(null)
-        showSeniorPopup(s, assessment)
-        if (onSeniorClick) onSeniorClick(s.uid)
+        showSeniorPopup(s, assessment as "HIGH" | "MEDIUM" | "LOW")
       })
       markersRef.current.push(marker)
     })
@@ -478,19 +472,10 @@ export function InteractiveMap({
     // Volunteer markers
     volunteers.forEach((v) => {
       if (!v.coords) return
-      const isHighlighted = v.vid === highlightedVolunteerId
-      const borderClass = isHighlighted ? "border-4 border-blue-500" : "border-2 border-white"
-      const sizeClass = isHighlighted ? "w-8 h-8" : "w-6 h-6"
-      const boxShadow = isHighlighted ? "0 0 10px #3b82f6" : "0 0 4px #888"
-      
       const el = document.createElement("div")
-      el.className = `${sizeClass} bg-blue-500 rounded-full ${borderClass} shadow-md flex items-center justify-center text-xs relative z-20 cursor-pointer`
+      el.className =
+        "w-6 h-6 bg-blue-500 rounded-full border-2 border-white shadow-md flex items-center justify-center text-xs relative z-20"
       el.innerText = "🙋"
-      el.style.boxShadow = boxShadow
-      
-      // Store reference to this element for highlighting
-      newVolunteerMap.set(v.vid, el)
-      
       const marker = new mapboxgl.Marker(el).setLngLat([v.coords.lng, v.coords.lat]).addTo(map.current!)
       el.addEventListener("click", (e) => {
         e.stopPropagation()
@@ -499,71 +484,115 @@ export function InteractiveMap({
       })
       markersRef.current.push(marker)
     })
-    
-    setSeniorMarkerElements(newSeniorMap)
-    setVolunteerMarkerElements(newVolunteerMap)
   }
 
-  // --- Popups ---
-  const showSeniorPopup = (s: Senior, assessment?: string) => {
-    if (!map.current) return
-
-    if (popupRef.current) {
-      popupRef.current.remove()
-      popupRef.current = null
-    }
-
-    const lastVisit = s.last_visit ? new Date(s.last_visit).toLocaleDateString() : "N/A"
-    const priority = assessment || "LOW"
-
-    popupRef.current = new mapboxgl.Popup({
-      closeOnClick: false, // Disable auto-close to prevent conflicts
-      closeButton: true, // Show close button instead
-      focusAfterOpen: false, // Prevent focus issues
-    })
-      .setLngLat([s.coords.lng, s.coords.lat])
-      .setHTML(`
-        <div class="p-3 min-w-[200px]">
-          <h3 class="font-semibold text-sm mb-1">${s.name || s.uid}</h3>
-          <div class="space-y-1 mb-2">
-          <div>🏥 Physical: ${wellbeingLabels[6 - s.physical] || "Unknown"}</div>
-          <div>🧠 Mental: ${wellbeingLabels[6 - s.mental] || "Unknown"}</div>
-          <div>👥 Community: ${wellbeingLabels[6- s.community] || "Unknown"}</div>
-          <div>📅 Last Visit: ${lastVisit}</div>
+  const createSeniorPopupHTML = (senior: Senior, priority: "HIGH" | "MEDIUM" | "LOW", wellbeingLabels: Record<number, string>) => {
+  const lastVisit = senior.last_visit ? new Date(senior.last_visit).toLocaleDateString() : "N/A"
+  
+  const priorityStyles = {
+    HIGH: "bg-red-100 text-red-800",
+    MEDIUM: "bg-yellow-100 text-yellow-800",
+    LOW: "bg-green-100 text-green-800"
+  }
+  
+  const wellbeingIcon = (score: number | undefined) => {
+    if (score === undefined) return "❓"
+    if (score <= 2) return "🔴"
+    if (score <= 3) return "🟡"
+    return "🟢"
+  }
+  
+  const escapeHtml = (text: string) => {
+    const div = document.createElement('div')
+    div.textContent = text
+    return div.innerHTML
+  }
+  
+  const wellbeingItems = [
+    { icon: wellbeingIcon(senior.physical), label: 'Physical Health', value: senior.physical },
+    { icon: wellbeingIcon(senior.mental), label: 'Mental Health', value: senior.mental },
+    { icon: wellbeingIcon(senior.community), label: 'Community', value: senior.community }
+  ]
+  
+  return `
+    <div class="w-60 p-0 bg-white rounded-lg">
+      <div class="pb-1">
+        <div class="flex items-center gap-3">
+          <div class="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center text-lg">
+            👤
           </div>
-          <div class="px-2 py-1 bg-gray-100 rounded text-xs">${priority} priority</div>
+          <div class="flex-1">
+            <h3 class="font-semibold text-base text-gray-900">${escapeHtml(senior.name || senior.uid)}</h3>
+            <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${priorityStyles[priority]}">
+              ${priority} Priority
+            </span>
+          </div>
         </div>
-      `)
-      .addTo(map.current)
+        
+        <div class="space-y-2">
+          <div>
+            <h4 class="text-sm font-medium text-gray-700 mb-2">Wellbeing Status</h4>
+            <div class="space-y-2">
+              ${wellbeingItems.map(item => `
+                <div class="flex items-center justify-between">
+                  <span class="text-sm text-gray-600 flex items-center gap-2">
+                    ${item.icon} ${item.label}
+                  </span>
+                  <span class="text-sm font-medium">
+                    ${item.value !== undefined ? wellbeingLabels[6 - item.value] : "Unknown"}
+                  </span>
+                </div>
+              `).join('')}
+            </div>
+          </div>
+          
+          <div class="pt-2 border-t border-gray-100">
+            <div class="flex items-center justify-between">
+              <span class="text-sm text-gray-600 flex items-center gap-2">
+                📅 Last Visit
+              </span>
+              <span class="text-sm font-medium">${lastVisit}</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  `
+}
 
-    popupRef.current.on("close", () => {
-      popupRef.current = null
-    })
+const createVolunteerPopupHTML = (volunteer: Volunteer, assignment?: Assignment) => {
+  const available = typeof volunteer.available === "boolean" 
+    ? volunteer.available 
+    : volunteer.available.length > 0
+
+  const escapeHtml = (text: string) => {
+    const div = document.createElement('div')
+    div.textContent = text
+    return div.innerHTML
   }
 
-  const showVolunteerPopup = (v: Volunteer) => {
-    if (!map.current) return
+  const availabilityStyle = available ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800"
+  const availabilityText = available ? "Available" : "Unavailable"
+  
+  const skillIcon = (skill: number) => {
+    if (skill >= 3) return "⭐"
+    if (skill >= 2) return "🟡"
+    return "🔴"
+  }
 
-    if (popupRef.current) {
-      popupRef.current.remove()
-      popupRef.current = null
-    }
-
-    const assignment = assignments.find((a) => a.volunteer === v.vid)
-    const available = typeof v.available === "boolean" ? v.available : v.available.length > 0
-
-    popupRef.current = new mapboxgl.Popup({
-      closeOnClick: false, // Disable auto-close to prevent conflicts
-      closeButton: true, // Show close button instead
-      focusAfterOpen: false, // Prevent focus issues
-    })
-      .setLngLat([v.coords.lng, v.coords.lat])
-      .setHTML(`
-        <div class="p-3 min-w-[200px]">
-          <h3 class="font-semibold text-sm mb-1">${v.name || v.vid}</h3>
-          <div>⭐ Skill: ${v.skill}/3</div>
-          <div>${available ? "✅ Available" : "❌ Unavailable"}</div>
-          ${assignment ? `<div>📍 Assigned: Cluster ${assignment.cluster}</div>` : ""}
+  return `
+    <div class="w-60 p-0 bg-white rounded-lg">
+      <div class="pb-1">
+        <div class="flex items-center gap-3">
+          <div class="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center text-lg">
+            🙋
+          </div>
+          <div class="flex-1">
+            <h3 class="font-semibold text-base text-gray-900">${escapeHtml(volunteer.name || volunteer.vid)}</h3>
+            <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${availabilityStyle}">
+              ${availabilityText}
+            </span>
+          </div>
         </div>
         
         <div class="space-y-2">
@@ -696,21 +725,10 @@ const showVolunteerPopup = (v: Volunteer) => {
             <div className="text-xs text-gray-500">Click elsewhere to clear</div>
           </div>
         )}
-        {highlightedSeniorId && (
-          <div className="mt-2 pt-2 border-t border-gray-200">
-            <div className="text-xs text-purple-600 font-medium">Senior highlighted on map</div>
-          </div>
-        )}
-        {highlightedVolunteerId && (
-          <div className="mt-2 pt-2 border-t border-gray-200">
-            <div className="text-xs text-blue-600 font-medium">Volunteer highlighted on map</div>
-          </div>
-        )}
       </div>
     </div>
   )
 }
-
 
 function LegendItem({ color, label }: { color: string; label: string }) {
   return (

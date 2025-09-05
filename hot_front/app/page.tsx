@@ -120,7 +120,6 @@ export default function VolunteerDashboard() {
   const [schedules, setSchedules] = useState<Schedule[]>([])
   const [assessments, setAssessments] = useState<Assessment[]>([])
   const [loading, setLoading] = useState(true)
-  const [selectedDistrict, setSelectedDistrict] = useState("Sembawang West")
   const [isMapCollapsed, setIsMapCollapsed] = useState(false)
   const [isScheduleCollapsed, setIsScheduleCollapsed] = useState(false)
   const [isAssignmentsCollapsed, setIsAssignmentsCollapsed] = useState(false)
@@ -423,17 +422,18 @@ export default function VolunteerDashboard() {
                 // assignments={assignments}
                 // schedules={schedules}
                 highlightedSeniorId={highlightedSeniorId}
-                highlightedVolunteerId={highlightedVolunteerId}
+                // highlightedVolunteerId={highlightedVolunteerId}
                 onMapUnfocus={() => {
                   setHighlightedSeniorId(null)
                   setHighlightedVolunteerId(null)
                 }}
-                onSeniorClick={() => setExpandedDay(null)} // <-- This closes the expanded card
-                seniorMarkerElements={seniorMarkerElements}
-                setSeniorMarkerElements={setSeniorMarkerElements}
-                volunteerMarkerElements={volunteerMarkerElements}
-                setVolunteerMarkerElements={setVolunteerMarkerElements}
-                mapRef={mapRef}
+                centerCoordinates={selectedNeighbourhood ? SINGAPORE_NEIGHBOURHOODS[selectedNeighbourhood] as [number, number] : undefined}
+                // onSeniorClick={() => setExpandedDay(null)} // <-- This closes the expanded card
+                // seniorMarkerElements={seniorMarkerElements}
+                // setSeniorMarkerElements={setSeniorMarkerElements}
+                // volunteerMarkerElements={volunteerMarkerElements}
+                // setVolunteerMarkerElements={setVolunteerMarkerElements}
+                // mapRef={mapRef}
               />
             </CardContent>
           )}
@@ -473,7 +473,7 @@ export default function VolunteerDashboard() {
                   const assigned = assignments.filter(a => a.volunteer === v.vid)
                   const numSeniors = schedules.filter(s => s.volunteer === v.vid).length
                   const cluster = assigned[0]?.cluster ?? "-"
-                  const distance = assigned[0]?.weighted_distance ?? "N/A"
+                  const distance = assigned[0]?.distance ?? "N/A"
                   const isHighlighted = highlightedVolunteerId === v.vid
 
                   return (
