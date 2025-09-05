@@ -3,6 +3,8 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 import uvicorn
 import time
+import asyncio
+from threading import Thread
 
 from config.settings import CORS_ORIGINS
 from utils.helpers import get_iso_time
@@ -20,6 +22,40 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Flag to track if initialization has run
+_initialization_done = False
+
+def run_classification_background():
+    """Run classification in background after app is fully started"""
+    global _initialization_done
+    try:
+        logger.info("Starting background classification...")
+        response = supabase.table("seniors").select("*").execute()
+        
+        if response.data:
+            classify_seniors({"seniors": response.data})
+            logger.info(f"Successfully classified {len(response.data)} seniors in background")
+        else:
+            logger.info("No seniors data found to classify")
+        
+        _initialization_done = True
+            
+    except Exception as e:
+        logger.error(f"Error during background classification: {str(e)}", exc_info=True)
+
+@app.on_event("startup")
+async def startup_event():
+    """Schedule classification to run after startup is complete"""
+    def delayed_classification():
+        import time
+        time.sleep(2)  # Wait for app to fully start
+        run_classification_background()
+    
+    # Run in background thread after a delay
+    thread = Thread(target=delayed_classification, daemon=True)
+    thread.start()
+    logger.info("Scheduled background classification to run after startup")
+
 # # Include routers
 # app.include_router(assignment.router)
 app.include_router(availability.router)
@@ -27,7 +63,11 @@ app.include_router(availability.router)
 
 @app.get("/")
 def health():
-    return {"status": "OK", "time": get_iso_time()}
+    return {
+        "status": "OK", 
+        "time": get_iso_time(),
+        "classification_complete": _initialization_done
+    }
 
 @app.get("/seniors")
 def get_seniors():
@@ -35,90 +75,20 @@ def get_seniors():
         response = supabase.table("seniors").select("*").execute()
         logger.info(f"Fetched {len(response.data)} seniors")
         
-        # Identify high-risk seniors first
-        high_risk_seniors = []
-        other_seniors = []
-        
-        for senior in response.data:
-            if senior.get("overall_wellbeing") == 1:
-                high_risk_seniors.append(senior)
-            else:
-                other_seniors.append(senior)
-        
-        logger.info(f"Found {len(high_risk_seniors)} high-risk seniors")
-        
+        # Simply add static addresses to seniors data
         seniors_with_address = []
-        geocoded_count = 0
-        max_geocode = 15  # Limit to prevent slowdowns
-        
-        # Process high-risk seniors first
-        for senior in high_risk_seniors:
+        for senior in response.data:
             senior_data = senior.copy()
-            coords = senior.get("coords")
-            
-            if coords and geocoded_count < max_geocode:
-                try:
-                    lat, lng = coords["lat"], coords["lng"]
-                    address = geocoder.get_singapore_address(lat, lng)
-                    senior_data["address"] = address
-                    geocoded_count += 1
-                    
-                    if address and "Singapore" in address:
-                        logger.info(f"Geocoded high-risk senior {senior.get('uid', 'unknown')[:8]}: {address[:50]}")
-                    
-                except Exception as e:
-                    logger.warning(f"Failed to geocode high-risk senior: {str(e)[:50]}")
-                    senior_data["address"] = geocoder._get_fallback_area(coords["lat"], coords["lng"])
-            else:
-                # Use fallback for seniors not geocoded
-                if coords:
-                    senior_data["address"] = geocoder._get_fallback_area(coords["lat"], coords["lng"])
-                else:
-                    senior_data["address"] = "Singapore"
-                    
+            # Use static_address if available, otherwise fallback
+            senior_data["address"] = senior.get("static_address", "Singapore")
             seniors_with_address.append(senior_data)
         
-        # Process other seniors
-        for senior in other_seniors:
-            senior_data = senior.copy()
-            coords = senior.get("coords")
-            
-            if coords and geocoded_count < max_geocode:
-                try:
-                    lat, lng = coords["lat"], coords["lng"]
-                    address = geocoder.get_singapore_address(lat, lng)
-                    senior_data["address"] = address
-                    geocoded_count += 1
-                    
-                except Exception as e:
-                    logger.warning(f"Failed to geocode senior: {str(e)[:50]}")
-                    senior_data["address"] = geocoder._get_fallback_area(coords["lat"], coords["lng"])
-            else:
-                # Use fallback for remaining seniors
-                if coords:
-                    senior_data["address"] = geocoder._get_fallback_area(coords["lat"], coords["lng"])
-                else:
-                    senior_data["address"] = "Singapore"
-                    
-            seniors_with_address.append(senior_data)
-        
-        logger.info(f"Processed {len(seniors_with_address)} seniors, geocoded {geocoded_count}")
+        logger.info(f"Processed {len(seniors_with_address)} seniors with static addresses")
         return {"seniors": seniors_with_address}
         
     except Exception as e:
         logger.error(f"Error in get_seniors: {str(e)}")
-        # Fallback: return seniors with area-based addresses
-        response = supabase.table("seniors").select("*").execute()
-        seniors_fallback = []
-        for senior in response.data:
-            senior_data = senior.copy()
-            coords = senior.get("coords")
-            if coords:
-                senior_data["address"] = geocoder._get_fallback_area(coords["lat"], coords["lng"])
-            else:
-                senior_data["address"] = "Singapore"
-            seniors_fallback.append(senior_data)
-        return {"seniors": seniors_fallback}
+        return {"seniors": []}
 
 # Add a separate endpoint for batch geocoding (run manually/scheduled)
 @app.post("/seniors/geocode")

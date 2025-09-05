@@ -13,7 +13,7 @@ def classify_seniors(data: dict):
         # Get seniors data and prepare features
         seniors = data.get("seniors", [])
         if not seniors:
-            return {"assessments": []}
+            return
 
         # Create DataFrame with required features
         df = pd.DataFrame(seniors)
@@ -21,9 +21,8 @@ def classify_seniors(data: dict):
                    'community', 'making_ends_meet', 'living_situation']
         X = df[features]
 
-        # Get predictions and probabilities
+        # Get predictions
         predictions = model.predict(X)
-        probabilities = model.predict_proba(X)
 
         # Update wellbeing scores in database
         for i, senior in enumerate(seniors):
@@ -34,32 +33,5 @@ def classify_seniors(data: dict):
             except Exception as e:
                 logger.error(f"Failed to update wellbeing for senior {senior['uid']}: {str(e)}")
 
-        # Create assessments
-        assessments = []
-        wellbeing_to_priority = {1: "HIGH", 2: "MEDIUM", 3: "LOW"}
-        
-        for i, senior in enumerate(seniors):
-            prediction = int(predictions[i])
-            probs = probabilities[i]
-            max_prob = max(probs)
-            
-            risk_score = (
-                float(senior.get('physical', 0)) + 
-                float(senior.get('mental', 0)) + 
-                float(senior.get('community', 0))
-            ) / 15
-
-            assessments.append({
-                "uid": senior['uid'],
-                "risk": round(risk_score, 2),
-                "priority": wellbeing_to_priority.get(prediction, "MEDIUM"),
-                "needscare": risk_score > 0.6 or prediction == 1,
-                "confidence": round(float(max_prob), 2),
-                "wellbeing": prediction
-            })
-
-        return {"assessments": assessments}
-
     except Exception as e:
         logger.error(f"Error in classify_seniors: {str(e)}", exc_info=True)
-        return {"error": str(e), "assessments": []}

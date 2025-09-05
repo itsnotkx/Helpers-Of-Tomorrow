@@ -62,7 +62,9 @@ export function ScheduleInterface({ assignments }: ScheduleProps) {
 
   const [selectedDay, setSelectedDay] = useState<string | null>(null);
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
-  const [selectedVolunteer, setSelectedVolunteer] = useState<string | null>(null);
+  const [selectedVolunteer, setSelectedVolunteer] = useState<string | null>(
+    null
+  );
   const [searchQuery, setSearchQuery] = useState("");
 
   // Format time as HH:MM (supports HH:MM:SS)
@@ -86,21 +88,26 @@ export function ScheduleInterface({ assignments }: ScheduleProps) {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const schedulesResponse = await fetch("http://localhost:8000/assignments");
+        const schedulesResponse = await fetch(
+          "http://localhost:8000/assignments"
+        );
         if (!schedulesResponse.ok) {
           console.error("Failed to fetch schedules:", schedulesResponse.status);
           return;
         }
         const schedulesData = await schedulesResponse.json();
 
-        const volunteersResponse = await fetch("http://localhost:8000/volunteers");
+        const volunteersResponse = await fetch(
+          "http://localhost:8000/volunteers"
+        );
         const volunteersData = await volunteersResponse.json();
 
         const seniorsResponse = await fetch("http://localhost:8000/seniors");
         const seniorsData = await seniorsResponse.json();
 
         // Map database fields to component interface
-        const assignmentsArray = schedulesData.assignments || schedulesData || [];
+        const assignmentsArray =
+          schedulesData.assignments || schedulesData || [];
         const mappedSchedules = assignmentsArray.map((assignment: any) => ({
           volunteer:
             assignment.vid || assignment.volunteer_id || assignment.volunteer,
@@ -134,9 +141,24 @@ export function ScheduleInterface({ assignments }: ScheduleProps) {
   const weekDays = useMemo(() => {
     const days: Date[] = [];
     const today = new Date();
+    const dayOfWeek = today.getDay(); // 0 = Sunday, 1 = Monday, etc.
+
+    let startOfWeek: Date;
+
+    if (dayOfWeek === 0) {
+      // If today is Sunday, start from today (Sunday) and go to next Sunday
+      startOfWeek = new Date(today);
+    } else {
+      // For any other day, get Monday of current week
+      startOfWeek = new Date(today);
+      const daysToMonday = 1 - dayOfWeek; // Days to get back to Monday
+      startOfWeek.setDate(today.getDate() + daysToMonday);
+    }
+
+    // Generate 7 days from the start date
     for (let i = 0; i < 7; i++) {
-      const date = new Date(today);
-      date.setDate(today.getDate() + i);
+      const date = new Date(startOfWeek);
+      date.setDate(startOfWeek.getDate() + i);
       days.push(date);
     }
     return days;
@@ -186,6 +208,22 @@ export function ScheduleInterface({ assignments }: ScheduleProps) {
     ? weekDays.findIndex((d) => d.toISOString().split("T")[0] === selectedDay)
     : -1;
 
+  // Helper to get volunteer's assignments count for this week
+  const getVolunteerWeeklyAssignments = (volunteerId: string) => {
+    const weekDayKeys = weekDays.map((day) => day.toISOString().split("T")[0]);
+    const volunteerSchedules = schedules.filter(
+      (s) =>
+        s.volunteer === volunteerId &&
+        weekDayKeys.includes(s.date?.split("T")[0])
+    );
+    return volunteerSchedules.length;
+  };
+
+  // Helper to check if volunteer is active this week
+  const isVolunteerActiveThisWeek = (volunteerId: string) => {
+    return getVolunteerWeeklyAssignments(volunteerId) > 0;
+  };
+
   return (
     <div className="">
       <Tabs defaultValue="weekly" className="w-full gap-0">
@@ -208,7 +246,8 @@ export function ScheduleInterface({ assignments }: ScheduleProps) {
                 {weekDays.map((day, index) => {
                   const dayKey = day.toISOString().split("T")[0];
                   const daySchedules = weekSchedules[dayKey] || [];
-                  const isToday = day.toDateString() === new Date().toDateString();
+                  const isToday =
+                    day.toDateString() === new Date().toDateString();
 
                   return (
                     <Card
@@ -331,9 +370,9 @@ export function ScheduleInterface({ assignments }: ScheduleProps) {
                 <div className="space-y-2">
                   {selectedDay &&
                     timeSlots.map((timeSlot) => {
-                      const schedulesAtTime = (weekSchedules[selectedDay] || []).filter(
-                        (s) => formatTime(s.start_time) === timeSlot
-                      );
+                      const schedulesAtTime = (
+                        weekSchedules[selectedDay] || []
+                      ).filter((s) => formatTime(s.start_time) === timeSlot);
                       return (
                         <div
                           key={timeSlot}
@@ -353,27 +392,54 @@ export function ScheduleInterface({ assignments }: ScheduleProps) {
                                 {schedulesAtTime.map((schedule, idx) => (
                                   <div
                                     key={idx}
-                                    className="flex items-center justify-between p-3 bg-muted/40 rounded-lg hover:bg-muted/60 transition-colors"
+                                    className="p-4 bg-muted/40 rounded-lg hover:bg-muted/60 transition-colors border border-border/30"
                                   >
-                                    <div className="flex items-center gap-3">
+                                    {/* Time and cluster header */}
+                                    <div className="flex items-center justify-between mb-3">
                                       <div className="flex items-center gap-2">
-                                        <User className="h-4 w-4 text-chart-4" />
-                                        <span className="font-medium">
-                                          {getVolunteerName(schedule.volunteer)}
+                                        <Clock className="h-4 w-4 text-muted-foreground" />
+                                        <span className="text-sm font-medium">
+                                          {formatTime(schedule.start_time)} –{" "}
+                                          {formatTime(schedule.end_time)}
                                         </span>
                                       </div>
                                       <div className="flex items-center gap-2">
                                         <MapPin className="h-4 w-4 text-chart-2" />
-                                        <span className="text-sm">
+                                        <Badge variant="outline">
                                           Cluster {schedule.cluster}
-                                        </span>
+                                        </Badge>
                                       </div>
                                     </div>
-                                    <div className="flex items-center gap-2">
-                                      <span className="text-sm">
-                                        {formatTime(schedule.start_time)} –{" "}
-                                        {formatTime(schedule.end_time)}
-                                      </span>
+
+                                    {/* Volunteer and Senior info */}
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                      {/* Volunteer */}
+                                      <div className="flex items-center gap-2 p-2 bg-blue-50 rounded border-l-4 border-l-blue-500">
+                                        <User className="h-4 w-4 text-blue-600" />
+                                        <div>
+                                          <div className="text-xs font-medium text-blue-700 uppercase tracking-wide">
+                                            Volunteer
+                                          </div>
+                                          <div className="font-medium text-blue-900">
+                                            {getVolunteerName(
+                                              schedule.volunteer
+                                            )}
+                                          </div>
+                                        </div>
+                                      </div>
+
+                                      {/* Senior */}
+                                      <div className="flex items-center gap-2 p-2 bg-red-50 rounded border-l-4 border-l-red-500">
+                                        <User className="h-4 w-4 text-red-600" />
+                                        <div>
+                                          <div className="text-xs font-medium text-red-700 uppercase tracking-wide">
+                                            Senior
+                                          </div>
+                                          <div className="font-medium text-red-900">
+                                            {getSeniorName(schedule.senior)}
+                                          </div>
+                                        </div>
+                                      </div>
                                     </div>
                                   </div>
                                 ))}
@@ -424,7 +490,9 @@ export function ScheduleInterface({ assignments }: ScheduleProps) {
                     <Button
                       key={volunteer.vid}
                       variant={
-                        selectedVolunteer === volunteer.vid ? "default" : "outline"
+                        selectedVolunteer === volunteer.vid
+                          ? "default"
+                          : "outline"
                       }
                       size="sm"
                       onClick={() => setSelectedVolunteer(volunteer.vid)}
@@ -439,16 +507,18 @@ export function ScheduleInterface({ assignments }: ScheduleProps) {
                 {volunteers
                   .filter(
                     (vol) =>
-                      (selectedVolunteer === null || vol.vid === selectedVolunteer) &&
+                      (selectedVolunteer === null ||
+                        vol.vid === selectedVolunteer) &&
                       vol.name.toLowerCase().includes(searchQuery.toLowerCase())
                   )
                   .map((volunteer) => {
                     const volunteerSchedules = schedules.filter(
                       (s) => s.volunteer === volunteer.vid
                     );
-                    const assignment = assignments.find(
-                      (a) => a.volunteer === volunteer.vid
+                    const weeklyAssignments = getVolunteerWeeklyAssignments(
+                      volunteer.vid
                     );
+                    const isActive = isVolunteerActiveThisWeek(volunteer.vid);
 
                     return (
                       <Card key={volunteer.vid}>
@@ -459,14 +529,27 @@ export function ScheduleInterface({ assignments }: ScheduleProps) {
                                 <User className="h-4 w-4 text-white" />
                               </div>
                               <div>
-                                <h4 className="font-medium">{volunteer.name}</h4>
+                                <h4 className="font-medium">
+                                  {volunteer.name}
+                                </h4>
                                 <p className="text-sm text-muted-foreground">
-                                  {assignment ? `Assigned to ${assignment.cluster}` : "No assignment"}
+                                  {weeklyAssignments > 0
+                                    ? `${weeklyAssignments} assignment${
+                                        weeklyAssignments > 1 ? "s" : ""
+                                      } this week`
+                                    : "No assignment"}
                                 </p>
                               </div>
                             </div>
-                            <Badge variant={volunteer.available ? "default" : "secondary"}>
-                              {volunteer.available ? "Available" : "Unavailable"}
+                            <Badge
+                              variant={isActive ? "default" : "secondary"}
+                              className={
+                                isActive
+                                  ? "bg-green-600 hover:bg-green-700 text-white"
+                                  : "bg-gray-400 hover:bg-gray-500 text-white"
+                              }
+                            >
+                              {isActive ? "Active" : "Inactive"}
                             </Badge>
                           </div>
                         </CardHeader>
@@ -484,7 +567,9 @@ export function ScheduleInterface({ assignments }: ScheduleProps) {
                                 >
                                   <div className="flex items-center gap-2">
                                     <Calendar className="h-4 w-4 text-muted-foreground" />
-                                    <span className="text-sm">{schedule.date}</span>
+                                    <span className="text-sm">
+                                      {schedule.date}
+                                    </span>
                                     <Clock className="h-4 w-4 text-muted-foreground ml-2" />
                                     <span className="text-sm">
                                       {formatTime(schedule.start_time)}

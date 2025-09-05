@@ -187,8 +187,8 @@ export default function VolunteerDashboard() {
           senior.overall_wellbeing === 1
             ? "HIGH"
             : senior.overall_wellbeing === 2
-              ? "MEDIUM"
-              : "LOW",
+            ? "MEDIUM"
+            : "LOW",
         needscare: senior.overall_wellbeing <= 2,
       }));
       setAssessments(derivedAssessments);
@@ -353,26 +353,43 @@ export default function VolunteerDashboard() {
   const now = new Date();
   const currentDay = now.getDay(); // 0 = Sunday, 1 = Monday, etc.
   const startOfWeek = new Date(now);
-  startOfWeek.setDate(now.getDate() - currentDay + 1); // Monday of this week
-  startOfWeek.setHours(0, 0, 0, 0);
+
+  if (currentDay === 0) {
+    // If today is Sunday, start from today (Sunday)
+    startOfWeek.setHours(0, 0, 0, 0);
+  } else {
+    // For any other day, get Monday of current week
+    startOfWeek.setDate(now.getDate() - currentDay + 1); // Monday of this week
+    startOfWeek.setHours(0, 0, 0, 0);
+  }
 
   const endOfWeek = new Date(startOfWeek);
-  endOfWeek.setDate(startOfWeek.getDate() + 6); // Sunday of this week
+  endOfWeek.setDate(startOfWeek.getDate() + 6); // 6 days later
   endOfWeek.setHours(23, 59, 59, 999);
 
   const startOfYear = new Date(new Date().getFullYear(), 0, 1);
   const today = new Date().toDateString();
 
-  // Active volunteers: those with assignments this week
-  const activeVolunteers = volunteers.filter((volunteer) =>
-    schedules.some((schedule) => {
+  // Helper to get volunteer's assignments count for this week
+  const getVolunteerWeeklyAssignments = (volunteerId: string) => {
+    return schedules.filter((schedule) => {
       const scheduleDate = new Date(schedule.date);
       return (
-        schedule.volunteer === volunteer.vid &&
+        schedule.volunteer === volunteerId &&
         scheduleDate >= startOfWeek &&
         scheduleDate <= endOfWeek
       );
-    })
+    }).length;
+  };
+
+  // Helper to check if volunteer is active this week
+  const isVolunteerActiveThisWeek = (volunteerId: string) => {
+    return getVolunteerWeeklyAssignments(volunteerId) > 0;
+  };
+
+  // Active volunteers: those with assignments this week
+  const activeVolunteers = volunteers.filter((volunteer) =>
+    isVolunteerActiveThisWeek(volunteer.vid)
   ).length;
 
   // Today's visits: schedules that match today's date
@@ -501,10 +518,11 @@ export default function VolunteerDashboard() {
                         }}
                       >
                         <Card
-                          className={`border-l-4 ${needsImmediateCare
-                            ? "border-l-red-600"
-                            : "border-l-destructive"
-                            }`}
+                          className={`border-l-4 ${
+                            needsImmediateCare
+                              ? "border-l-red-600"
+                              : "border-l-destructive"
+                          }`}
                         >
                           <CardContent className="pt-4">
                             <div className="flex justify-between items-start mb-3">
@@ -564,8 +582,8 @@ export default function VolunteerDashboard() {
                                 <p className="text-sm text-muted-foreground">
                                   {senior.last_visit
                                     ? new Date(
-                                      senior.last_visit
-                                    ).toLocaleDateString()
+                                        senior.last_visit
+                                      ).toLocaleDateString()
                                     : "Never"}
                                 </p>
                               </div>
@@ -626,9 +644,9 @@ export default function VolunteerDashboard() {
                 centerCoordinates={
                   selectedNeighbourhood
                     ? (SINGAPORE_NEIGHBOURHOODS[selectedNeighbourhood] as [
-                      number,
-                      number
-                    ])
+                        number,
+                        number
+                      ])
                     : undefined
                 }
               />
@@ -675,44 +693,55 @@ export default function VolunteerDashboard() {
             <CardContent>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 {volunteers.map((v, i) => {
+                  const weeklyAssignments = getVolunteerWeeklyAssignments(
+                    v.vid
+                  );
+                  const isActive = isVolunteerActiveThisWeek(v.vid);
                   const assigned = schedules.filter(
                     (a) => a.volunteer === v.vid
                   );
-                  const numSeniors = schedules.filter(
-                    (s) => s.volunteer === v.vid
-                  ).length;
                   const cluster = assigned[0]?.cluster ?? "-";
                   const isHighlighted = highlightedVolunteerId === v.vid;
                   return (
                     <div
                       key={i}
-                      className={`p-4 border rounded-lg cursor-pointer hover:bg-muted transition ${isHighlighted ? "border-blue-500 bg-blue-50 shadow-lg" : ""
-                        }`}
+                      className={`p-4 border rounded-lg cursor-pointer hover:bg-muted transition ${
+                        isHighlighted
+                          ? "border-blue-500 bg-blue-50 shadow-lg"
+                          : ""
+                      }`}
                       onClick={() => handleVolunteerCardClick(v.vid)}
                     >
                       <div className="flex justify-between mb-2">
-                        <h4 className="font-medium">{v.name || "Unknown Volunteer"}</h4>
+                        <h4 className="font-medium">
+                          {v.name || "Unknown Volunteer"}
+                        </h4>
                         <Badge variant="secondary" className="h-6">
                           Cluster {cluster}
                         </Badge>
                       </div>
                       <p className="text-sm text-muted-foreground">
-                        Seniors Assigned: {numSeniors}
+                        {weeklyAssignments > 0
+                          ? `${weeklyAssignments} assignment${
+                              weeklyAssignments > 1 ? "s" : ""
+                            } this week`
+                          : "No assignments this week"}
                       </p>
                       <p className="text-sm text-muted-foreground">
                         Skill Level: {v.skill ?? "N/A"}
                       </p>
-                      <p className="text-sm text-muted-foreground">
+                      <p className="text-sm text-muted-foreground flex items-center gap-1">
                         Status:{" "}
-                        {v.available === null
-                          ? "❌ Not Available"
-                          : typeof v.available === "boolean"
-                            ? v.available
-                              ? "✅ Active"
-                              : "❌ Inactive"
-                            : v.available.length > 0
-                              ? "✅ Active (Scheduled)"
-                              : "❌ Inactive"}
+                        <Badge
+                          variant={isActive ? "default" : "secondary"}
+                          className={`text-xs ${
+                            isActive
+                              ? "bg-green-600 hover:bg-green-700 text-white"
+                              : "bg-gray-400 hover:bg-gray-500 text-white"
+                          }`}
+                        >
+                          {isActive ? "Active" : "Inactive"}
+                        </Badge>
                       </p>
                       {isHighlighted && (
                         <div className="text-xs text-blue-600 mt-2 font-medium">
