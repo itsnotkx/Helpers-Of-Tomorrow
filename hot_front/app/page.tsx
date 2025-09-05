@@ -25,15 +25,6 @@ interface Senior {
   overall_wellbeing: 1 | 2 | 3
 }
 
-// interface Volunteer {
-//   vid: string
-//   email?: string
-//   name?: string
-//   coords: { lat: number; lng: number }
-//   skill?: number
-//   available?: string[]
-// }
-
 interface Assessment {
   uid: string
   risk: number
@@ -47,13 +38,7 @@ interface Assignment {
     distance: number;
 }
 
-// interface Schedule {
-//   volunteer: string
-//   senior: string
-//   cluster: number
-//   datetime: string
-//   duration: number
-// }
+
 
 interface Volunteer {
     vid: string;
