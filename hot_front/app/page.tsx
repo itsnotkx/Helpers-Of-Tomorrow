@@ -62,6 +62,7 @@ interface Senior {
   last_visit?: string;
   cluster?: number;
   overall_wellbeing: 1 | 2 | 3;
+  address?: string; // Add the new address field
 }
 
 interface Assessment {
@@ -347,13 +348,48 @@ export default function VolunteerDashboard() {
   const highPrioritySeniors = seniors.filter(
     (s) => levels[s.overall_wellbeing] === "HIGH"
   );
-  const highRiskCount = highPrioritySeniors.length;
-  const activeVolunteers = volunteers.filter(
-    (v) => Array.isArray(v.available) && v.available.length > 0
+
+  // Get current date boundaries for this week and this year
+  const now = new Date();
+  const currentDay = now.getDay(); // 0 = Sunday, 1 = Monday, etc.
+  const startOfWeek = new Date(now);
+  startOfWeek.setDate(now.getDate() - currentDay + 1); // Monday of this week
+  startOfWeek.setHours(0, 0, 0, 0);
+
+  const endOfWeek = new Date(startOfWeek);
+  endOfWeek.setDate(startOfWeek.getDate() + 6); // Sunday of this week
+  endOfWeek.setHours(23, 59, 59, 999);
+
+  const startOfYear = new Date(new Date().getFullYear(), 0, 1);
+  const today = new Date().toDateString();
+
+  // Active volunteers: those with assignments this week
+  const activeVolunteers = volunteers.filter((volunteer) =>
+    schedules.some((schedule) => {
+      const scheduleDate = new Date(schedule.date);
+      return (
+        schedule.volunteer === volunteer.vid &&
+        scheduleDate >= startOfWeek &&
+        scheduleDate <= endOfWeek
+      );
+    })
   ).length;
-  const todaySchedules = schedules.filter(
-    (s) => new Date(s.start_time).toDateString() === new Date().toDateString()
-  );
+
+  // Today's visits: schedules that match today's date
+  const todaySchedules = schedules.filter((schedule) => {
+    const scheduleDate = new Date(schedule.date).toDateString();
+    return scheduleDate === today;
+  });
+
+  // Seniors needing immediate care: high priority AND not visited this year
+  const seniorsNeedingImmediateCare = highPrioritySeniors.filter((senior) => {
+    if (!senior.last_visit) return true; // Never visited
+    const lastVisitDate = new Date(senior.last_visit);
+    return lastVisitDate < startOfYear; // Not visited this year
+  });
+
+  const highRiskCount = highPrioritySeniors.length;
+  const immediateCareCoun = seniorsNeedingImmediateCare.length;
 
   return (
     <div className="min-h-screen bg-background">
@@ -427,7 +463,7 @@ export default function VolunteerDashboard() {
                     {highRiskCount}
                   </div>
                   <p className="text-xs text-muted-foreground">
-                    need immediate care
+                    {immediateCareCoun} need immediate care
                   </p>
                 </CardContent>
               </Card>
@@ -445,93 +481,112 @@ export default function VolunteerDashboard() {
                     No high-risk seniors at this time.
                   </p>
                 ) : (
-                  highPrioritySeniors.map((senior) => (
-                    <div
-                      key={senior.uid}
-                      className="cursor-pointer rounded-lg border border-purple-500 p-4 hover:bg-purple-50 transition"
-                      onClick={() => {
-                        handleSeniorCardClick(senior.uid);
-                        setShowHighRiskModal(false); // Close the modal
-                      }}
-                    >
-                      <Card
+                  highPrioritySeniors.map((senior) => {
+                    const needsImmediateCare =
+                      seniorsNeedingImmediateCare.includes(senior);
+
+                    return (
+                      <div
                         key={senior.uid}
-                        className="border-l-4 border-l-destructive"
+                        className="cursor-pointer rounded-lg border border-purple-500 p-4 hover:bg-purple-50 transition"
+                        onClick={() => {
+                          handleSeniorCardClick(senior.uid);
+                          setShowHighRiskModal(false); // Close the modal
+                        }}
                       >
-                        <CardContent className="pt-4">
-                          <div className="flex justify-between items-start mb-3">
-                            <div>
-                              <h3 className="font-semibold text-lg">
-                                {senior.name || `Senior ${senior.uid}`}
-                              </h3>
-                              <p className="text-sm text-muted-foreground">
-                                ID: {senior.uid}
-                              </p>
+                        <Card
+                          className={`border-l-4 ${
+                            needsImmediateCare
+                              ? "border-l-red-600"
+                              : "border-l-destructive"
+                          }`}
+                        >
+                          <CardContent className="pt-4">
+                            <div className="flex justify-between items-start mb-3">
+                              <div>
+                                <h3 className="font-semibold text-lg">
+                                  {senior.name || `Senior ${senior.uid}`}
+                                </h3>
+                                {needsImmediateCare && (
+                                  <div className="flex items-center gap-1 mt-1">
+                                    <AlertTriangle className="h-4 w-4 text-red-600" />
+                                    <span className="text-sm font-medium text-red-600">
+                                      IMMEDIATE CARE NEEDED
+                                    </span>
+                                  </div>
+                                )}
+                              </div>
+                              <div className="flex flex-col gap-1">
+                                <Badge variant="destructive">HIGH RISK</Badge>
+                              </div>
                             </div>
-                            <Badge variant="destructive">HIGH RISK</Badge>
-                          </div>
 
-                          <div className="grid grid-cols-2 gap-4 mb-3">
-                            <div>
-                              <p className="text-sm font-medium">
-                                Physical Health
-                              </p>
-                              <p className="text-sm text-muted-foreground">
-                                {senior.physical
-                                  ? `${wellbeingLabels[senior.physical]}`
-                                  : "Not assessed"}
-                              </p>
+                            <div className="grid grid-cols-2 gap-4 mb-3">
+                              <div>
+                                <p className="text-sm font-medium">
+                                  Physical Health
+                                </p>
+                                <p className="text-sm text-muted-foreground">
+                                  {senior.physical
+                                    ? `${wellbeingLabels[senior.physical]}`
+                                    : "Not assessed"}
+                                </p>
+                              </div>
+                              <div>
+                                <p className="text-sm font-medium">
+                                  Mental Health
+                                </p>
+                                <p className="text-sm text-muted-foreground">
+                                  {senior.mental
+                                    ? `${wellbeingLabels[senior.mental]}`
+                                    : "Not assessed"}
+                                </p>
+                              </div>
+                              <div>
+                                <p className="text-sm font-medium">
+                                  Community Support
+                                </p>
+                                <p className="text-sm text-muted-foreground">
+                                  {senior.community
+                                    ? `${wellbeingLabels[senior.community]}`
+                                    : "Not assessed"}
+                                </p>
+                              </div>
+                              <div>
+                                <p className="text-sm font-medium">
+                                  Last Visit
+                                </p>
+                                <p className="text-sm text-muted-foreground">
+                                  {senior.last_visit
+                                    ? new Date(
+                                        senior.last_visit
+                                      ).toLocaleDateString()
+                                    : "Never"}
+                                </p>
+                              </div>
                             </div>
-                            <div>
-                              <p className="text-sm font-medium">
-                                Mental Health
-                              </p>
-                              <p className="text-sm text-muted-foreground">
-                                {senior.mental
-                                  ? `${wellbeingLabels[senior.mental]}`
-                                  : "Not assessed"}
-                              </p>
-                            </div>
-                            <div>
-                              <p className="text-sm font-medium">
-                                Community Support
-                              </p>
-                              <p className="text-sm text-muted-foreground">
-                                {senior.community
-                                  ? `${wellbeingLabels[senior.community]}`
-                                  : "Not assessed"}
-                              </p>
-                            </div>
-                            <div>
-                              <p className="text-sm font-medium">Last Visit</p>
-                              <p className="text-sm text-muted-foreground">
-                                {senior.last_visit
-                                  ? new Date(
-                                      senior.last_visit
-                                    ).toLocaleDateString()
-                                  : "Never"}
-                              </p>
-                            </div>
-                          </div>
 
-                          <div className="flex justify-between items-center">
-                            <div>
-                              <p className="text-sm font-medium">Location</p>
-                              <p className="text-sm text-muted-foreground">
-                                {senior.coords.lat.toFixed(4)},{" "}
-                                {senior.coords.lng.toFixed(4)}
-                              </p>
+                            <div className="flex justify-between items-center">
+                              <div>
+                                <p className="text-sm font-medium">Location</p>
+                                <p className="text-sm text-muted-foreground">
+                                  {senior.address ||
+                                    `${senior.coords.lat.toFixed(
+                                      4
+                                    )}, ${senior.coords.lng.toFixed(4)}`}
+                                </p>
+                              </div>
+                              {senior.cluster && (
+                                <Badge variant="outline">
+                                  Cluster {senior.cluster}
+                                </Badge>
+                              )}
                             </div>
-                            {senior.cluster && (
-                              <Badge variant="outline">
-                                Cluster {senior.cluster}
-                              </Badge>
-                            )}
-                          </div>
-                        </CardContent>
-                      </Card>
-                    </div>
-                  ))
+                          </CardContent>
+                        </Card>
+                      </div>
+                    );
+                  })
                 )}
               </div>
             </DialogContent>

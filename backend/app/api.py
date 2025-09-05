@@ -2,11 +2,13 @@ from routers import availability
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 import uvicorn
+import time
 
 from config.settings import CORS_ORIGINS
 from utils.helpers import get_iso_time
 from services.assessments import classify_seniors
 from config.settings import supabase, logger
+from utils.geocoding import geocoder
 
 app = FastAPI(title="AIC Senior Care MVP")
 
@@ -23,16 +25,136 @@ app.add_middleware(
 app.include_router(availability.router)
 # app.include_router(schedule.router)
 
-
 @app.get("/")
 def health():
     return {"status": "OK", "time": get_iso_time()}
 
 @app.get("/seniors")
-def get_seniors():  # Changed from get_senior to get_seniors
-    response = supabase.table("seniors").select("*").execute()
-    logger.info(f"Fetched {len(response.data)} seniors")
-    return {"seniors": response.data}
+def get_seniors():
+    try:
+        response = supabase.table("seniors").select("*").execute()
+        logger.info(f"Fetched {len(response.data)} seniors")
+        
+        # Identify high-risk seniors first
+        high_risk_seniors = []
+        other_seniors = []
+        
+        for senior in response.data:
+            if senior.get("overall_wellbeing") == 1:
+                high_risk_seniors.append(senior)
+            else:
+                other_seniors.append(senior)
+        
+        logger.info(f"Found {len(high_risk_seniors)} high-risk seniors")
+        
+        seniors_with_address = []
+        geocoded_count = 0
+        max_geocode = 15  # Limit to prevent slowdowns
+        
+        # Process high-risk seniors first
+        for senior in high_risk_seniors:
+            senior_data = senior.copy()
+            coords = senior.get("coords")
+            
+            if coords and geocoded_count < max_geocode:
+                try:
+                    lat, lng = coords["lat"], coords["lng"]
+                    address = geocoder.get_singapore_address(lat, lng)
+                    senior_data["address"] = address
+                    geocoded_count += 1
+                    
+                    if address and "Singapore" in address:
+                        logger.info(f"Geocoded high-risk senior {senior.get('uid', 'unknown')[:8]}: {address[:50]}")
+                    
+                except Exception as e:
+                    logger.warning(f"Failed to geocode high-risk senior: {str(e)[:50]}")
+                    senior_data["address"] = geocoder._get_fallback_area(coords["lat"], coords["lng"])
+            else:
+                # Use fallback for seniors not geocoded
+                if coords:
+                    senior_data["address"] = geocoder._get_fallback_area(coords["lat"], coords["lng"])
+                else:
+                    senior_data["address"] = "Singapore"
+                    
+            seniors_with_address.append(senior_data)
+        
+        # Process other seniors
+        for senior in other_seniors:
+            senior_data = senior.copy()
+            coords = senior.get("coords")
+            
+            if coords and geocoded_count < max_geocode:
+                try:
+                    lat, lng = coords["lat"], coords["lng"]
+                    address = geocoder.get_singapore_address(lat, lng)
+                    senior_data["address"] = address
+                    geocoded_count += 1
+                    
+                except Exception as e:
+                    logger.warning(f"Failed to geocode senior: {str(e)[:50]}")
+                    senior_data["address"] = geocoder._get_fallback_area(coords["lat"], coords["lng"])
+            else:
+                # Use fallback for remaining seniors
+                if coords:
+                    senior_data["address"] = geocoder._get_fallback_area(coords["lat"], coords["lng"])
+                else:
+                    senior_data["address"] = "Singapore"
+                    
+            seniors_with_address.append(senior_data)
+        
+        logger.info(f"Processed {len(seniors_with_address)} seniors, geocoded {geocoded_count}")
+        return {"seniors": seniors_with_address}
+        
+    except Exception as e:
+        logger.error(f"Error in get_seniors: {str(e)}")
+        # Fallback: return seniors with area-based addresses
+        response = supabase.table("seniors").select("*").execute()
+        seniors_fallback = []
+        for senior in response.data:
+            senior_data = senior.copy()
+            coords = senior.get("coords")
+            if coords:
+                senior_data["address"] = geocoder._get_fallback_area(coords["lat"], coords["lng"])
+            else:
+                senior_data["address"] = "Singapore"
+            seniors_fallback.append(senior_data)
+        return {"seniors": seniors_fallback}
+
+# Add a separate endpoint for batch geocoding (run manually/scheduled)
+@app.post("/seniors/geocode")
+def batch_geocode_seniors():
+    """
+    Batch geocode all seniors and store addresses in database.
+    This should be run separately, not during normal API calls.
+    """
+    try:
+        response = supabase.table("seniors").select("*").execute()
+        
+        geocoded_count = 0
+        for senior in response.data:
+            coords = senior.get("coords")
+            if coords and not senior.get("address"):  # Only geocode if no address exists
+                try:
+                    time.sleep(1)  # Respectful delay
+                    lat, lng = coords["lat"], coords["lng"]
+                    address = geocoder.get_singapore_address(lat, lng)
+                    
+                    if address:
+                        # Update the database with the address
+                        supabase.table("seniors").update({
+                            "address": address
+                        }).eq("uid", senior["uid"]).execute()
+                        geocoded_count += 1
+                        logger.info(f"Geocoded senior {senior['uid'][:8]}")
+                        
+                except Exception as e:
+                    logger.warning(f"Failed to geocode {senior['uid'][:8]}: {str(e)[:50]}")
+                    continue
+        
+        return {"message": f"Geocoded {geocoded_count} seniors"}
+    except Exception as e:
+        logger.error(f"Batch geocoding error: {str(e)}")
+        return {"error": "Batch geocoding failed"}
 
 @app.get("/volunteers")
 def get_volunteers():  # This was correct but adding logging
