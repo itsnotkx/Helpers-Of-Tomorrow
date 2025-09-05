@@ -1,4 +1,4 @@
-from routers import availability 
+from routers import availability, assignment, schedule
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 import uvicorn
@@ -57,9 +57,9 @@ async def startup_event():
     logger.info("Scheduled background classification to run after startup")
 
 # # Include routers
-# app.include_router(assignment.router)
+app.include_router(assignment.router)
 app.include_router(availability.router)
-# app.include_router(schedule.router)
+app.include_router(schedule.router)
 
 @app.get("/")
 def health():

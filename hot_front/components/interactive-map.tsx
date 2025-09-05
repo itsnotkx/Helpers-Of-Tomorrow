@@ -74,6 +74,7 @@ export function InteractiveMap({
   centerCoordinates?: [number, number];
   initialZoom?: number;
 }) {
+  console.log(centerCoordinates)
   const mapContainer = useRef<HTMLDivElement>(null);
   const map = useRef<mapboxgl.Map | null>(null);
   const markersRef = useRef<mapboxgl.Marker[]>([]);
