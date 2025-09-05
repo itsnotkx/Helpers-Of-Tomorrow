@@ -3,7 +3,6 @@ from fastapi import APIRouter # type: ignore
 from datetime import datetime, timedelta
 
 from config.settings import logger, supabase
-from routers.assignment import get_assignments
 from geopy.geocoders import Nominatim
 from utils.helpers import get_senior_name, get_volunteer_name
 import smtplib
