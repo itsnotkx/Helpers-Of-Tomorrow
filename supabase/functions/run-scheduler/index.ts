@@ -76,20 +76,29 @@ Deno.serve(async (req) => {
       coords: typeof v.coords === 'string' ? JSON.parse(v.coords) : v.coords
     }))
 
-    // Fetch volunteer availabilities for the next week
+    // Calculate date range: Monday to Sunday after current Sunday
     const today = new Date()
-    const tomorrow = new Date(today.getTime() + 24 * 60 * 60 * 1000)
-    const nextWeek = new Date(tomorrow.getTime() + 7 * 24 * 60 * 60 * 1000)
+    const dayOfWeek = today.getDay() // 0 = Sunday
+    
+    // If today is Sunday, get Monday-Sunday of the following week
+    // If today is any other day, this shouldn't run, but handle gracefully
+    const daysUntilNextMonday = dayOfWeek === 0 ? 1 : (8 - dayOfWeek) % 7
+    const nextMonday = new Date(today.getTime() + daysUntilNextMonday * 24 * 60 * 60 * 1000)
+    const nextSunday = new Date(nextMonday.getTime() + 6 * 24 * 60 * 60 * 1000)
+    
+    console.log(`Scheduling for week: ${nextMonday.toISOString().split('T')[0]} to ${nextSunday.toISOString().split('T')[0]}`)
     
     const { data: availabilities, error: availabilitiesError } = await supabase
       .from('availabilities')
       .select('date, start_t, end_t, volunteer_email')
-      .gte('date', tomorrow.toISOString().split('T')[0])
-      .lte('date', nextWeek.toISOString().split('T')[0])
+      .gte('date', nextMonday.toISOString().split('T')[0])
+      .lte('date', nextSunday.toISOString().split('T')[0])
 
     if (availabilitiesError) throw availabilitiesError
 
-    // Perform geographical K-means clustering
+    console.log(`Found ${availabilities.length} availability slots for the target week`)
+
+    // Perform geographical K-means clustering with overlap avoidance
     const clusters = performGeographicalClustering(seniors, volunteers)
     
     console.log('Generated clusters:', clusters.length)
@@ -97,14 +106,14 @@ Deno.serve(async (req) => {
     // Update clusters table with cluster information
     if (clusters.length > 0) {
       const clusterInserts = clusters.map((cluster) => ({
-        id: cluster.id + 1, // Convert 0-based to 1-based for database
-        centroid: JSON.stringify(cluster.centroid),
+        id: cluster.id,
+        centroid: cluster.centroid, // pass object for json/jsonb column
         radius: cluster.radius
       }))
 
-      console.log('Cluster inserts with mapping:')
+      console.log('Cluster inserts:')
       clusters.forEach(cluster => {
-        console.log(`Algorithm cluster ${cluster.id} -> DB cluster ${cluster.id + 1}`)
+        console.log(`Cluster ${cluster.id} with ${cluster.seniors.length} seniors`)
       })
       console.log('Cluster inserts:', clusterInserts)
 
@@ -119,7 +128,7 @@ Deno.serve(async (req) => {
       const { error: clusterError, data: insertedClusters } = await supabase
         .from('clusters')
         .insert(clusterInserts)
-        .select()
+        .select('*') // select for debug visibility
 
       if (clusterError) {
         console.error('Error updating clusters:', clusterError)
@@ -136,11 +145,13 @@ Deno.serve(async (req) => {
     
     // Insert schedules into assignments table
     if (schedules.length > 0) {
-      const { error: insertError } = await supabase
+      const { error: insertError, data: insertedAssignments } = await supabase
         .from('assignments')
         .insert(schedules)
+        .select('*') // select for debug visibility
 
       if (insertError) throw insertError
+      console.log(`Inserted ${insertedAssignments?.length ?? 0} assignments`)
     }
 
     return new Response(
@@ -190,116 +201,179 @@ function calculateClusterRadius(seniors: Senior[], centroid: { lat: number; lng:
   return Math.max(...distances)
 }
 
-function performGeographicalClustering(seniors: Senior[], volunteers: Volunteer[]): Cluster[] {
+function performGeographicalClustering(seniors: Senior[], _volunteers: Volunteer[]): Cluster[] {
   if (seniors.length === 0) return []
-  
-  // Stage 1: Cluster seniors based on geographical proximity (euclidean distance)
-  const targetRatio = 3 // seniors per volunteer
-  const recommendedClusters = Math.max(1, Math.floor(seniors.length / (targetRatio * Math.max(1, volunteers.length))))
-  const minClusters = Math.max(1, Math.floor(seniors.length / 6)) // max 6 seniors per cluster
-  const maxClusters = Math.floor(seniors.length / 2) // min 2 seniors per cluster
-  const nClusters = Math.max(minClusters, Math.min(recommendedClusters, maxClusters))
-  
-  console.log(`Clustering ${seniors.length} seniors into ${nClusters} clusters`)
-  
-  // Extract coordinates for K-means clustering of seniors
-  const coordinates = seniors.map(s => [s.coords.lat, s.coords.lng])
-  
-  // Initialize centroids randomly within data bounds
-  const lats = coordinates.map(c => c[0])
-  const lngs = coordinates.map(c => c[1])
-  const minLat = Math.min(...lats)
-  const maxLat = Math.max(...lats)
-  const minLng = Math.min(...lngs)
-  const maxLng = Math.max(...lngs)
-  
-  // Use timestamp-based seed for better randomization
-  const seed = Date.now()
-  let centroids = Array.from({ length: nClusters }, (_, i) => [
-    minLat + ((seed + i * 1000) % 1000000 / 1000000) * (maxLat - minLat),
-    minLng + ((seed + i * 2000) % 1000000 / 1000000) * (maxLng - minLng)
-  ])
-  
+
+  const targetSize = 7
+  const k = Math.ceil(seniors.length / targetSize)
+
+  type Point = { lat: number; lng: number; senior: Senior }
+  const pts: Point[] = seniors.map(s => ({ lat: s.coords.lat, lng: s.coords.lng, senior: s }))
+
+  const euclid = (a: { lat: number; lng: number }, b: { lat: number; lng: number }) =>
+    Math.sqrt(Math.pow(a.lat - b.lat, 2) + Math.pow(a.lng - b.lng, 2))
+
+  // k-means++ initialization
+  const centroids: { lat: number; lng: number }[] = []
+  const first = pts[Math.floor(Math.random() * pts.length)]
+  centroids.push({ lat: first.lat, lng: first.lng })
+  while (centroids.length < k) {
+    const d2 = pts.map(p => {
+      let m = Infinity
+      for (const c of centroids) m = Math.min(m, euclid(p, c))
+      return m * m
+    })
+    const sum = d2.reduce((a, b) => a + b, 0) || 1
+    let r = Math.random() * sum
+    let idx = 0
+    while (idx < d2.length - 1 && r > d2[idx]) {
+      r -= d2[idx]
+      idx++
+    }
+    const p = pts[idx]
+    centroids.push({ lat: p.lat, lng: p.lng })
+  }
+
   let clusters: Cluster[] = []
-  let converged = false
-  let iterations = 0
-  const maxIterations = 100
-  
-  // K-means clustering for seniors
-  while (!converged && iterations < maxIterations) {
-    // Initialize clusters
-    clusters = centroids.map((centroid, id) => ({
+  const maxIter = 20
+
+  for (let iter = 0; iter < maxIter; iter++) {
+    // Init clusters and capacities
+    clusters = centroids.map((c, id) => ({
       seniors: [],
-      centroid: { lat: centroid[0], lng: centroid[1] },
-      id
+      centroid: { lat: c.lat, lng: c.lng },
+      id: id + 1
     }))
-    
-    // Assign seniors to closest clusters based on euclidean distance
-    for (const senior of seniors) {
-      let minDist = Infinity
-      let assignedCluster = 0
-      
-      for (let i = 0; i < centroids.length; i++) {
-        const dist = distance(senior.coords, { lat: centroids[i][0], lng: centroids[i][1] })
-        if (dist < minDist) {
-          minDist = dist
-          assignedCluster = i
+    const capacity = new Array(centroids.length).fill(targetSize)
+
+    // Build preferences (closest centroids first)
+    const prefs = pts.map(p => {
+      const order = centroids
+        .map((c, i) => ({ i, d: euclid(p, c) }))
+        .sort((a, b) => a.d - b.d)
+        .map(o => o.i)
+      return { p, order, bestDist: euclid(p, centroids[order[0]]) }
+    })
+
+    // Assign nearest-first with capacity constraint to avoid oversized clusters
+    prefs.sort((a, b) => a.bestDist - b.bestDist)
+    for (const pref of prefs) {
+      let placed = false
+      for (const ci of pref.order) {
+        if (capacity[ci] > 0) {
+          clusters[ci].seniors.push({ ...pref.p.senior, cluster: clusters[ci].id })
+          capacity[ci]--
+          placed = true
+          break
         }
       }
-      
-      clusters[assignedCluster].seniors.push({ ...senior, cluster: assignedCluster })
+      if (!placed) {
+        // Fallback (should be rare): assign to absolute nearest ignoring capacity
+        const ci = pref.order[0]
+        clusters[ci].seniors.push({ ...pref.p.senior, cluster: clusters[ci].id })
+      }
     }
-    
-    // Update centroids based on assigned seniors
-    const newCentroids = clusters.map(cluster => {
-      if (cluster.seniors.length === 0) return [cluster.centroid.lat, cluster.centroid.lng]
-      
-      const avgLat = cluster.seniors.reduce((sum, s) => sum + s.coords.lat, 0) / cluster.seniors.length
-      const avgLng = cluster.seniors.reduce((sum, s) => sum + s.coords.lng, 0) / cluster.seniors.length
-      return [avgLat, avgLng]
+
+    // Update centroids
+    centroids.forEach((c, i) => {
+      const members = clusters[i].seniors
+      if (members.length > 0) {
+        const avgLat = members.reduce((s, m) => s + m.coords.lat, 0) / members.length
+        const avgLng = members.reduce((s, m) => s + m.coords.lng, 0) / members.length
+        c.lat = avgLat
+        c.lng = avgLng
+      }
     })
-    
-    // Check convergence
-    converged = centroids.every((centroid, i) => 
-      Math.abs(centroid[0] - newCentroids[i][0]) < 0.001 &&
-      Math.abs(centroid[1] - newCentroids[i][1]) < 0.001
-    )
-    
-    centroids = newCentroids
-    clusters.forEach((cluster, i) => {
-      cluster.centroid = { lat: centroids[i][0], lng: centroids[i][1] }
-    })
-    iterations++
   }
-  
-  // Filter out empty clusters and calculate density and radius for each cluster
-  const validClusters = clusters.filter(cluster => cluster.seniors.length > 0)
-  
-  // IMPORTANT: Reassign cluster IDs to be consecutive starting from 0
-  validClusters.forEach((cluster, index) => {
-    cluster.id = index // Ensure IDs are 0, 1, 2, etc.
-    // Update senior cluster assignments to match
-    cluster.seniors.forEach(senior => {
-      senior.cluster = index
+
+  // Drop empty clusters and reindex
+  clusters = clusters.filter(c => c.seniors.length > 0)
+  clusters.forEach((c, idx) => {
+    c.id = idx + 1
+    c.seniors.forEach(s => (s.cluster = c.id))
+    const avgLat = c.seniors.reduce((s, m) => s + m.coords.lat, 0) / c.seniors.length
+    const avgLng = c.seniors.reduce((s, m) => s + m.coords.lng, 0) / c.seniors.length
+    c.centroid = { lat: avgLat, lng: avgLng }
+  })
+
+  // Compute density/radius
+  clusters.forEach(c => {
+    c.density = calculateClusterDensity(c.seniors)
+    c.radius = calculateClusterRadius(c.seniors, c.centroid)
+  })
+
+  // Split outlier-radius clusters to avoid “spanning” ones
+  const radii = clusters.map(c => c.radius || 0).sort((a, b) => a - b)
+  const median = radii.length ? radii[Math.floor(radii.length / 2)] : 0
+  const threshold = median > 0 ? median * 2.5 : 0 // outlier if > 2.5x median
+
+  if (threshold > 0) {
+    const next: Cluster[] = []
+    for (const c of clusters) {
+      if ((c.radius || 0) > threshold && c.seniors.length > 4) {
+        // Split into two by farthest-pair seeding (2-means within cluster)
+        const arr = c.seniors
+        let a = 0, b = 1, maxD = -1
+        for (let i = 0; i < arr.length; i++) {
+          for (let j = i + 1; j < arr.length; j++) {
+            const d = euclid(arr[i].coords, arr[j].coords)
+            if (d > maxD) { maxD = d; a = i; b = j }
+          }
+        }
+        const seed1 = { lat: arr[a].coords.lat, lng: arr[a].coords.lng }
+        const seed2 = { lat: arr[b].coords.lat, lng: arr[b].coords.lng }
+
+        const part1: Senior[] = []
+        const part2: Senior[] = []
+        for (const s of arr) {
+          const d1 = euclid(s.coords, seed1)
+          const d2 = euclid(s.coords, seed2)
+          if (d1 <= d2) part1.push({ ...s })
+          else part2.push({ ...s })
+        }
+
+        const mkCluster = (members: Senior): Cluster => {
+          const m = Array.isArray(members) ? members : [members]
+          const avgLat = m.reduce((s, x) => s + x.coords.lat, 0) / m.length
+          const avgLng = m.reduce((s, x) => s + x.coords.lng, 0) / m.length
+          const cl: Cluster = { seniors: m, centroid: { lat: avgLat, lng: avgLng }, id: 0 }
+          cl.density = calculateClusterDensity(m)
+          cl.radius = calculateClusterRadius(m, cl.centroid)
+          return cl
+        }
+
+        if (part1.length === 0 || part2.length === 0) {
+          next.push(c) // degenerate split; keep as-is
+        } else {
+          next.push(mkCluster(part1 as unknown as Senior))
+          next.push(mkCluster(part2 as unknown as Senior))
+        }
+      } else {
+        next.push(c)
+      }
+    }
+
+    // Reindex and fix members
+    next.forEach((c, idx) => {
+      c.id = idx + 1
+      c.seniors.forEach(s => (s.cluster = c.id))
     })
+    clusters = next
+  }
+
+  // Final density/radius update
+  clusters.forEach(c => {
+    c.density = calculateClusterDensity(c.seniors)
+    c.radius = calculateClusterRadius(c.seniors, c.centroid)
   })
-  
-  console.log(`Valid clusters after filtering: ${validClusters.length}`)
-  validClusters.forEach((cluster, index) => {
-    console.log(`Cluster ${cluster.id} has ${cluster.seniors.length} seniors with centroid:`, cluster.centroid)
-  })
-  
-  // Add density and radius information to clusters
-  validClusters.forEach(cluster => {
-    cluster.density = calculateClusterDensity(cluster.seniors)
-    cluster.radius = calculateClusterRadius(cluster.seniors, cluster.centroid)
-  })
-  
-  return validClusters
+
+  return clusters
 }
 
 function assignVolunteersToClusters(clusters: Cluster[], volunteers: Volunteer[], availabilities: Availability[]): Map<string, number> {
-  // Stage 2: Assign volunteers to clusters using weighted euclidean distance
+  // Two-pass assignment:
+  //   1) Try to ensure each cluster gets at least one available volunteer (by proximity, higher density first)
+  //   2) Assign remaining volunteers to their closest clusters
   const availabilityMap = new Map<string, Availability[]>()
   availabilities.forEach(avail => {
     if (!availabilityMap.has(avail.volunteer_email)) {
@@ -307,50 +381,77 @@ function assignVolunteersToClusters(clusters: Cluster[], volunteers: Volunteer[]
     }
     availabilityMap.get(avail.volunteer_email)!.push(avail)
   })
-  
+
   const volunteerClusterAssignment = new Map<string, number>()
-  
-  // Only consider volunteers who have availability
   const availableVolunteers = volunteers.filter(v => availabilityMap.has(v.email))
-  
-  console.log('Available volunteers:', availableVolunteers.length)
-  console.log('Total clusters:', clusters.length)
-  
-  for (const volunteer of availableVolunteers) {
-    let bestCluster = -1
-    let minWeightedDistance = Infinity
-    
-    console.log(`Assigning volunteer ${volunteer.email} to clusters:`)
-    
-    for (const cluster of clusters) {
-      // Calculate euclidean distance from volunteer to cluster centroid
-      const euclideanDist = distance(volunteer.coords, cluster.centroid)
-      
-      // Calculate weighted euclidean distance using density
-      // Higher density = smaller weighted distance (more priority)
-      const weightedDistance = euclideanDist / (cluster.density || 0.001)
-      
-      console.log(`  Cluster ${cluster.id}: distance=${euclideanDist.toFixed(4)}, weighted=${weightedDistance.toFixed(4)}`)
-      
-      if (weightedDistance < minWeightedDistance) {
-        minWeightedDistance = weightedDistance
-        bestCluster = cluster.id
+
+  console.log(`Assigning ${availableVolunteers.length} available volunteers to ${clusters.length} clusters`)
+
+  if (availableVolunteers.length < clusters.length) {
+    console.warn(`Only ${availableVolunteers.length} available volunteers for ${clusters.length} clusters; some clusters may have none.`)
+  }
+
+  const assignedVolunteers = new Set<string>()
+
+  // Sort clusters by density desc, then by number of seniors desc
+  const sortedClusters = [...clusters].sort((a, b) => {
+    const densityDiff = (b.density || 0) - (a.density || 0)
+    if (Math.abs(densityDiff) < 0.0001) return b.seniors.length - a.seniors.length
+    return densityDiff
+  })
+
+  // Pass 1: ensure coverage (one volunteer per cluster where possible)
+  for (const cluster of sortedClusters) {
+    let bestVolunteer: Volunteer | null = null
+    let minDistance = Infinity
+
+    for (const volunteer of availableVolunteers) {
+      if (assignedVolunteers.has(volunteer.email)) continue
+      const d = distance(volunteer.coords, cluster.centroid)
+      if (d < minDistance) {
+        minDistance = d
+        bestVolunteer = volunteer
       }
     }
-    
-    if (bestCluster !== -1) {
-      volunteerClusterAssignment.set(volunteer.email, bestCluster)
-      console.log(`Volunteer ${volunteer.email} assigned to cluster ${bestCluster}`)
+
+    if (bestVolunteer) {
+      volunteerClusterAssignment.set(bestVolunteer.email, cluster.id)
+      assignedVolunteers.add(bestVolunteer.email)
+      console.log(`Assigned ${bestVolunteer.email} to cluster ${cluster.id} (d=${minDistance.toFixed(4)})`)
+    } else {
+      console.warn(`No unassigned available volunteer found for cluster ${cluster.id}`)
     }
   }
-  
-  // Log cluster assignment summary
+
+  // Pass 2: assign remaining volunteers by proximity (allows multiple volunteers per cluster)
+  const remaining = availableVolunteers.filter(v => !assignedVolunteers.has(v.email))
+  for (const volunteer of remaining) {
+    let bestClusterId = -1
+    let minDistance = Infinity
+    for (const cluster of clusters) {
+      const d = distance(volunteer.coords, cluster.centroid)
+      if (d < minDistance) {
+        minDistance = d
+        bestClusterId = cluster.id
+      }
+    }
+    if (bestClusterId !== -1) {
+      volunteerClusterAssignment.set(volunteer.email, bestClusterId)
+      console.log(`Additional assignment: ${volunteer.email} -> cluster ${bestClusterId} (d=${minDistance.toFixed(4)})`)
+    }
+  }
+
+  // Report coverage
   const clusterCounts = new Map<number, number>()
-  volunteerClusterAssignment.forEach(clusterId => {
-    clusterCounts.set(clusterId, (clusterCounts.get(clusterId) || 0) + 1)
-  })
+  volunteerClusterAssignment.forEach(cid => clusterCounts.set(cid, (clusterCounts.get(cid) || 0) + 1))
   console.log('Volunteers per cluster:', Object.fromEntries(clusterCounts))
-  
+
+  for (const cluster of clusters) {
+    if (!clusterCounts.has(cluster.id)) {
+      console.warn(`Cluster ${cluster.id} has no assigned volunteers`)
+    }
+  }
+
   return volunteerClusterAssignment
 }
 
@@ -390,7 +491,7 @@ function generateOptimalSchedules(clusters: Cluster[], volunteers: Volunteer[], 
       availabilityMap.has(v.email)
     )
     
-    console.log(`Cluster ${cluster.id} (DB ID: ${cluster.id + 1}) has ${clusterVolunteers.length} volunteers and ${sortedSeniors.length} seniors`)
+    console.log(`Cluster ${cluster.id} (DB ID: ${cluster.id}) has ${clusterVolunteers.length} volunteers and ${sortedSeniors.length} seniors`)
     
     if (clusterVolunteers.length === 0) {
       console.log(`No volunteers available for cluster ${cluster.id}, skipping`)
@@ -449,7 +550,7 @@ function generateOptimalSchedules(clusters: Cluster[], volunteers: Volunteer[], 
             end_time: endTimeString,
             volunteer_email: volunteer.email,
             is_acknowledged: false,
-            cluster_id: cluster.id + 1 // Convert 0-based cluster.id to 1-based for database
+            cluster_id: cluster.id // No conversion needed - already starts from 1
           })
           
           // Mark slot as used and senior as scheduled
@@ -457,7 +558,7 @@ function generateOptimalSchedules(clusters: Cluster[], volunteers: Volunteer[], 
           scheduledSeniors.add(senior.uid)
           seniorScheduled = true
           
-          console.log(`Scheduled senior ${senior.uid} with volunteer ${volunteer.email} on ${slot.date} at ${slot.start_t} for cluster ${cluster.id + 1}`)
+          console.log(`Scheduled senior ${senior.uid} with volunteer ${volunteer.email} on ${slot.date} at ${slot.start_t} for cluster ${cluster.id}`)
           
           // Move to next senior (one visit per senior maximum)
           break
@@ -486,5 +587,3 @@ function generateOptimalSchedules(clusters: Cluster[], volunteers: Volunteer[], 
     --data '{}'
 
 */
-
-
