@@ -62,7 +62,7 @@ interface Senior {
   last_visit?: string;
   cluster?: number;
   overall_wellbeing: 1 | 2 | 3;
-  address?: string; // Add the new address field
+  address?: string;
 }
 
 interface Assessment {
@@ -187,8 +187,8 @@ export default function VolunteerDashboard() {
           senior.overall_wellbeing === 1
             ? "HIGH"
             : senior.overall_wellbeing === 2
-            ? "MEDIUM"
-            : "LOW",
+              ? "MEDIUM"
+              : "LOW",
         needscare: senior.overall_wellbeing <= 2,
       }));
       setAssessments(derivedAssessments);
@@ -391,6 +391,12 @@ export default function VolunteerDashboard() {
   const highRiskCount = highPrioritySeniors.length;
   const immediateCareCoun = seniorsNeedingImmediateCare.length;
 
+  const sortedHighPrioritySeniors = [...highPrioritySeniors].sort((a, b) => {
+    const aNeedsCare = seniorsNeedingImmediateCare.includes(a);
+    const bNeedsCare = seniorsNeedingImmediateCare.includes(b);
+    return aNeedsCare === bNeedsCare ? 0 : aNeedsCare ? -1 : 1;
+  });
+
   return (
     <div className="min-h-screen bg-background">
       <DashboardHeader
@@ -481,7 +487,7 @@ export default function VolunteerDashboard() {
                     No high-risk seniors at this time.
                   </p>
                 ) : (
-                  highPrioritySeniors.map((senior) => {
+                  sortedHighPrioritySeniors.map((senior) => {
                     const needsImmediateCare =
                       seniorsNeedingImmediateCare.includes(senior);
 
@@ -495,11 +501,10 @@ export default function VolunteerDashboard() {
                         }}
                       >
                         <Card
-                          className={`border-l-4 ${
-                            needsImmediateCare
-                              ? "border-l-red-600"
-                              : "border-l-destructive"
-                          }`}
+                          className={`border-l-4 ${needsImmediateCare
+                            ? "border-l-red-600"
+                            : "border-l-destructive"
+                            }`}
                         >
                           <CardContent className="pt-4">
                             <div className="flex justify-between items-start mb-3">
@@ -559,8 +564,8 @@ export default function VolunteerDashboard() {
                                 <p className="text-sm text-muted-foreground">
                                   {senior.last_visit
                                     ? new Date(
-                                        senior.last_visit
-                                      ).toLocaleDateString()
+                                      senior.last_visit
+                                    ).toLocaleDateString()
                                     : "Never"}
                                 </p>
                               </div>
@@ -613,12 +618,7 @@ export default function VolunteerDashboard() {
           {!isMapCollapsed && (
             <CardContent>
               <InteractiveMap
-                // seniors={seniors}
-                // volunteers={volunteers}
-                // assignments={assignments}
-                // schedules={schedules}
                 highlightedSeniorId={highlightedSeniorId}
-                // highlightedVolunteerId={highlightedVolunteerId}
                 onMapUnfocus={() => {
                   setHighlightedSeniorId(null);
                   setHighlightedVolunteerId(null);
@@ -626,17 +626,11 @@ export default function VolunteerDashboard() {
                 centerCoordinates={
                   selectedNeighbourhood
                     ? (SINGAPORE_NEIGHBOURHOODS[selectedNeighbourhood] as [
-                        number,
-                        number
-                      ])
+                      number,
+                      number
+                    ])
                     : undefined
                 }
-                // onSeniorClick={() => setExpandedDay(null)} // <-- This closes the expanded card
-                // seniorMarkerElements={seniorMarkerElements}
-                // setSeniorMarkerElements={setSeniorMarkerElements}
-                // volunteerMarkerElements={volunteerMarkerElements}
-                // setVolunteerMarkerElements={setVolunteerMarkerElements}
-                // mapRef={mapRef}
               />
             </CardContent>
           )}
@@ -681,30 +675,23 @@ export default function VolunteerDashboard() {
             <CardContent>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 {volunteers.map((v, i) => {
-                  const assigned = assignments.filter(
+                  const assigned = schedules.filter(
                     (a) => a.volunteer === v.vid
                   );
                   const numSeniors = schedules.filter(
                     (s) => s.volunteer === v.vid
                   ).length;
                   const cluster = assigned[0]?.cluster ?? "-";
-                  const distance = assigned[0]?.distance ?? "N/A";
                   const isHighlighted = highlightedVolunteerId === v.vid;
-
                   return (
                     <div
                       key={i}
-                      className={`p-4 border rounded-lg cursor-pointer hover:bg-muted transition ${
-                        isHighlighted
-                          ? "border-blue-500 bg-blue-50 shadow-lg"
-                          : ""
-                      }`}
+                      className={`p-4 border rounded-lg cursor-pointer hover:bg-muted transition ${isHighlighted ? "border-blue-500 bg-blue-50 shadow-lg" : ""
+                        }`}
                       onClick={() => handleVolunteerCardClick(v.vid)}
                     >
                       <div className="flex justify-between mb-2">
-                        <h4 className="font-medium">
-                          {v.name || "Unknown Volunteer"}
-                        </h4>
+                        <h4 className="font-medium">{v.name || "Unknown Volunteer"}</h4>
                         <Badge variant="secondary" className="h-6">
                           Cluster {cluster}
                         </Badge>
@@ -716,7 +703,16 @@ export default function VolunteerDashboard() {
                         Skill Level: {v.skill ?? "N/A"}
                       </p>
                       <p className="text-sm text-muted-foreground">
-                        Distance to Cluster: {distance} km
+                        Status:{" "}
+                        {v.available === null
+                          ? "❌ Not Available"
+                          : typeof v.available === "boolean"
+                            ? v.available
+                              ? "✅ Active"
+                              : "❌ Inactive"
+                            : v.available.length > 0
+                              ? "✅ Active (Scheduled)"
+                              : "❌ Inactive"}
                       </p>
                       {isHighlighted && (
                         <div className="text-xs text-blue-600 mt-2 font-medium">
