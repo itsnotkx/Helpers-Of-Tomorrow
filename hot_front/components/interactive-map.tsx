@@ -691,7 +691,7 @@ export function InteractiveMap({
                   <span class="text-sm font-medium">
                     ${
                       item.value !== undefined
-                        ? wellbeingLabels[6 - item.value]
+                        ? wellbeingLabels[item.value]
                         : "Unknown"
                     }
                   </span>

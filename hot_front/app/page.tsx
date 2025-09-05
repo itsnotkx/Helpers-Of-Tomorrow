@@ -150,9 +150,9 @@ export default function VolunteerDashboard() {
   const { isLoaded, isSignedIn, user } = useUser();
   const [dlisLoading, setDLIsLoading] = useState(true);
   const [userSchedule, setUserSchedule] = useState<Volunteer>();
-  const [userCoordinates, setUserCoordinates] = useState<[number, number]>(
-    [103.8198, 1.3521]
-  );
+  const [userCoordinates, setUserCoordinates] = useState<[number, number]>([
+    103.8198, 1.3521,
+  ]);
   const [constituencyName, setConstituencyName] = useState<string>("Singapore");
 
   const wellbeingLabels: Record<number, string> = {
@@ -478,7 +478,7 @@ export default function VolunteerDashboard() {
                               </p>
                               <p className="text-sm text-muted-foreground">
                                 {senior.physical
-                                  ? `${wellbeingLabels[6 - senior.physical]}`
+                                  ? `${wellbeingLabels[senior.physical]}`
                                   : "Not assessed"}
                               </p>
                             </div>
@@ -488,7 +488,7 @@ export default function VolunteerDashboard() {
                               </p>
                               <p className="text-sm text-muted-foreground">
                                 {senior.mental
-                                  ? `${wellbeingLabels[6 - senior.mental]}`
+                                  ? `${wellbeingLabels[senior.mental]}`
                                   : "Not assessed"}
                               </p>
                             </div>
@@ -498,7 +498,7 @@ export default function VolunteerDashboard() {
                               </p>
                               <p className="text-sm text-muted-foreground">
                                 {senior.community
-                                  ? `${wellbeingLabels[6 - senior.community]}`
+                                  ? `${wellbeingLabels[senior.community]}`
                                   : "Not assessed"}
                               </p>
                             </div>
@@ -679,5 +679,3 @@ export default function VolunteerDashboard() {
     </div>
   );
 }
-
-
