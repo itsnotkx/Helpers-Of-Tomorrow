@@ -39,11 +39,12 @@ interface Schedule {
   cluster: number;
   datetime: string;
   duration: number;
+  seniors: string[];
 }
 
 interface Cluster {
   id: number;
-  centroid: { lat: number; lng: number };
+  center: { lat: number; lng: number };
   radius: number;
   seniors?: Senior[];
 }
@@ -136,13 +137,28 @@ export function InteractiveMap({
           );
 
           // Process assignments data
-          const schedulesFromAssignments = assignmentsData.map(
-            (assignment: any) => ({
-              volunteer: assignment.vid,
-              cluster: assignment.cluster_id,
-              datetime: `${assignment.date}T${assignment.start_time}`,
-              duration: 60, // Default duration
-            })
+          const schedulesFromAssignments: Schedule[] = Object.values(
+            assignmentsData.reduce((acc: any, assignment: any) => {
+              const start = new Date(`1970-01-01T${assignment.start_time}`);
+              const end = new Date(`1970-01-01T${assignment.end_time}`);
+              const duration = (end.getTime() - start.getTime()) / (1000 * 60); // minutes
+
+              const key = `${assignment.vid}-${assignment.cluster_id}-${assignment.date}T${assignment.start_time}`;
+
+              if (!acc[key]) {
+                acc[key] = {
+                  volunteer: assignment.vid,
+                  cluster: assignment.cluster_id,
+                  datetime: `${assignment.date}T${assignment.start_time}`,
+                  duration,
+                  seniors: [],
+                };
+              }
+
+              acc[key].seniors.push(assignment.sid);
+
+              return acc;
+            }, {})
           );
 
           const assignmentsFromData = assignmentsData.map(
@@ -164,18 +180,23 @@ export function InteractiveMap({
             // Approximate conversion: 1 degree ≈ 111 km at equator
             const radiusInKm = cluster.radius * 111;
 
-            // Group filtered seniors by cluster
-            const clusterSeniors = filteredSeniors.filter(
-              (senior) => senior.cluster === cluster.id
-            );
+            // Collect *full senior objects* from schedules belonging to this cluster
+            const clusterSeniors = schedulesFromAssignments
+              .filter((schedule) => schedule.cluster === cluster.id)
+              .flatMap((schedule) =>
+                schedule.seniors
+                  .map((sid) => filteredSeniors.find((s) => s.uid === sid))
+                  .filter((s): s is Senior => !!s) // keep only found seniors
+              );
 
             return {
               id: cluster.id,
               center: centroid,
               radius: radiusInKm,
-              seniors: clusterSeniors,
+              seniors: clusterSeniors, // Senior[]
             };
           });
+
 
           setSeniors(filteredSeniors);
           setVolunteers(volunteersWithAssignments);
@@ -270,7 +291,6 @@ export function InteractiveMap({
     markersRef.current = [];
 
     updateClusterCircles();
-
     // Cluster markers
     clusters.forEach((cluster, idx) => {
       const el = document.createElement("div");
@@ -313,6 +333,7 @@ export function InteractiveMap({
 
       el.addEventListener("click", () => {
         setHighlightedCluster(idx);
+        console.log(cluster)
 
         if (popupRef.current) {
           popupRef.current.remove();
@@ -327,7 +348,8 @@ export function InteractiveMap({
               bounds.extend([senior.coords.lng, senior.coords.lat]);
             }
           });
-          map.current?.fitBounds(bounds, { padding: 50 });
+
+          map.current?.fitBounds(bounds, { padding: 20 });
         }
       });
 
@@ -483,6 +505,7 @@ export function InteractiveMap({
       el.className =
         "w-10 h-10 bg-purple-500 rounded-full flex items-center justify-center text-white font-bold shadow-lg cursor-pointer relative z-10";
       el.innerText = cluster.id.toString(); // Show actual cluster ID instead of senior count
+      el.style.zIndex = "1000";
 
       // Add hover effect to highlight corresponding circle
       el.addEventListener("mouseenter", () => {
@@ -526,6 +549,7 @@ export function InteractiveMap({
         }
 
         // Fit map to cluster bounds if seniors exist
+        console.log(cluster)
         if (cluster.seniors && cluster.seniors.length > 0) {
           const bounds = new mapboxgl.LngLatBounds();
           cluster.seniors.forEach((senior) => {
@@ -661,11 +685,10 @@ export function InteractiveMap({
           </div>
           <div class="flex-1">
             <h3 class="font-semibold text-base text-gray-900">${escapeHtml(
-              senior.name || senior.uid
-            )}</h3>
-            <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
-              priorityStyles[priority]
-            }">
+      senior.name || senior.uid
+    )}</h3>
+            <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${priorityStyles[priority]
+      }">
               ${priority} Priority
             </span>
           </div>
@@ -682,29 +705,27 @@ export function InteractiveMap({
             <h4 class="text-sm font-medium text-gray-700 mb-2">Wellbeing Status</h4>
             <div class="space-y-2">
               ${wellbeingItems
-                .map(
-                  (item) => `
+        .map(
+          (item) => `
                 <div class="flex items-center justify-between">
                   <span class="text-sm text-gray-600 flex items-center gap-2">
                     ${item.icon} ${item.label}
                   </span>
                   <span class="text-sm font-medium">
-                    ${
-                      item.value !== undefined
-                        ? wellbeingLabels[item.value]
-                        : "Unknown"
-                    }
+                    ${item.value !== undefined
+              ? wellbeingLabels[item.value]
+              : "Unknown"
+            }
                   </span>
                 </div>
               `
-                )
-                .join("")}
+        )
+        .join("")}
             </div>
           </div>
           
-          ${
-            senior.cluster
-              ? `
+          ${senior.cluster
+        ? `
           <div class="pt-2 border-t border-gray-100">
             <div class="flex items-center justify-between">
               <span class="text-sm text-gray-600 flex items-center gap-2">
@@ -714,8 +735,8 @@ export function InteractiveMap({
             </div>
           </div>
           `
-              : ""
-          }
+        : ""
+      }
         </div>
       </div>
     </div>
@@ -757,8 +778,8 @@ export function InteractiveMap({
           </div>
           <div class="flex-1">
             <h3 class="font-semibold text-base text-gray-900">${escapeHtml(
-              volunteer.name || volunteer.vid
-            )}</h3>
+      volunteer.name || volunteer.vid
+    )}</h3>
             <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${availabilityStyle}">
               ${availabilityText}
             </span>
@@ -782,16 +803,14 @@ export function InteractiveMap({
                   📍 Assignment
                 </span>
                 <span class="text-sm font-medium">
-                  ${
-                    assignment
-                      ? `Cluster ${assignment.cluster}`
-                      : "Not Assigned"
-                  }
+                  ${assignment
+        ? `Cluster ${assignment.cluster}`
+        : "Not Assigned"
+      }
                 </span>
               </div>
-              ${
-                assignment && assignment.weighted_distance
-                  ? `
+              ${assignment && assignment.weighted_distance
+        ? `
               <div class="flex items-center justify-between">
                 <span class="text-sm text-gray-600 flex items-center gap-2">
                   📏 Distance
@@ -801,8 +820,8 @@ export function InteractiveMap({
                 </span>
               </div>
               `
-                  : ""
-              }
+        : ""
+      }
             </div>
           </div>
         </div>
