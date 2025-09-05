@@ -30,7 +30,7 @@ interface Volunteer {
   available: boolean | string[]
 }
 
-interface Assignment {
+export interface Assignment {
   volunteer: string
   cluster: number
   weighted_distance?: number
@@ -82,6 +82,8 @@ export function InteractiveMap({
   setVolunteerMarkerElements: (elements: Map<string, HTMLElement>) => void
   mapRef: React.MutableRefObject<mapboxgl.Map | null>
 }) {
+
+
   const mapContainer = useRef<HTMLDivElement>(null)
   const map = useRef<mapboxgl.Map | null>(null)
   const markersRef = useRef<mapboxgl.Marker[]>([])
@@ -136,6 +138,7 @@ export function InteractiveMap({
 
   // --- Initialize Mapbox ---
   useEffect(() => {
+
     if (!mapContainer.current) return
 
     const mapboxToken = process.env.NEXT_PUBLIC_MAPBOX_TOKEN
@@ -152,10 +155,8 @@ export function InteractiveMap({
     map.current = new mapboxgl.Map({
       container: mapContainer.current,
       style: "mapbox://styles/wzinl/cmf5f4has01rh01pj8ajb1993",
-      center: [103.8198, 1.3521],
-      zoom: 11,
-
-      bounds: singaporeBounds
+      center: centerCoordinates,
+      zoom: 13
     })
     
     // Set map reference for parent component
@@ -564,13 +565,103 @@ export function InteractiveMap({
           <div>${available ? "✅ Available" : "❌ Unavailable"}</div>
           ${assignment ? `<div>📍 Assigned: Cluster ${assignment.cluster}</div>` : ""}
         </div>
-      `)
-      .addTo(map.current)
+        
+        <div class="space-y-2">
+          <div>
+            <h4 class="text-sm font-medium text-gray-700 mb-2">Volunteer Details</h4>
+            <div class="space-y-2">
+              <div class="flex items-center justify-between">
+                <span class="text-sm text-gray-600 flex items-center gap-2">
+                  ${skillIcon(volunteer.skill)} Skill Level
+                </span>
+                <span class="text-sm font-medium">
+                  ${volunteer.skill}/3
+                </span>
+              </div>
+              ${assignment ? `
+                <div class="flex items-center justify-between">
+                  <span class="text-sm text-gray-600 flex items-center gap-2">
+                    📍 Assignment
+                  </span>
+                  <span class="text-sm font-medium">
+                    Cluster ${assignment.cluster}
+                  </span>
+                </div>
+              ` : `
+                <div class="flex items-center justify-between">
+                  <span class="text-sm text-gray-600 flex items-center gap-2">
+                    📍 Assignment
+                  </span>
+                  <span class="text-sm font-medium">
+                    Not Assigned
+                  </span>
+                </div>
+              `}
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  `
+}
 
-    popupRef.current.on("close", () => {
-      popupRef.current = null
-    })
+
+  // --- Popups ---
+const showSeniorPopup = (s: Senior, priority?: "HIGH" | "MEDIUM" | "LOW") => {
+  if (!map.current) return
+
+  if (popupRef.current) {
+    popupRef.current.remove()
+    popupRef.current = null
   }
+
+  const displayPriority = priority || "LOW"
+  const popupHTML = createSeniorPopupHTML(s, displayPriority, wellbeingLabels)
+
+  popupRef.current = new mapboxgl.Popup({
+    closeButton: false,
+    closeOnClick: true,
+    closeOnMove: true,
+    focusAfterOpen: true,
+    maxWidth: "500",
+    className: ""
+  })
+    .setLngLat([s.coords.lng, s.coords.lat])
+    .setHTML(popupHTML)
+    .addTo(map.current)
+
+  popupRef.current.on("close", () => {
+    popupRef.current = null
+  })
+}
+
+const showVolunteerPopup = (v: Volunteer) => {
+  if (!map.current) return
+
+  if (popupRef.current) {
+    popupRef.current.remove()
+    popupRef.current = null
+  }
+
+  const assignment = assignments.find((a) => a.volunteer === v.vid)
+  const popupHTML = createVolunteerPopupHTML(v, assignment)
+
+  popupRef.current = new mapboxgl.Popup({
+    closeButton: false,
+    closeOnClick: true,
+    closeOnMove: true,
+    focusAfterOpen: true,
+    maxWidth: "500",
+    className: ""
+  })
+    .setLngLat([v.coords.lng, v.coords.lat])
+    .setHTML(popupHTML)
+    .addTo(map.current)
+
+  popupRef.current.on("close", () => {
+    popupRef.current = null
+  })
+}
 
   return (
     <div className="w-full h-[400px] relative">
