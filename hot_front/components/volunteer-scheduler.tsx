@@ -128,7 +128,6 @@ export default function VolunteerSchedule() {
             };
           });
 
-        console.log("Fetched schedules:", userAssignments);
         setUserSchedule(userAssignments);
       }
     } catch (error) {
@@ -164,9 +163,6 @@ export default function VolunteerSchedule() {
         acknowledgedIds.map((id) => [id, id])
       );
 
-      console.log("Acknowledged IDs:", jsonFormat);
-
-      // Example: send to backend (Supabase, API, etc.)
       const response = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8000"}/acknowledgements`, {
         method: "PUT",
         headers: {

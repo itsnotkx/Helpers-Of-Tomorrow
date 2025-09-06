@@ -53,7 +53,6 @@ export function InteractiveMap({
   assignments?: Assignment[];
   clusters?: Cluster[];
 }) {
-  console.log(centerCoordinates);
   const mapContainer = useRef<HTMLDivElement>(null);
   const map = useRef<mapboxgl.Map | null>(null);
   const markersRef = useRef<mapboxgl.Marker[]>([]);
@@ -79,13 +78,6 @@ export function InteractiveMap({
   // --- Update internal state when props change ---
   useEffect(() => {
     if (seniorsProp && volunteersProp && assignmentsProp && clustersProp) {
-      console.log("Updating map data from props:", {
-        seniors: seniorsProp.length,
-        volunteers: volunteersProp.length,
-        assignments: assignmentsProp.length,
-        clusters: clustersProp.length,
-      });
-
       // Filter seniors: show those who haven't been visited this year, OR high risk seniors not visited in past 4 months
       const currentYear = new Date().getFullYear();
       const fourMonthsAgo = new Date();
@@ -341,13 +333,6 @@ export function InteractiveMap({
   // --- Re-render markers when data changes ---
   useEffect(() => {
     if (!map.current || !mapLoaded) return;
-
-    console.log("Re-rendering markers with data:", {
-      seniors: seniors.length,
-      volunteers: volunteers.length,
-      clusters: clusters.length,
-    });
-
     renderMarkers();
 
     // Clicking elsewhere on the map unfocuses
@@ -484,7 +469,7 @@ export function InteractiveMap({
         }
 
         // Fit map to cluster bounds if seniors exist
-        console.log(cluster);
+
         if (cluster.seniors && cluster.seniors.length > 0) {
           const bounds = new mapboxgl.LngLatBounds();
           cluster.seniors.forEach((senior) => {
@@ -503,7 +488,6 @@ export function InteractiveMap({
 
     // Senior markers
     seniors.forEach((s) => {
-      console.log(s.coords);
       if (!s.coords) return;
 
       const assessment = getPriorityLevel(s.overall_wellbeing);
@@ -851,7 +835,7 @@ export function InteractiveMap({
   };
 
   return (
-    <div className="w-full h-[400px] relative">
+    <div className="w-full h-[600px] relative">
       {mapError && (
         <div className="absolute inset-0 flex items-center justify-center bg-muted z-10">
           <div className="text-center p-4">

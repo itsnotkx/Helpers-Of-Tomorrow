@@ -144,12 +144,9 @@ const hasTimeClash = (daySlots: TimeSlot[], currentSlotId?: string) => {
 };
 
 // Convert frontend slot format to API format
-// Convert frontend slot format to API format
 const convertSlotToApiFormat = (slot: TimeSlot, date: Date) => {
-  console.log(slot);
   const startHour24 = convertTo24Hour(slot.startTime, slot.startPeriod);
   const endHour24 = convertTo24Hour(slot.endTime, slot.endPeriod);
-  console.log(startHour24, endHour24);
 
   // Create datetime objects in local timezone
   const startDateTime = new Date(date);
@@ -191,7 +188,6 @@ const convertBackendToFrontendFormat = (
   });
 
   backendSlots.forEach((slot) => {
-    // console.log(slot)
     // Parse the date from the slot
     const slotDate = new Date(slot.date);
 
@@ -457,7 +453,6 @@ export function WeeklyTimeSlotForm() {
 
         daySlots.forEach((slot) => {
           if (isSlotValid(slot)) {
-            // console.log(slot)
             const apiSlot = convertSlotToApiFormat(slot, dayDate);
             apiSlots.push(apiSlot);
           }

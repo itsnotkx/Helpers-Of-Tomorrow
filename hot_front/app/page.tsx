@@ -177,7 +177,6 @@ async function fetch_dl_details(email: string) {
         },
       }).then((res) => res.json());
 
-        console.log("Fetched user information:", res.dl_info[0]);
         if (res.dl_info[0] != null) {
           if (
             res.dl_info[0].constituency.centre_lat &&
@@ -188,7 +187,6 @@ async function fetch_dl_details(email: string) {
               res.dl_info[0].constituency.centre_lat,
             ];
             setUserCoordinates(coordinates);
-            console.log("Setting user coordinates to:", coordinates); // Log the actual values being set
           }
           if (res.dl_info[0].constituency_name) {
             setConstituencyName(res.dl_info[0].constituency_name);
