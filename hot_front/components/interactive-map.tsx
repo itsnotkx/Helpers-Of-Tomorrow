@@ -64,7 +64,7 @@ const priorityColors: Record<"HIGH" | "MEDIUM" | "LOW", string> = {
 export function InteractiveMap({
   highlightedSeniorId,
   onMapUnfocus,
-  onSeniorClick,
+  // onSeniorClick,
   centerCoordinates = [103.8198, 1.3521], // Default to Singapore center
   initialZoom = 11,
 }: {
@@ -479,7 +479,7 @@ export function InteractiveMap({
           essential: true,
         });
 
-        if (onSeniorClick) onSeniorClick(s.uid);
+        // if (onSeniorClick) onSeniorClick(s.uid);
       });
 
       const marker = new mapboxgl.Marker(el)
@@ -527,7 +527,7 @@ export function InteractiveMap({
     mapLoaded,
     highlightedCluster,
     onMapUnfocus,
-    onSeniorClick,
+    // onSeniorClick,
     locallyFocusedSeniorId, // NEW
   ]);
 
@@ -673,7 +673,7 @@ export function InteractiveMap({
 
     // Senior markers
     seniors.forEach((s) => {
-      // console.log(s.overall_wellbeing)
+      console.log(s.coords)
       if (!s.coords) return;
       const levels = {
         1: "HIGH",
@@ -712,7 +712,7 @@ export function InteractiveMap({
         e.stopPropagation();
         setHighlightedCluster(null);
         setLocallyFocusedSeniorId(s.uid); // NEW: border on this one
-        showSeniorPopup(s, assessment as "HIGH" | "MEDIUM" | "LOW");
+        
 
         // NEW: focus now
         map.current?.flyTo({
@@ -720,8 +720,10 @@ export function InteractiveMap({
           zoom: Math.max(map.current!.getZoom(), 15),
           essential: true,
         });
+          
+        showSeniorPopup(s, assessment as "HIGH" | "MEDIUM" | "LOW");
 
-        if (onSeniorClick) onSeniorClick(s.uid);
+        // if (onSeniorClick) onSeniorClick(s.uid);
       });
       markersRef.current.push(marker);
     });
@@ -833,6 +835,73 @@ export function InteractiveMap({
     const visitStatus = senior.last_visit
       ? `Last visited: ${lastVisit}`
       : "Never visited - needs attention";
+
+    console.log(`<div class="w-60 p-0 bg-white rounded-lg">
+      <div class="pb-1">
+        <div class="flex items-center gap-3">
+          <div class="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center text-lg">
+            👤
+          </div>
+          <div class="flex-1">
+            <h3 class="font-semibold text-base text-gray-900">${escapeHtml(
+              senior.name || senior.uid
+            )}</h3>
+            <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
+              priorityStyles[priority]
+            }">
+              ${priority} Priority
+            </span>
+          </div>
+        </div>
+        
+        <div class="space-y-2">
+          <div class="p-2 bg-orange-50 border border-orange-200 rounded">
+            <span class="text-xs text-orange-800 font-medium">
+              📅 ${visitStatus}
+            </span>
+          </div>
+          
+          <div>
+            <h4 class="text-sm font-medium text-gray-700 mb-2">Wellbeing Status</h4>
+            <div class="space-y-2">
+              ${wellbeingItems
+                .map(
+                  (item) => `
+                <div class="flex items-center justify-between">
+                  <span class="text-sm text-gray-600 flex items-center gap-2">
+                    ${item.icon} ${item.label}
+                  </span>
+                  <span class="text-sm font-medium">
+                    ${
+                      item.value !== undefined
+                        ? wellbeingLabels[item.value]
+                        : "Unknown"
+                    }
+                  </span>
+                </div>
+              `
+                )
+                .join("")}
+            </div>
+          </div>
+          
+          ${
+            senior.cluster
+              ? `
+          <div class="pt-2 border-t border-gray-100">
+            <div class="flex items-center justify-between">
+              <span class="text-sm text-gray-600 flex items-center gap-2">
+                📍 Cluster
+              </span>
+              <span class="text-sm font-medium">${senior.cluster}</span>
+            </div>
+          </div>
+          `
+              : ""
+          }
+        </div>
+      </div>
+    </div>`)
 
     return `
     <div class="w-60 p-0 bg-white rounded-lg">
@@ -992,6 +1061,7 @@ export function InteractiveMap({
 
   // --- Popups ---
   const showSeniorPopup = (s: Senior, priority?: "HIGH" | "MEDIUM" | "LOW") => {
+    console.log("hello world!")
     if (!map.current) return;
 
     if (popupRef.current) {
@@ -1009,7 +1079,7 @@ export function InteractiveMap({
     popupRef.current = new mapboxgl.Popup({
       closeButton: false,
       closeOnClick: true,
-      closeOnMove: true,
+      closeOnMove: false,
       focusAfterOpen: true,
       maxWidth: "500",
       className: "",
