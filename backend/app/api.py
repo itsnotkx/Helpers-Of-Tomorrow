@@ -10,8 +10,6 @@ from config.settings import CORS_ORIGINS
 from utils.helpers import get_iso_time
 from services.assessments import classify_seniors
 from config.settings import supabase, logger
-from utils.geocoding import geocoder
-from utils.static_addresses import get_nearest_area
 
 app = FastAPI(title="AIC Senior Care MVP")
 
