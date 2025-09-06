@@ -34,8 +34,10 @@ const wellbeingLabels: Record<number, string> = {
 
 export function InteractiveMap({
   highlightedSeniorId,
+  highlightedVolunteerId,
   onMapUnfocus,
   // onSeniorClick,
+  // onVolunteerClick,
   centerCoordinates = [103.8198, 1.3521], // Default to Singapore center
   initialZoom = 11,
   seniors: seniorsProp,
@@ -44,8 +46,10 @@ export function InteractiveMap({
   clusters: clustersProp,
 }: {
   highlightedSeniorId?: string | null;
+  highlightedVolunteerId?: string | null;
   onMapUnfocus?: () => void;
   onSeniorClick?: (seniorId: string) => void;
+  onVolunteerClick?: (volunteerId: string) => void;
   centerCoordinates?: [number, number];
   initialZoom?: number;
   seniors?: Senior[];
@@ -72,6 +76,11 @@ export function InteractiveMap({
 
   // NEW: local focused senior id (for clicks from map or external events)
   const [locallyFocusedSeniorId, setLocallyFocusedSeniorId] = useState<
+    string | null
+  >(null);
+
+  // NEW: local focused volunteer id (for clicks from map or external events)
+  const [locallyFocusedVolunteerId, setLocallyFocusedVolunteerId] = useState<
     string | null
   >(null);
 
@@ -317,6 +326,7 @@ export function InteractiveMap({
     };
 
     const onFocusVolunteer = (e: any) => {
+      console.log("Received focus-volunteer event:", e);
       const vid = e?.detail?.vid as string | undefined;
       if (!vid) return;
       const v = volunteers.find((x) => x.vid === vid);
@@ -324,6 +334,7 @@ export function InteractiveMap({
 
       setHighlightedCluster(null);
       setLocallyFocusedSeniorId(null);
+      setLocallyFocusedVolunteerId(null);
 
       map.current?.flyTo({
         center: [v.coords.lng, v.coords.lat],
@@ -333,10 +344,7 @@ export function InteractiveMap({
     };
 
     window.addEventListener("focus-senior", onFocusSenior as EventListener);
-    window.addEventListener(
-      "focus-volunteer",
-      onFocusVolunteer as EventListener
-    );
+    window.addEventListener("focus-volunteer", onFocusVolunteer as EventListener);
     return () => {
       window.removeEventListener(
         "focus-senior",
@@ -358,6 +366,7 @@ export function InteractiveMap({
     if (map.current && onMapUnfocus) {
       map.current.on("click", () => {
         setLocallyFocusedSeniorId(null);
+        setLocallyFocusedVolunteerId(null);
         onMapUnfocus();
       });
     }
@@ -371,10 +380,12 @@ export function InteractiveMap({
     volunteers,
     clusters,
     highlightedSeniorId,
+    highlightedVolunteerId,
     mapLoaded,
     highlightedCluster,
     onMapUnfocus,
     locallyFocusedSeniorId,
+    locallyFocusedVolunteerId,
   ]);
 
   // Helper function to create circle polygon
@@ -541,6 +552,7 @@ export function InteractiveMap({
         e.stopPropagation();
         setHighlightedCluster(null);
         setLocallyFocusedSeniorId(s.uid);
+        setLocallyFocusedVolunteerId(null);
 
         map.current?.flyTo({
           center: [s.coords.lng, s.coords.lat],
@@ -556,9 +568,18 @@ export function InteractiveMap({
     // Volunteer markers
     volunteers.forEach((v) => {
       if (!v.coords) return;
+      
+      const isIndividuallyHighlighted = v.vid === highlightedVolunteerId;
+      const isLocallyFocused = v.vid === locallyFocusedVolunteerId;
+      const focused = isIndividuallyHighlighted || isLocallyFocused;
+      
+      const sizeClass = focused ? "w-8 h-8" : "w-6 h-6";
+      const borderClass = focused
+        ? "border-4 border-purple-500"
+        : "border-2 border-white";
+      
       const el = document.createElement("div");
-      el.className =
-        "w-6 h-6 bg-blue-500 rounded-full border-2 border-white shadow-md flex items-center justify-center text-xs relative z-20";
+      el.className = `${sizeClass} bg-blue-500 rounded-full ${borderClass} shadow-md cursor-pointer flex items-center justify-center text-xs relative z-20`;
       el.style.zIndex = "1001"; // Ensure it's above cluster circles and layers
       el.innerText = "🙋";
 
@@ -570,6 +591,14 @@ export function InteractiveMap({
         e.stopPropagation();
         setHighlightedCluster(null);
         setLocallyFocusedSeniorId(null);
+        setLocallyFocusedVolunteerId(v.vid);
+
+        map.current?.flyTo({
+          center: [v.coords.lng, v.coords.lat],
+          zoom: Math.max(map.current!.getZoom(), 15),
+          essential: true,
+        });
+
         showVolunteerPopup(v);
       });
       markersRef.current.push(marker);
@@ -801,7 +830,6 @@ export function InteractiveMap({
   // --- Popups ---
   const showSeniorPopup = (s: Senior, priority?: "HIGH" | "MEDIUM" | "LOW") => {
     if (!map.current) return;
-
     if (popupRef.current) {
       popupRef.current.remove();
       popupRef.current = null;
@@ -847,7 +875,7 @@ export function InteractiveMap({
     popupRef.current = new mapboxgl.Popup({
       closeButton: false,
       closeOnClick: true,
-      closeOnMove: true,
+      closeOnMove: false,
       focusAfterOpen: true,
       maxWidth: "500",
       className: "popup-above-circles",

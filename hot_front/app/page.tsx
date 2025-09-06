@@ -277,6 +277,7 @@ async function fetch_dl_details(email: string) {
           new CustomEvent("focus-senior", { detail: { uid: id } })
         );
       } else {
+        console.log("Dispatching focus-volunteer event for", id);
         window.dispatchEvent(
           new CustomEvent("focus-volunteer", { detail: { vid: id } })
         );
@@ -572,6 +573,7 @@ async function fetch_dl_details(email: string) {
             <CardContent>
               <InteractiveMap
                 highlightedSeniorId={highlightedSeniorId}
+                highlightedVolunteerId={highlightedVolunteerId}
                 onMapUnfocus={() => {
                   setHighlightedSeniorId(null);
                   setHighlightedVolunteerId(null);
