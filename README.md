@@ -107,29 +107,31 @@ Prerequisites:
 - Mapbox token
 
 1) Fork the repo
-2) Create a virtual environment
+2) Create(and activate) a virtual environment
 ```
 py -m venv .venv
+.venv\scripts\activate
 ```
 3) Install backend requirements
 ```
 cd backend
 pip install -r requirements.txt
 ```
-4) Launch backend
+4) Move .env.local file into backend/app
+5) Launch backend
 ```
 cd app
 fastapi run
 ```
-4) Install frontend requirements
+6) Install frontend requirements
 ```
 cd ..
-cd .. //should be in root directory
+cd .. # should be in /Helpers-Of-Tomorrow directory
 cd hot_front
 npm install
 ```
-
-5) Launch frontend
+7) Move frontend's .venv file to /hot_front
+7) Launch frontend
 ```
 npm run dev
 ```
