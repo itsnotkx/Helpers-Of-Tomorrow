@@ -70,7 +70,8 @@ export default function VolunteerSchedule() {
 
   // Reusable function to fetch data from API
   const fetchFromAPI = async (endpoint: string) => {
-    const BASE_URL = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8000";
+    const BASE_URL =
+      process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8000";
     const response = await fetch(`${BASE_URL}${endpoint}`, {
       method: "GET",
       headers: { "Content-Type": "application/json" },
@@ -107,12 +108,39 @@ export default function VolunteerSchedule() {
         // Fetch all assignments and seniors data
         const [assignmentsData, seniorsData] = await Promise.all([
           fetchFromAPI("/assignments"),
-          fetchFromAPI("/seniors")
+          fetchFromAPI("/seniors"),
         ]);
 
-        // Filter assignments by user email and map to userSchedule format
+        // Calculate week boundaries for filtering
+        const today = new Date();
+        const dayOfWeek = today.getDay(); // 0 = Sunday, 1 = Monday, etc.
+        let startOfWeek: Date;
+
+        if (dayOfWeek === 0) {
+          // If today is Sunday, start from today (Sunday) and go to next Sunday
+          startOfWeek = new Date(today);
+        } else {
+          // For any other day, get Monday of current week
+          startOfWeek = new Date(today);
+          const daysToMonday = 1 - dayOfWeek; // Days to get back to Monday
+          startOfWeek.setDate(today.getDate() + daysToMonday);
+        }
+
+        // Generate 7 days from the start date
+        const weekDays = [];
+        for (let i = 0; i < 7; i++) {
+          const date = new Date(startOfWeek);
+          date.setDate(startOfWeek.getDate() + i);
+          weekDays.push(date.toISOString().split("T")[0]);
+        }
+
+        // Filter assignments by user email and current week, then map to userSchedule format
         const userAssignments = assignmentsData.assignments
-          .filter((assignment: any) => assignment.volunteer_email === email)
+          .filter(
+            (assignment: any) =>
+              assignment.volunteer_email === email &&
+              weekDays.includes(assignment.date)
+          )
           .map((assignment: any) => {
             const senior = seniorsData.seniors.find(
               (s: any) => s.uid === assignment.sid
@@ -163,13 +191,18 @@ export default function VolunteerSchedule() {
         acknowledgedIds.map((id) => [id, id])
       );
 
-      const response = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8000"}/acknowledgements`, {
-        method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(jsonFormat),
-      });
+      const response = await fetch(
+        `${
+          process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8000"
+        }/acknowledgements`,
+        {
+          method: "PUT",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(jsonFormat),
+        }
+      );
 
       const result = await response.json();
       if (result.success) {
@@ -195,17 +228,17 @@ export default function VolunteerSchedule() {
   };
 
   // Reusable Assignment Card Component
-  const AssignmentCard = ({ 
-    assignment, 
-    isNew = false 
-  }: { 
-    assignment: userSchedule; 
-    isNew?: boolean; 
+  const AssignmentCard = ({
+    assignment,
+    isNew = false,
+  }: {
+    assignment: userSchedule;
+    isNew?: boolean;
   }) => (
     <Card
       key={assignment.aid}
       className={`shadow-lg border-l-4 ${
-        isNew ? 'border-l-red-500' : 'border-l-green-500'
+        isNew ? "border-l-red-500" : "border-l-green-500"
       } hover:shadow-xl transition-shadow duration-200`}
     >
       <CardHeader className="pb-0">
@@ -239,11 +272,15 @@ export default function VolunteerSchedule() {
         <div className="space-y-3">
           <div className="flex items-center gap-2">
             <Calendar className="h-4 w-4 text-gray-500" />
-            <span className="text-sm text-gray-700">{formatDate(assignment.date)}</span>
+            <span className="text-sm text-gray-700">
+              {formatDate(assignment.date)}
+            </span>
           </div>
           <div className="flex items-center gap-2">
             <Clock className="h-4 w-4 text-gray-500" />
-            <span className="text-sm text-gray-700">{assignment.start_time} - {assignment.end_time}</span>
+            <span className="text-sm text-gray-700">
+              {assignment.start_time} - {assignment.end_time}
+            </span>
           </div>
           <div className="flex items-start gap-2">
             <MapPin className="h-4 w-4 text-green-600 mt-0.5 flex-shrink-0" />
@@ -290,8 +327,8 @@ export default function VolunteerSchedule() {
   ) => (
     <div className="w-full mx-auto space-y-4">
       <div className="flex items-center justify-center gap-2 mb-6">
-        <Badge 
-          variant={isNew ? "destructive" : "secondary"} 
+        <Badge
+          variant={isNew ? "destructive" : "secondary"}
           className="text-base px-4 py-2"
         >
           {badgeText}
