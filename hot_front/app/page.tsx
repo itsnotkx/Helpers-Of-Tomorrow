@@ -93,6 +93,7 @@ export default function VolunteerDashboard() {
   const [userCoordinates, setUserCoordinates] = useState<[number, number]>();
   const [constituencyName, setConstituencyName] = useState<string>("Singapore");
   const [hasLoadedUserDetails, setHasLoadedUserDetails] = useState(false);
+  const mapSectionRef = useRef<HTMLDivElement>(null);
 
   const wellbeingLabels: Record<number, string> = {
     1: "Very Poor",
@@ -259,6 +260,16 @@ async function fetch_dl_details(email: string) {
       setIsMapCollapsed(false);
     }
 
+    // Scroll to map section
+    setTimeout(() => {
+      if (mapSectionRef.current) {
+        mapSectionRef.current.scrollIntoView({
+          behavior: 'smooth',
+          block: 'start'
+        });
+      }
+    }, 100);
+
     // Dispatch custom event for map to handle
     setTimeout(() => {
       if (type === "senior") {
@@ -270,7 +281,7 @@ async function fetch_dl_details(email: string) {
           new CustomEvent("focus-volunteer", { detail: { vid: id } })
         );
       }
-    }, 100);
+    }, 200);
   };
 
   const highPrioritySeniors = seniors.filter(
@@ -540,7 +551,7 @@ async function fetch_dl_details(email: string) {
           </Card>
         </div>
 
-        <div className="lg:col-span-2 mb-8">
+        <div className="lg:col-span-2 mb-8" ref={mapSectionRef}>
           <CardHeader className="flex justify-between">
             <CardTitle className="flex items-center gap-2">
               <MapPin className="h-5 w-5" /> District Map & Clusters
