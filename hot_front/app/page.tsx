@@ -132,7 +132,7 @@ export default function VolunteerDashboard() {
         });
         
         if (!response.ok) {
-          throw new Error(`Failed to fetch ${name}: ${response.status} ${response.statusText}`);
+          console.error(`Failed to fetch ${name}: ${response.status} ${response.statusText}`);
         }
         
         return response.json();
