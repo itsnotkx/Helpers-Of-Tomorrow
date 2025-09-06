@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -107,6 +107,7 @@ export default function VolunteerDashboard() {
   const [userSchedule, setUserSchedule] = useState<Volunteer>();
   const [userCoordinates, setUserCoordinates] = useState<[number, number]>();
   const [constituencyName, setConstituencyName] = useState<string>("Singapore");
+  const [hasLoadedUserDetails, setHasLoadedUserDetails] = useState(false);
 
   const wellbeingLabels: Record<number, string> = {
     1: "Very Poor",
@@ -176,10 +177,15 @@ export default function VolunteerDashboard() {
   }, []);
 
   useEffect(() => {
-    if (user?.primaryEmailAddress?.emailAddress) {
+    if (user?.primaryEmailAddress?.emailAddress && !hasLoadedUserDetails) {
       fetch_dl_details(user.primaryEmailAddress.emailAddress);
     }
-  }, [isLoaded, isSignedIn, user]);
+  }, [isLoaded, isSignedIn, user, hasLoadedUserDetails]);
+
+  // Memoize centerCoordinates to prevent unnecessary re-renders
+  const memoizedCenterCoordinates = useMemo(() => {
+    return userCoordinates ? (userCoordinates as [number, number]) : undefined;
+  }, [userCoordinates]);
 
 async function fetch_dl_details(email: string) {
   try {
@@ -215,10 +221,11 @@ async function fetch_dl_details(email: string) {
     console.error("Error fetching schedules:", error);
   } finally {
     setDLIsLoading(false);
+    setHasLoadedUserDetails(true); // Mark as loaded to prevent re-fetching
   }
 }
 
-  if (!isLoaded || dlisLoading || loading) {
+  if (dlisLoading && !hasLoadedUserDetails) {
     return (
       <div className="flex justify-center items-center min-h-screen">
         <div className="text-center">
@@ -594,11 +601,7 @@ async function fetch_dl_details(email: string) {
                   setHighlightedSeniorId(null);
                   setHighlightedVolunteerId(null);
                 }}
-                centerCoordinates={
-                  userCoordinates
-                    ? (userCoordinates as [number, number])
-                    : undefined
-                }
+                centerCoordinates={memoizedCenterCoordinates}
                 seniors={seniors}
                 volunteers={volunteers}
                 assignments={assignments}
