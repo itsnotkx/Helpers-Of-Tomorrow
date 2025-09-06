@@ -26,7 +26,7 @@ import { DashboardHeader } from "@/components/dashboard-header";
 import { useRef } from "react";
 import { useUser } from "@clerk/nextjs";
 
-interface Senior {
+export interface Senior {
   uid: string;
   name: string;
   coords: { lat: number; lng: number };
@@ -46,13 +46,13 @@ interface Assessment {
   needscare: boolean;
 }
 
-interface Assignment {
+export interface Assignment {
   volunteer: string;
   cluster: string;
   distance: number;
 }
 
-interface Volunteer {
+export interface Volunteer {
   vid: string;
   name: string;
   coords: { lat: number; lng: number };
@@ -70,10 +70,18 @@ interface Schedule {
   priority_score: number;
 }
 
+export interface Cluster {
+  id: number;
+  center: { lat: number; lng: number };
+  radius: number;
+  seniors?: Senior[];
+}
+
 export default function VolunteerDashboard() {
   const [seniors, setSeniors] = useState<Senior[]>([]);
   const [volunteers, setVolunteers] = useState<Volunteer[]>([]);
   const [assignments, setAssignments] = useState<Assignment[]>([]);
+  const [clusters, setClusters] = useState<Cluster[]>([]);
   const [schedules, setSchedules] = useState<Schedule[]>([]);
   const [assessments, setAssessments] = useState<Assessment[]>([]);
   const [loading, setLoading] = useState(true);
@@ -113,15 +121,17 @@ export default function VolunteerDashboard() {
       setLoading(true);
       const BASE_URL = "http://localhost:8000";
 
-      const [seniorsRes, volunteersRes, assignmentsRes] = await Promise.all([
+      const [seniorsRes, volunteersRes, assignmentsRes, clusterRes] = await Promise.all([
         fetch(`${BASE_URL}/seniors`).then((r) => r.json()),
         fetch(`${BASE_URL}/volunteers`).then((r) => r.json()),
         fetch(`${BASE_URL}/assignments`).then((r) => r.json()),
+        fetch(`${BASE_URL}/clusters`).then((r) => r.json()),
       ]);
 
       setSeniors(seniorsRes.seniors);
       setVolunteers(volunteersRes.volunteers);
       setAssignments(assignmentsRes.assignments);
+      setClusters(clusterRes.clusters);
 
       // Derive assessments from seniors data
       const derivedAssessments = seniorsRes.seniors.map((senior: Senior) => ({
@@ -171,41 +181,42 @@ export default function VolunteerDashboard() {
     }
   }, [isLoaded, isSignedIn, user]);
 
-  async function fetch_dl_details(email: string) {
-    try {
-      setDLIsLoading(true);
-      const BASE_URL = "http://localhost:8000";
-      if (email != "") {
-        const res = await fetch(`${BASE_URL}/dl/${email}`, {
-          method: "GET",
-          headers: {
-            "Content-Type": "application/json",
-          },
-        }).then((res) => res.json());
+async function fetch_dl_details(email: string) {
+  try {
+    setDLIsLoading(true);
+    const BASE_URL = "http://localhost:8000";
+    if (email != "") {
+      const res = await fetch(`${BASE_URL}/dl/${email}`, {
+        method: "GET",
+        headers: {
+          "Content-Type": "application/json",
+        },
+      }).then((res) => res.json());
 
-        console.log("Fetched user information:", res.dl_info[0]);
-        if (res.dl_info[0] != null) {
-          if (
-            res.dl_info[0].constituency.centre_lat &&
-            res.dl_info[0].constituency.centre_long
-          ) {
-            setUserCoordinates([
-              res.dl_info[0].constituency.centre_long,
-              res.dl_info[0].constituency.centre_lat,
-            ]);
-            console.log("Set user coordinates to:", userCoordinates);
-          }
-          if (res.dl_info[0].constituency_name) {
-            setConstituencyName(res.dl_info[0].constituency_name);
-          }
+      console.log("Fetched user information:", res.dl_info[0]);
+      if (res.dl_info[0] != null) {
+        if (
+          res.dl_info[0].constituency.centre_lat &&
+          res.dl_info[0].constituency.centre_long
+        ) {
+          const coordinates: [number, number] = [
+            res.dl_info[0].constituency.centre_long,
+            res.dl_info[0].constituency.centre_lat,
+          ];
+          setUserCoordinates(coordinates);
+          console.log("Setting user coordinates to:", coordinates); // Log the actual values being set
+        }
+        if (res.dl_info[0].constituency_name) {
+          setConstituencyName(res.dl_info[0].constituency_name);
         }
       }
-    } catch (error) {
-      console.error("Error fetching schedules:", error);
-    } finally {
-      setDLIsLoading(false);
     }
+  } catch (error) {
+    console.error("Error fetching schedules:", error);
+  } finally {
+    setDLIsLoading(false);
   }
+}
 
   if (!isLoaded || dlisLoading || loading) {
     return (
@@ -360,7 +371,7 @@ export default function VolunteerDashboard() {
     const bNeedsCare = seniorsNeedingImmediateCare.includes(b);
     return aNeedsCare === bNeedsCare ? 0 : aNeedsCare ? -1 : 1;
   });
-  console.log("User coordinates:", userCoordinates);
+ 
   return (
     <div className="min-h-screen bg-background">
       <DashboardHeader
@@ -588,6 +599,10 @@ export default function VolunteerDashboard() {
                     ? (userCoordinates as [number, number])
                     : undefined
                 }
+                seniors={seniors}
+                volunteers={volunteers}
+                assignments={assignments}
+                clusters={clusters}
               />
             </CardContent>
           )}

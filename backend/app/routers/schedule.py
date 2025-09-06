@@ -3,7 +3,7 @@ from fastapi import APIRouter # type: ignore
 from datetime import datetime, timedelta
 
 from config.settings import logger, supabase
-from geopy.geocoders import Nominatim
+# from geopy.geocoders import Nominatim
 from utils.helpers import get_senior_name, get_volunteer_name
 import smtplib
 from email.mime.text import MIMEText

@@ -3,36 +3,7 @@
 import { useState, useEffect, useRef } from "react";
 import mapboxgl from "mapbox-gl";
 import "mapbox-gl/dist/mapbox-gl.css";
-
-// --- TypeScript interfaces ---
-interface Coord {
-  lat: number;
-  lng: number;
-}
-export interface Senior {
-  uid: string;
-  name: string;
-  coords: { lat: number; lng: number };
-  physical?: number;
-  mental?: number;
-  community?: number;
-  last_visit?: string;
-  cluster?: number;
-  overall_wellbeing: 1 | 2 | 3;
-}
-export interface Volunteer {
-  vid: string;
-  name: string;
-  coords: { lat: number; lng: number };
-  skill: number;
-  available: boolean | string[];
-}
-
-export interface Assignment {
-  volunteer: string;
-  cluster: number;
-  weighted_distance?: number;
-}
+import { Assignment, Cluster , Senior, Volunteer} from "@/app/page";
 
 interface Schedule {
   volunteer: string;
@@ -40,13 +11,6 @@ interface Schedule {
   datetime: string;
   duration: number;
   seniors: string[];
-}
-
-interface Cluster {
-  id: number;
-  center: { lat: number; lng: number };
-  radius: number;
-  seniors?: Senior[];
 }
 
 interface ScheduleResponse {
@@ -67,12 +31,20 @@ export function InteractiveMap({
   // onSeniorClick,
   centerCoordinates = [103.8198, 1.3521], // Default to Singapore center
   initialZoom = 11,
+  seniors: seniorsProp,
+  volunteers: volunteersProp,
+  assignments: assignmentsProp,
+  clusters: clustersProp
 }: {
   highlightedSeniorId?: string | null;
   onMapUnfocus?: () => void;
   onSeniorClick?: (seniorId: string) => void;
   centerCoordinates?: [number, number];
   initialZoom?: number;
+  seniors?: Senior[];
+  volunteers?: Volunteer[];
+  assignments?: Assignment[];
+  clusters?: Cluster[];
 }) {
   console.log(centerCoordinates)
   const mapContainer = useRef<HTMLDivElement>(null);
@@ -103,118 +75,104 @@ export function InteractiveMap({
     5: "Very Good",
   };
 
-  // --- Fetch all data from backend ---
+  // --- Update internal state when props change ---
   useEffect(() => {
-    async function loadData() {
-      try {
-        const [sRes, vRes, aRes, cRes] = await Promise.all([
-          fetch("http://localhost:8000/seniors").catch(() => null),
-          fetch("http://localhost:8000/volunteers").catch(() => null),
-          fetch("http://localhost:8000/assignments").catch(() => null),
-          fetch("http://localhost:8000/clusters").catch(() => null),
-        ]);
+    if (seniorsProp && volunteersProp && assignmentsProp && clustersProp) {
+      console.log("Updating map data from props:", {
+        seniors: seniorsProp.length,
+        volunteers: volunteersProp.length,
+        assignments: assignmentsProp.length,
+        clusters: clustersProp.length
+      });
 
-        if (sRes && vRes && aRes && cRes) {
-          console.log("All data fetched successfully");
-          const seniorsData: Senior[] = (await sRes.json()).seniors || [];
-          const volunteersData: Volunteer[] =
-            (await vRes.json()).volunteers || [];
-          const assignmentsData = (await aRes.json()).assignments || [];
-          const clustersData = (await cRes.json()).clusters || [];
+      // Filter seniors: only show those who haven't been visited this year
+      const currentYear = new Date().getFullYear();
+      const filteredSeniors = seniorsProp.filter((senior) => {
+        if (!senior.last_visit) return true; // Never visited
+        const lastVisitDate = new Date(senior.last_visit);
+        const lastVisitYear = lastVisitDate.getFullYear();
+        return lastVisitYear < currentYear; // Not visited this year
+      });
 
-          // Filter seniors: only show those who haven't been visited this year
-          const currentYear = new Date().getFullYear();
-          const filteredSeniors = seniorsData.filter((senior) => {
-            if (!senior.last_visit) return true; // Never visited
-            const lastVisitDate = new Date(senior.last_visit);
-            const lastVisitYear = lastVisitDate.getFullYear();
-            return lastVisitYear < currentYear; // Not visited this year
-          });
+      // Filter volunteers: only show those with assignments
+      const volunteersWithAssignments = volunteersProp.filter((volunteer) =>
+        assignmentsProp.some(
+          (assignment: any) =>
+            assignment.vid === volunteer.vid ||
+            assignment.volunteer_id === volunteer.vid ||
+            assignment.volunteer === volunteer.vid
+        )
+      );
 
-          // Filter volunteers: only show those with assignments
-          const volunteersWithAssignments = volunteersData.filter((volunteer) =>
-            assignmentsData.some(
-              (assignment: any) =>
-                assignment.vid === volunteer.vid ||
-                assignment.volunteer_id === volunteer.vid ||
-                assignment.volunteer === volunteer.vid
-            )
-          );
+      // Process assignments data
+      const schedulesFromAssignments: Schedule[] = Object.values(
+        assignmentsProp.reduce((acc: any, assignment: any) => {
+          const start = new Date(`1970-01-01T${assignment.start_time || '09:00'}`);
+          const end = new Date(`1970-01-01T${assignment.end_time || '10:00'}`);
+          const duration = (end.getTime() - start.getTime()) / (1000 * 60); // minutes
 
-          // Process assignments data
-          const schedulesFromAssignments: Schedule[] = Object.values(
-            assignmentsData.reduce((acc: any, assignment: any) => {
-              const start = new Date(`1970-01-01T${assignment.start_time}`);
-              const end = new Date(`1970-01-01T${assignment.end_time}`);
-              const duration = (end.getTime() - start.getTime()) / (1000 * 60); // minutes
+          const key = `${assignment.vid || assignment.volunteer}-${assignment.cluster_id || assignment.cluster}-${assignment.date || new Date().toISOString().split('T')[0]}T${assignment.start_time || '09:00'}`;
 
-              const key = `${assignment.vid}-${assignment.cluster_id}-${assignment.date}T${assignment.start_time}`;
-
-              if (!acc[key]) {
-                acc[key] = {
-                  volunteer: assignment.vid,
-                  cluster: assignment.cluster_id,
-                  datetime: `${assignment.date}T${assignment.start_time}`,
-                  duration,
-                  seniors: [],
-                };
-              }
-
-              acc[key].seniors.push(assignment.sid);
-
-              return acc;
-            }, {})
-          );
-
-          const assignmentsFromData = assignmentsData.map(
-            (assignment: any) => ({
-              volunteer: assignment.vid,
-              cluster: assignment.cluster_id,
-              weighted_distance: assignment.distance || 0,
-            })
-          );
-
-          // Process clusters data and convert radius to km
-          const processedClusters = clustersData.map((cluster: any) => {
-            const centroid =
-              typeof cluster.centroid === "string"
-                ? JSON.parse(cluster.centroid)
-                : cluster.centroid;
-
-            // Convert coordinate-based radius to kilometers
-            // Approximate conversion: 1 degree ≈ 111 km at equator
-            const radiusInKm = cluster.radius * 111;
-
-            // Collect *full senior objects* from schedules belonging to this cluster
-            const clusterSeniors = schedulesFromAssignments
-              .filter((schedule) => schedule.cluster === cluster.id)
-              .flatMap(
-                (schedule) =>
-                  schedule.seniors
-                    .map((sid) => filteredSeniors.find((s) => s.uid === sid))
-                    .filter((s): s is Senior => !!s) // keep only found seniors
-              );
-
-            return {
-              id: cluster.id,
-              center: centroid,
-              radius: radiusInKm,
-              seniors: clusterSeniors, // Senior[]
+          if (!acc[key]) {
+            acc[key] = {
+              volunteer: assignment.vid || assignment.volunteer_id || assignment.volunteer,
+              cluster: assignment.cluster_id || assignment.cluster,
+              datetime: `${assignment.date || new Date().toISOString().split('T')[0]}T${assignment.start_time || '09:00'}`,
+              duration,
+              seniors: [],
             };
-          });
+          }
 
-          setSeniors(filteredSeniors);
-          setVolunteers(volunteersWithAssignments);
-          setAssignments(assignmentsFromData);
-          setSchedules(schedulesFromAssignments);
-          setClusters(processedClusters);
-        }
-      } catch (err) {
-        console.error("Failed to fetch data", err);
-      }
+          acc[key].seniors.push(assignment.sid || assignment.senior_id || assignment.senior);
+
+          return acc;
+        }, {})
+      );
+
+      const assignmentsFromData = assignmentsProp.map(
+        (assignment: any) => ({
+          volunteer: assignment.vid || assignment.volunteer_id || assignment.volunteer,
+          cluster: assignment.cluster_id || assignment.cluster,
+          distance: assignment.distance || 0,
+        })
+      );
+
+      // Process clusters data and convert radius to km
+      const processedClusters = clustersProp.map((cluster: any) => {
+        const centroid =
+          typeof cluster.centroid === "string"
+            ? JSON.parse(cluster.centroid)
+            : cluster.centroid || cluster.center;
+
+        // Convert coordinate-based radius to kilometers
+        // Approximate conversion: 1 degree ≈ 111 km at equator
+        const radiusInKm = (cluster.radius || 0.01) * 111;
+
+        // Collect *full senior objects* from schedules belonging to this cluster
+        const clusterSeniors = schedulesFromAssignments
+          .filter((schedule) => schedule.cluster === cluster.id)
+          .flatMap(
+            (schedule) =>
+              schedule.seniors
+                .map((sid) => filteredSeniors.find((s) => s.uid === sid))
+                .filter((s): s is Senior => !!s) // keep only found seniors
+          );
+
+        return {
+          id: cluster.id,
+          center: centroid,
+          radius: radiusInKm,
+          seniors: clusterSeniors, // Senior[]
+        };
+      });
+
+      setSeniors(filteredSeniors);
+      setVolunteers(volunteersWithAssignments);
+      setAssignments(assignmentsFromData);
+      setSchedules(schedulesFromAssignments);
+      setClusters(processedClusters);
     }
-    loadData();
-  }, []);
+  }, [seniorsProp, volunteersProp, assignmentsProp, clustersProp]);
 
   // --- Initialize Mapbox ---
   useEffect(() => {
@@ -360,157 +318,20 @@ export function InteractiveMap({
 
   // --- Re-render markers when data changes ---
   useEffect(() => {
-  if (!map.current || !mapLoaded) return;
-    markersRef.current.forEach((m) => m.remove());
-    markersRef.current = [];
-
-    updateClusterCircles();
-    // Cluster markers
-    clusters.forEach((cluster, idx) => {
-      const el = document.createElement("div");
-      el.className =
-        "w-10 h-10 bg-purple-500 rounded-full flex items-center justify-center text-white font-bold shadow-lg cursor-pointer relative z-10";
-      el.innerText = cluster.id.toString(); // Show actual cluster ID instead of senior count
-
-      // Add hover effect to highlight corresponding circle
-      el.addEventListener("mouseenter", () => {
-        map.current?.setPaintProperty("cluster-circles-layer", "fill-opacity", [
-          "case",
-          ["==", ["get", "clusterId"], cluster.id],
-          0.4, // Highlighted opacity
-          0.2, // Default opacity
-        ]);
-        map.current?.setPaintProperty("cluster-circles-outline", "line-width", [
-          "case",
-          ["==", ["get", "clusterId"], cluster.id],
-          3, // Highlighted width
-          2, // Default width
-        ]);
-      });
-
-      el.addEventListener("mouseleave", () => {
-        map.current?.setPaintProperty(
-          "cluster-circles-layer",
-          "fill-opacity",
-          0.2
-        );
-        map.current?.setPaintProperty(
-          "cluster-circles-outline",
-          "line-width",
-          2
-        );
-      });
-
-      const marker = new mapboxgl.Marker(el)
-        .setLngLat([cluster.center.lng, cluster.center.lat])
-        .addTo(map.current!);
-
-      el.addEventListener("click", () => {
-        setHighlightedCluster(idx);
-        setLocallyFocusedSeniorId(null); // NEW: clear single focus when cluster focus starts
-
-        if (popupRef.current) {
-          popupRef.current.remove();
-          popupRef.current = null;
-        }
-
-        // Fit map to cluster bounds if seniors exist
-        if (cluster.seniors && cluster.seniors.length > 0) {
-          const bounds = new mapboxgl.LngLatBounds();
-          cluster.seniors.forEach((senior) => {
-            if (senior.coords) {
-              bounds.extend([senior.coords.lng, senior.coords.lat]);
-            }
-          });
-
-          map.current?.fitBounds(bounds, { padding: 20 });
-        }
-      });
-
-      markersRef.current.push(marker);
+    if (!map.current || !mapLoaded) return;
+    
+    console.log("Re-rendering markers with data:", {
+      seniors: seniors.length,
+      volunteers: volunteers.length,
+      clusters: clusters.length
     });
-
-    // Senior markers
-    seniors.forEach((s) => {
-      if (!s.coords) return;
-      const levels = { 1: "HIGH", 2: "MEDIUM", 3: "LOW" } as const;
-      const assessment = levels[s.overall_wellbeing] || "LOW";
-
-      // highlight seniors inside the focused cluster
-      const isInHighlightedCluster =
-        highlightedCluster !== null &&
-        clusters[highlightedCluster]?.seniors?.some(
-          (clusterSenior) => clusterSenior.uid === s.uid
-        );
-
-      // existing single-senior highlight (from prop) + NEW local focus
-      const isIndividuallyHighlighted = s.uid === highlightedSeniorId;
-      const isLocallyFocused = s.uid === locallyFocusedSeniorId; // NEW
-
-      // purple border if any of the above is true
-      const focused = isInHighlightedCluster || isIndividuallyHighlighted || isLocallyFocused; // NEW
-
-      const colorClass =
-        priorityColors[(assessment || "LOW") as "HIGH" | "MEDIUM" | "LOW"];
-
-      const sizeClass = focused ? "w-8 h-8" : "w-6 h-6";
-      const borderClass = focused
-        ? "border-4 border-purple-500"
-        : "border-2 border-white";
-
-      const boxShadow = focused ? "0 0 10px #a855f7" : "0 0 4px #888";
-
-      const el = document.createElement("div");
-      el.className = `${sizeClass} ${colorClass} rounded-full ${borderClass} shadow-md cursor-pointer flex items-center justify-center text-xs relative z-20`;
-      el.innerText = "👤";
-      el.style.boxShadow = boxShadow;
-
-      el.addEventListener("click", (e) => {
-        e.stopPropagation();
-        setHighlightedCluster(null); // clicking a senior cancels cluster focus
-        setLocallyFocusedSeniorId(s.uid); // NEW: ensure purple border on this one
-
-        showSeniorPopup(s, assessment as "HIGH" | "MEDIUM" | "LOW");
-
-        // NEW: focus/zoom camera on this senior
-        map.current?.flyTo({
-          center: [s.coords.lng, s.coords.lat],
-          zoom: Math.max(map.current!.getZoom(), 15),
-          essential: true,
-        });
-
-        // if (onSeniorClick) onSeniorClick(s.uid);
-      });
-
-      const marker = new mapboxgl.Marker(el)
-        .setLngLat([s.coords.lng, s.coords.lat])
-        .addTo(map.current!);
-      markersRef.current.push(marker);
-    });
-
-    // Volunteer markers
-    volunteers.forEach((v) => {
-      if (!v.coords) return;
-      const el = document.createElement("div");
-      el.className =
-        "w-6 h-6 bg-blue-500 rounded-full border-2 border-white shadow-md flex items-center justify-center text-xs relative z-20";
-      el.innerText = "🙋";
-      const marker = new mapboxgl.Marker(el)
-        .setLngLat([v.coords.lng, v.coords.lat])
-        .addTo(map.current!);
-      el.addEventListener("click", (e) => {
-        e.stopPropagation();
-        setHighlightedCluster(null);
-        setLocallyFocusedSeniorId(null); // NEW: clear single-senior focus when focusing a volunteer
-        showVolunteerPopup(v);
-      });
-      markersRef.current.push(marker);
-    });
+    
+    renderMarkers();
     
     // Clicking elsewhere on the map unfocuses
     if (map.current && onMapUnfocus) {
       map.current.on("click", () => {
-        setLocallyFocusedSeniorId(null); // NEW: clear local focus on map click
+        setLocallyFocusedSeniorId(null);
         onMapUnfocus();
       });
     }
@@ -527,8 +348,7 @@ export function InteractiveMap({
     mapLoaded,
     highlightedCluster,
     onMapUnfocus,
-    // onSeniorClick,
-    locallyFocusedSeniorId, // NEW
+    locallyFocusedSeniorId,
   ]);
 
   // --- Helper function to create circle polygon ---
@@ -1038,14 +858,14 @@ export function InteractiveMap({
                 </span>
               </div>
               ${
-                assignment && assignment.weighted_distance
+                assignment && assignment.distance
                   ? `
               <div class="flex items-center justify-between">
                 <span class="text-sm text-gray-600 flex items-center gap-2">
                   📏 Distance
                 </span>
                 <span class="text-sm font-medium">
-                  ${assignment.weighted_distance.toFixed(1)} km
+                  ${assignment.distance.toFixed(1)} km
                 </span>
               </div>
               `
