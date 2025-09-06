@@ -96,6 +96,9 @@ Deno.serve(async (req) => {
     // Calculate date range: Monday to Sunday after current Sunday
     // NOTE: reuse 'today' from above to avoid redeclaration
     const dayOfWeek = today.getDay() // 0 = Sunday
+    
+    // If today is Sunday, get Monday-Sunday of the following week
+    // If today is any other day, this shouldn't run, but handle gracefully
     const daysUntilNextMonday = dayOfWeek === 0 ? 1 : (8 - dayOfWeek) % 7
     const nextMonday = new Date(today.getTime() + daysUntilNextMonday * 24 * 60 * 60 * 1000)
     const nextSunday = new Date(nextMonday.getTime() + 6 * 24 * 60 * 60 * 1000)
@@ -111,33 +114,9 @@ Deno.serve(async (req) => {
     if (availabilitiesError) throw availabilitiesError
 
     let availList = availabilities ?? []
-    console.log(`Found ${availList.length} availability slots for the target week`)
+    console.log(`Found ${availList.length} availability slots for the current week`)
 
-    // Fallback: if no next-week availability, try current week (Mon–Sun including today)
-    if (availList.length === 0) {
-      const currentDow = today.getDay()
-      const currentMonday = new Date(today)
-      currentMonday.setDate(today.getDate() - (currentDow === 0 ? 6 : currentDow - 1))
-      currentMonday.setHours(0, 0, 0, 0)
-      const currentSunday = new Date(currentMonday)
-      currentSunday.setDate(currentMonday.getDate() + 6)
-      currentSunday.setHours(23, 59, 59, 999)
-
-      console.log(`No next-week availability. Falling back to current week: ${currentMonday.toISOString().split('T')[0]} to ${currentSunday.toISOString().split('T')[0]}`)
-
-      const { data: fallbackAvail, error: fallbackErr } = await supabase
-        .from('availabilities')
-        .select('date, start_t, end_t, volunteer_email')
-        .gte('date', currentMonday.toISOString().split('T')[0])
-        .lte('date', currentSunday.toISOString().split('T')[0])
-
-      if (fallbackErr) {
-        console.error('Error fetching fallback current-week availability:', fallbackErr)
-      } else {
-        availList = fallbackAvail ?? []
-        console.log(`Found ${availList.length} availability slots for the current week`)
-      }
-    }
+    // No fallback needed since we're already using current week
 
     // Perform geographical K-means clustering on eligible seniors
     const clusters = performGeographicalClustering(seniors, volunteers)
