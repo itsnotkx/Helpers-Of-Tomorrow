@@ -85,46 +85,28 @@ const AM_PM_OPTIONS = [
   { value: "PM", display: "PM" },
 ];
 
-const isValidTimeRange = (time: string, period: string) => {
-  if (!time || !period) return true; // Don't validate incomplete selections
-
+// Centralized time conversion utility
+const convertTo24Hour = (time: string, period: string) => {
   const hour = Number.parseInt(time.split(":")[0]);
-  const hour24 =
-    period === "AM" ? (hour === 12 ? 0 : hour) : hour === 12 ? 12 : hour + 12;
+  return period === "AM"
+    ? hour === 12 ? 0 : hour
+    : hour === 12 ? 12 : hour + 12;
+};
 
-  return hour24 >= 8 && hour24 <= 22; // 8am (8) to 10pm (22)
+// Centralized time validation
+const isValidTimeRange = (time: string, period: string) => {
+  if (!time || !period) return true;
+  const hour24 = convertTo24Hour(time, period);
+  return hour24 >= 8 && hour24 <= 22; // 8am to 10pm
 };
 
 const isEndTimeAfterStartTime = (slot: TimeSlot) => {
-  if (
-    !slot.startTime ||
-    !slot.startPeriod ||
-    !slot.endTime ||
-    !slot.endPeriod
-  ) {
+  if (!slot.startTime || !slot.startPeriod || !slot.endTime || !slot.endPeriod) {
     return true; // Don't validate incomplete selections
   }
 
-  const startHour = Number.parseInt(slot.startTime.split(":")[0]);
-  const endHour = Number.parseInt(slot.endTime.split(":")[0]);
-
-  const startHour24 =
-    slot.startPeriod === "AM"
-      ? startHour === 12
-        ? 0
-        : startHour
-      : startHour === 12
-      ? 12
-      : startHour + 12;
-  const endHour24 =
-    slot.endPeriod === "AM"
-      ? endHour === 12
-        ? 0
-        : endHour
-      : endHour === 12
-      ? 12
-      : endHour + 12;
-
+  const startHour24 = convertTo24Hour(slot.startTime, slot.startPeriod);
+  const endHour24 = convertTo24Hour(slot.endTime, slot.endPeriod);
   return endHour24 > startHour24;
 };
 
@@ -159,17 +141,6 @@ const hasTimeClash = (daySlots: TimeSlot[], currentSlotId?: string) => {
     }
   }
   return false;
-};
-
-const convertTo24Hour = (time: string, period: string) => {
-  const hour = Number.parseInt(time.split(":")[0]);
-  return period === "AM"
-    ? hour === 12
-      ? 0
-      : hour
-    : hour === 12
-    ? 12
-    : hour + 12;
 };
 
 // Convert frontend slot format to API format
@@ -272,7 +243,7 @@ const convertBackendToFrontendFormat = (
 export function WeeklyTimeSlotForm() {
   const { isLoaded, isSignedIn, user } = useUser();
   const router = useRouter();
-  // const
+
   const [schedule, setSchedule] = useState<WeeklySchedule>(() => {
     const initialSchedule: WeeklySchedule = {};
     DAYS_OF_WEEK.forEach((day) => {
@@ -281,12 +252,32 @@ export function WeeklyTimeSlotForm() {
     return initialSchedule;
   });
 
-  const [isSunday, setIsSunday] = useState(false); // Add Sunday state
+  const [isSunday, setIsSunday] = useState(false);
+  const [weekDates, setWeekDates] = useState<Date[]>([]);
+  const [isClient, setIsClient] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+  const [submitStatus, setSubmitStatus] = useState<{
+    type: "success" | "error" | null;
+    message: string;
+  }>({ type: null, message: "" });
+  const [showSuccessDialog, setShowSuccessDialog] = useState(false);
+  const [successMessage, setSuccessMessage] = useState("");
+  const [openDays, setOpenDays] = useState<{ [key: string]: boolean }>(() => {
+    const initialOpen: { [key: string]: boolean } = {};
+    DAYS_OF_WEEK.forEach((day) => {
+      initialOpen[day] = true;
+    });
+    return initialOpen;
+  });
+
+  // Consolidated initialization effect
   useEffect(() => {
     setIsClient(true);
+    setWeekDates(getNextWeekDates());
+    
     const today = new Date();
     if (today.getDay() === 0) {
-      // Sunday
       setIsSunday(true);
       router.push("/");
       return;
@@ -297,32 +288,63 @@ export function WeeklyTimeSlotForm() {
     }
   }, [isLoaded, isSignedIn, user, router]);
 
-  const [weekDates, setWeekDates] = useState<Date[]>([]);
-  const [isClient, setIsClient] = useState(false);
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [isLoading, setIsLoading] = useState(true); // Add loading state
-  const [submitStatus, setSubmitStatus] = useState<{
-    type: "success" | "error" | null;
-    message: string;
-  }>({
-    type: null,
-    message: "",
-  });
-  const [showSuccessDialog, setShowSuccessDialog] = useState(false);
-  const [successMessage, setSuccessMessage] = useState("");
-  const [openDays, setOpenDays] = useState<{ [key: string]: boolean }>(() => {
-    const initialOpen: { [key: string]: boolean } = {};
-    DAYS_OF_WEEK.forEach((day) => {
-      initialOpen[day] = true; // All days start open
-    });
-    return initialOpen;
-  });
+  // Reusable TimeSelector component
+  const TimeSelector = ({ 
+    label, 
+    timeValue, 
+    periodValue, 
+    onTimeChange, 
+    onPeriodChange,
+    timeValid,
+    validationMessage 
+  }: {
+    label: string;
+    timeValue: string;
+    periodValue: string;
+    onTimeChange: (value: string) => void;
+    onPeriodChange: (value: string) => void;
+    timeValid: boolean;
+    validationMessage?: string;
+  }) => (
+    <div className="space-y-2">
+      <Label className="text-sm">{label}</Label>
+      <div className="flex">
+        <Select value={timeValue} onValueChange={onTimeChange}>
+          <SelectTrigger className="flex-1 rounded-r-none">
+            <SelectValue placeholder="Time" />
+          </SelectTrigger>
+          <SelectContent>
+            {TIME_OPTIONS.map((time) => (
+              <SelectItem key={time.value} value={time.value}>
+                {time.display}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        <Select value={periodValue} onValueChange={onPeriodChange}>
+          <SelectTrigger className="w-20 rounded-l-none border-l-0">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {AM_PM_OPTIONS.map((period) => (
+              <SelectItem key={period.value} value={period.value}>
+                {period.display}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+      {!timeValid && validationMessage && (
+        <p className="text-xs text-destructive">{validationMessage}</p>
+      )}
+    </div>
+  );
 
   const loadSavedSlots = async () => {
     if (!user?.primaryEmailAddress?.emailAddress) return;
 
     try {
-      const BASE_URL = "http://localhost:8000";
+      const BASE_URL = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8000";
       const response = await fetch(
         `${BASE_URL}/get_slots/${user.primaryEmailAddress.emailAddress}`
       );
@@ -346,16 +368,6 @@ export function WeeklyTimeSlotForm() {
       setIsLoading(false);
     }
   };
-  useEffect(() => {
-    setIsClient(true);
-    if (isLoaded && isSignedIn && user) {
-      loadSavedSlots();
-    }
-  }, [isLoaded, isSignedIn, user]);
-  useEffect(() => {
-    setWeekDates(getNextWeekDates());
-    setIsClient(true);
-  }, []);
 
   // Early return for authentication check
   if (!isLoaded || !isSignedIn) {
@@ -452,7 +464,7 @@ export function WeeklyTimeSlotForm() {
         });
       });
 
-      const BASE_URL = "http://localhost:8000";
+      const BASE_URL = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8000";
       const emailId = user.primaryEmailAddress?.emailAddress;
       const response = await fetch(`${BASE_URL}/upload_slots`, {
         method: "POST",
@@ -493,12 +505,11 @@ export function WeeklyTimeSlotForm() {
     <>
       <form onSubmit={handleSubmit} className="space-y-6">
         {/* Back button */}
-        <div className="flex justify-start mb-4">
+        <div className="flex justify-end mb-4">
           <Button
             type="button"
-            variant="outline"
             onClick={() => router.push("/volunteer")}
-            className="flex items-center gap-2"
+            className="bg-red-600 hover:bg-red-700 text-white text-lg px-6 py-3 rounded-lg shadow-md flex items-center gap-2 mt-4"
           >
             <ArrowLeft className="h-4 w-4" />
             Back to Schedule
@@ -566,154 +577,49 @@ export function WeeklyTimeSlotForm() {
                           className="flex items-start gap-3 p-3 border rounded-sm bg-muted/20"
                         >
                           <div className="flex-1 grid grid-cols-1 md:grid-cols-2 gap-3">
-                            <div className="space-y-2">
-                              <Label
-                                htmlFor={`${slot.id}-start`}
-                                className="text-sm"
-                              >
-                                Start Time
-                              </Label>
-                              <div className="flex">
-                                <Select
-                                  value={slot.startTime}
-                                  onValueChange={(value) =>
-                                    updateTimeSlot(
-                                      day,
-                                      slot.id,
-                                      "startTime",
-                                      value
-                                    )
-                                  }
-                                >
-                                  <SelectTrigger className="flex-1 rounded-r-none">
-                                    <SelectValue placeholder="Time" />
-                                  </SelectTrigger>
-                                  <SelectContent>
-                                    {TIME_OPTIONS.map((time) => (
-                                      <SelectItem
-                                        key={time.value}
-                                        value={time.value}
-                                      >
-                                        {time.display}
-                                      </SelectItem>
-                                    ))}
-                                  </SelectContent>
-                                </Select>
-                                <Select
-                                  value={slot.startPeriod}
-                                  onValueChange={(value) =>
-                                    updateTimeSlot(
-                                      day,
-                                      slot.id,
-                                      "startPeriod",
-                                      value
-                                    )
-                                  }
-                                >
-                                  <SelectTrigger className="w-20 rounded-l-none border-l-0">
-                                    <SelectValue />
-                                  </SelectTrigger>
-                                  <SelectContent>
-                                    {AM_PM_OPTIONS.map((period) => (
-                                      <SelectItem
-                                        key={period.value}
-                                        value={period.value}
-                                      >
-                                        {period.display}
-                                      </SelectItem>
-                                    ))}
-                                  </SelectContent>
-                                </Select>
-                              </div>
-                              {slot.startTime &&
-                                slot.startPeriod &&
-                                !isValidTimeRange(
-                                  slot.startTime,
-                                  slot.startPeriod
-                                ) && (
-                                  <p className="text-xs text-destructive">
-                                    Time must be between 8am and 10pm
-                                  </p>
-                                )}
-                            </div>
-                            <div className="space-y-2">
-                              <Label className="text-sm">End Time</Label>
-                              <div className="flex">
-                                <Select
-                                  value={slot.endTime}
-                                  onValueChange={(value) =>
-                                    updateTimeSlot(
-                                      day,
-                                      slot.id,
-                                      "endTime",
-                                      value
-                                    )
-                                  }
-                                >
-                                  <SelectTrigger className="flex-1 rounded-r-none">
-                                    <SelectValue placeholder="Time" />
-                                  </SelectTrigger>
-                                  <SelectContent>
-                                    {TIME_OPTIONS.map((time) => (
-                                      <SelectItem
-                                        key={time.value}
-                                        value={time.value}
-                                      >
-                                        {time.display}
-                                      </SelectItem>
-                                    ))}
-                                  </SelectContent>
-                                </Select>
-                                <Select
-                                  value={slot.endPeriod}
-                                  onValueChange={(value) =>
-                                    updateTimeSlot(
-                                      day,
-                                      slot.id,
-                                      "endPeriod",
-                                      value
-                                    )
-                                  }
-                                >
-                                  <SelectTrigger className="w-20 rounded-l-none border-l-0">
-                                    <SelectValue />
-                                  </SelectTrigger>
-                                  <SelectContent>
-                                    {AM_PM_OPTIONS.map((period) => (
-                                      <SelectItem
-                                        key={period.value}
-                                        value={period.value}
-                                      >
-                                        {period.display}
-                                      </SelectItem>
-                                    ))}
-                                  </SelectContent>
-                                </Select>
-                              </div>
-                              {slot.endTime &&
-                                slot.endPeriod &&
-                                !isValidTimeRange(
-                                  slot.endTime,
-                                  slot.endPeriod
-                                ) && (
-                                  <p className="text-xs text-destructive">
-                                    Time must be between 8am and 10pm
-                                  </p>
-                                )}
-                              {slot.startTime &&
-                                slot.startPeriod &&
+                            <TimeSelector
+                              label="Start Time"
+                              timeValue={slot.startTime}
+                              periodValue={slot.startPeriod}
+                              onTimeChange={(value) =>
+                                updateTimeSlot(day, slot.id, "startTime", value)
+                              }
+                              onPeriodChange={(value) =>
+                                updateTimeSlot(day, slot.id, "startPeriod", value)
+                              }
+                              timeValid={
+                                !slot.startTime ||
+                                !slot.startPeriod ||
+                                isValidTimeRange(slot.startTime, slot.startPeriod)
+                              }
+                              validationMessage="Time must be between 8am and 10pm"
+                            />
+                            
+                            <TimeSelector
+                              label="End Time"
+                              timeValue={slot.endTime}
+                              periodValue={slot.endPeriod}
+                              onTimeChange={(value) =>
+                                updateTimeSlot(day, slot.id, "endTime", value)
+                              }
+                              onPeriodChange={(value) =>
+                                updateTimeSlot(day, slot.id, "endPeriod", value)
+                              }
+                              timeValid={
+                                !slot.endTime ||
+                                !slot.endPeriod ||
+                                (isValidTimeRange(slot.endTime, slot.endPeriod) &&
+                                 isEndTimeAfterStartTime(slot))
+                              }
+                              validationMessage={
                                 slot.endTime &&
                                 slot.endPeriod &&
-                                isValidTimeRange(
-                                  slot.endTime,
-                                  slot.endPeriod
-                                ) &&
-                                !isEndTimeAfterStartTime(slot) && (
-                                  <p className="text-xs text-destructive">
-                                    End time must be after start time
-                                  </p>
-                                )}
-                            </div>
+                                isValidTimeRange(slot.endTime, slot.endPeriod) &&
+                                !isEndTimeAfterStartTime(slot)
+                                  ? "End time must be after start time"
+                                  : "Time must be between 8am and 10pm"
+                              }
+                            />
                           </div>
                           <div className="flex items-center pt-7">
                             <Button

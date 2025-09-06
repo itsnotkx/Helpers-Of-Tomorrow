@@ -111,7 +111,7 @@ export default function VolunteerDashboard() {
   const loadDashboardData = async () => {
     try {
       setLoading(true);
-      const BASE_URL = "http://localhost:8000";
+      const BASE_URL = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8000";
 
       const [seniorsRes, volunteersRes, assignmentsRes, clusterRes] =
         await Promise.all([
@@ -165,17 +165,17 @@ export default function VolunteerDashboard() {
     return userCoordinates ? (userCoordinates as [number, number]) : undefined;
   }, [userCoordinates]);
 
-  async function fetch_dl_details(email: string) {
-    try {
-      setDLIsLoading(true);
-      const BASE_URL = "http://localhost:8000";
-      if (email != "") {
-        const res = await fetch(`${BASE_URL}/dl/${email}`, {
-          method: "GET",
-          headers: {
-            "Content-Type": "application/json",
-          },
-        }).then((res) => res.json());
+async function fetch_dl_details(email: string) {
+  try {
+    setDLIsLoading(true);
+    const BASE_URL = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8000";
+    if (email != "") {
+      const res = await fetch(`${BASE_URL}/dl/${email}`, {
+        method: "GET",
+        headers: {
+          "Content-Type": "application/json",
+        },
+      }).then((res) => res.json());
 
         console.log("Fetched user information:", res.dl_info[0]);
         if (res.dl_info[0] != null) {

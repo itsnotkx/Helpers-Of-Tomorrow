@@ -19,8 +19,7 @@ export default function Scheduler() {
         title="Your Volunteer Schedule"
         subtitle="Managing care for Singapore"
         selectedDistrict="Sembawang"
-        needButton={false} 
-      />
+       />
 
       {/* Change colour here */}
       <div className="flex justify-end mt-4 mb-6">
