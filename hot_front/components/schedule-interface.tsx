@@ -143,22 +143,57 @@ export function ScheduleInterface({ assignments }: ScheduleProps) {
 
   // Fetch from backend
   useEffect(() => {
-    const fetchData = async () => {
+    const fetchData = async (retryCount = 0) => {
+      const MAX_RETRIES = 3;
+      const RETRY_DELAY = 1000; // 1 second
+      
       try {
-        const BASE_URL =
-          process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8000";
-
-        const schedulesResponse = await fetch(`${BASE_URL}/assignments`);
+        const BASE_URL = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8000";
+        
+        const schedulesResponse = await fetch(
+          `${BASE_URL}/assignments`, 
+          {
+            method: 'GET',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            // Add timeout
+            signal: AbortSignal.timeout(10000) // 10 second timeout
+          }
+        );
         if (!schedulesResponse.ok) {
-          console.error("Failed to fetch schedules:", schedulesResponse.status);
-          return;
+          throw new Error(`Failed to fetch schedules: ${schedulesResponse.status} ${schedulesResponse.statusText}`);
         }
         const schedulesData = await schedulesResponse.json();
 
-        const volunteersResponse = await fetch(`${BASE_URL}/volunteers`);
+        const volunteersResponse = await fetch(
+          `${BASE_URL}/volunteers`,
+          {
+            method: 'GET',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            signal: AbortSignal.timeout(10000)
+          }
+        );
+        if (!volunteersResponse.ok) {
+          throw new Error(`Failed to fetch volunteers: ${volunteersResponse.status} ${volunteersResponse.statusText}`);
+        }
         const volunteersData = await volunteersResponse.json();
 
-        const seniorsResponse = await fetch(`${BASE_URL}/seniors`);
+        const seniorsResponse = await fetch(
+          `${BASE_URL}/seniors`,
+          {
+            method: 'GET',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            signal: AbortSignal.timeout(10000)
+          }
+        );
+        if (!seniorsResponse.ok) {
+          throw new Error(`Failed to fetch seniors: ${seniorsResponse.status} ${seniorsResponse.statusText}`);
+        }
         const seniorsData = await seniorsResponse.json();
 
         // Map database fields to component interface
@@ -179,8 +214,21 @@ export function ScheduleInterface({ assignments }: ScheduleProps) {
         setSchedules(mappedSchedules);
         setVolunteers(volunteersData.volunteers || volunteersData || []);
         setSeniors(seniorsData.seniors || seniorsData || []);
+        
+        console.log("Successfully fetched all data");
       } catch (error) {
-        console.error("Failed to fetch data:", error);
+        console.error(`Failed to fetch data (attempt ${retryCount + 1}):`, error);
+        
+        // Retry logic
+        if (retryCount < MAX_RETRIES - 1) {
+          console.log(`Retrying in ${RETRY_DELAY}ms...`);
+          setTimeout(() => {
+            fetchData(retryCount + 1);
+          }, RETRY_DELAY * (retryCount + 1)); // Exponential backoff
+        } else {
+          console.error("All retry attempts failed. Please check your backend connection.");
+          // You could set an error state here to show to the user
+        }
       }
     };
 
