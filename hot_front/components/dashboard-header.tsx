@@ -38,13 +38,15 @@ export function DashboardHeader({
 
           {/* Right Side Controls */}
           <div className="flex items-center gap-6">
-            <Badge
-              variant="outline"
-              className="text-base px-4 py-2 font-semibold"
-            >
-              <MapPin className="h-5 w-5 mr-2" />
-              {selectedDistrict}
-            </Badge>
+            {selectedDistrict && (
+              <Badge
+                variant="outline"
+                className="text-base px-4 py-2 font-semibold"
+              >
+                <MapPin className="h-5 w-5 mr-2" />
+                {selectedDistrict}
+              </Badge>
+            )}
 
             <UserButton
               showName

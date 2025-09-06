@@ -454,10 +454,11 @@ export default function VolunteerSchedule() {
           </div>
 
           <div className="flex items-center justify-center gap-2 mb-6 mt-8">
-            <Badge variant="secondary" className="text-base px-4 py-2">
+            <h4 className="text-xl font-semibold text-red-600">
               Outstanding Assignments
-            </Badge>
+            </h4>
           </div>
+          <div className="mb-4"></div>
           <div className="w-full mx-auto space-y-4">
             {userSchedule.filter(
               (s: userSchedule) => s.is_acknowledged === true
