@@ -125,12 +125,11 @@ fastapi run
 ```
 6) Install frontend requirements
 ```
-cd ..
-cd .. # should be in /Helpers-Of-Tomorrow directory
+#open a new terminal. This should be in the root directory (/Helpers-Of-Tomorrow)
 cd hot_front
 npm install
 ```
-7) Move frontend's .venv file to /hot_front
+7) Move frontend's .env file to /hot_front
 7) Launch frontend
 ```
 npm run dev
