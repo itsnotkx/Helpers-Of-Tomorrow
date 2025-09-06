@@ -116,6 +116,14 @@
   z-index: 50;
 }
 
+.popup-above-circles .mapboxgl-popup-content {
+  z-index: 2000 !important;
+}
+
+.popup-above-circles {
+  z-index: 2000 !important;
+}
+
 @layer base {
   * {
     @apply border-border outline-ring/50;

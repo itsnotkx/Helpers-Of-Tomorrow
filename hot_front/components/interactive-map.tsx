@@ -221,29 +221,39 @@ export function InteractiveMap({
           },
         });
       }
-      // Add circle layer for cluster boundaries
+      // Add circle layer for cluster boundaries (added as the bottommost layers)
+      // Try to insert before existing layers to ensure they stay at the bottom
+      const layerIds = map.current!.getStyle().layers?.map(layer => layer.id) || [];
+      const beforeLayer = layerIds.find(id => 
+        id.includes('building') || 
+        id.includes('road') || 
+        id.includes('label')
+      ) || undefined;
+
       map.current!.addLayer({
         id: "cluster-circles-layer",
         type: "fill",
         source: "cluster-circles",
+        layout: {},
         paint: {
           "fill-color": "#8B5CF6", // Purple color matching cluster markers
           "fill-opacity": 0.2,
           "fill-outline-color": "#8B5CF6",
         },
-      });
+      }, beforeLayer);
 
       // Add circle outline layer
       map.current!.addLayer({
         id: "cluster-circles-outline",
         type: "line",
         source: "cluster-circles",
+        layout: {},
         paint: {
           "line-color": "#8B5CF6",
           "line-width": 2,
           "line-opacity": 0.8,
         },
-      });
+      }, beforeLayer);
 
       renderMarkers();
     });
@@ -510,6 +520,7 @@ export function InteractiveMap({
 
       const el = document.createElement("div");
       el.className = `${sizeClass} ${colorClass} rounded-full ${borderClass} shadow-md cursor-pointer flex items-center justify-center text-xs relative z-20`;
+      el.style.zIndex = "1001"; // Ensure it's above cluster circles and layers
       el.innerText = "👤";
       seniorMarkerElements.set(s.uid, el);
 
@@ -539,6 +550,7 @@ export function InteractiveMap({
       const el = document.createElement("div");
       el.className =
         "w-6 h-6 bg-blue-500 rounded-full border-2 border-white shadow-md flex items-center justify-center text-xs relative z-20";
+      el.style.zIndex = "1001"; // Ensure it's above cluster circles and layers
       el.innerText = "🙋";
 
       const marker = new mapboxgl.Marker(el)
@@ -795,7 +807,7 @@ export function InteractiveMap({
       closeOnMove: false,
       focusAfterOpen: true,
       maxWidth: "500",
-      className: "",
+      className: "popup-above-circles",
     })
       .setLngLat([s.coords.lng, s.coords.lat])
       .setHTML(popupHTML)
@@ -823,7 +835,7 @@ export function InteractiveMap({
       closeOnMove: true,
       focusAfterOpen: true,
       maxWidth: "500",
-      className: "",
+      className: "popup-above-circles",
     })
       .setLngLat([v.coords.lng, v.coords.lat])
       .setHTML(popupHTML)
@@ -835,7 +847,7 @@ export function InteractiveMap({
   };
 
   return (
-    <div className="w-full h-[600px] relative">
+    <div className="w-full h-[600px] relative overflow-hidden">
       {mapError && (
         <div className="absolute inset-0 flex items-center justify-center bg-muted z-10">
           <div className="text-center p-4">
@@ -849,10 +861,10 @@ export function InteractiveMap({
           <p className="text-muted-foreground">Loading map...</p>
         </div>
       )}
-      <div ref={mapContainer} className="w-full h-full rounded-lg" />
+      <div ref={mapContainer} className="w-full h-full rounded-lg" style={{ position: 'relative', zIndex: 1 }} />
 
       {/* Legend */}
-      <div className="absolute bottom-4 left-4 bg-white p-3 rounded-lg shadow-lg z-50">
+      <div className="absolute bottom-4 left-4 bg-white p-3 rounded-lg shadow-lg" style={{ zIndex: 100 }}>
         <h4 className="text-xs font-medium mb-2">Legend</h4>
         <div className="space-y-1">
           <LegendItem color="bg-red-500" label="High Priority Senior" />
