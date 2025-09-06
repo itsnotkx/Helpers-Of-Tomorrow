@@ -13,16 +13,23 @@ interface Schedule {
   seniors: string[];
 }
 
-interface ScheduleResponse {
-  schedules: Schedule[];
-  clusters: Cluster[];
-  cluster_density: Record<string, number>;
-}
-
 const priorityColors: Record<"HIGH" | "MEDIUM" | "LOW", string> = {
   HIGH: "bg-red-500",
-  MEDIUM: "bg-yellow-500",
+  MEDIUM: "bg-yellow-500", 
   LOW: "bg-green-500",
+};
+
+// Unified priority and wellbeing utilities
+const getPriorityLevel = (wellbeing: 1 | 2 | 3): "HIGH" | "MEDIUM" | "LOW" => {
+  return wellbeing === 1 ? "HIGH" : wellbeing === 2 ? "MEDIUM" : "LOW";
+};
+
+const wellbeingLabels: Record<number, string> = {
+  1: "Very Poor",
+  2: "Poor",
+  3: "Normal", 
+  4: "Good",
+  5: "Very Good",
 };
 
 export function InteractiveMap({
@@ -65,15 +72,7 @@ export function InteractiveMap({
   const [clusters, setClusters] = useState<Cluster[]>([]);
 
   // NEW: local focused senior id (for clicks from map or external events)
-  const [locallyFocusedSeniorId, setLocallyFocusedSeniorId] = useState<string | null>(null); // NEW
-
-  const wellbeingLabels: Record<number, string> = {
-    1: "Very Poor",
-    2: "Poor",
-    3: "Normal",
-    4: "Good",
-    5: "Very Good",
-  };
+  const [locallyFocusedSeniorId, setLocallyFocusedSeniorId] = useState<string | null>(null);
 
   // --- Update internal state when props change ---
   useEffect(() => {
@@ -88,81 +87,74 @@ export function InteractiveMap({
       // Filter seniors: only show those who haven't been visited this year
       const currentYear = new Date().getFullYear();
       const filteredSeniors = seniorsProp.filter((senior) => {
-        if (!senior.last_visit) return true; // Never visited
-        const lastVisitDate = new Date(senior.last_visit);
-        const lastVisitYear = lastVisitDate.getFullYear();
-        return lastVisitYear < currentYear; // Not visited this year
+        if (!senior.last_visit) return true;
+        return new Date(senior.last_visit).getFullYear() < currentYear;
       });
 
       // Filter volunteers: only show those with assignments
       const volunteersWithAssignments = volunteersProp.filter((volunteer) =>
-        assignmentsProp.some(
-          (assignment: any) =>
-            assignment.vid === volunteer.vid ||
-            assignment.volunteer_id === volunteer.vid ||
-            assignment.volunteer === volunteer.vid
+        assignmentsProp.some((assignment: any) =>
+          [assignment.vid, assignment.volunteer_id, assignment.volunteer].includes(volunteer.vid)
         )
       );
 
-      // Process assignments data
+      // Process assignments and schedules
       const schedulesFromAssignments: Schedule[] = Object.values(
         assignmentsProp.reduce((acc: any, assignment: any) => {
-          const start = new Date(`1970-01-01T${assignment.start_time || '09:00'}`);
+          const volunteerId = assignment.vid || assignment.volunteer_id || assignment.volunteer;
+          const clusterId = assignment.cluster_id || assignment.cluster;
+          const date = assignment.date || new Date().toISOString().split('T')[0];
+          const startTime = assignment.start_time || '09:00';
+          
+          const start = new Date(`1970-01-01T${startTime}`);
           const end = new Date(`1970-01-01T${assignment.end_time || '10:00'}`);
-          const duration = (end.getTime() - start.getTime()) / (1000 * 60); // minutes
+          const duration = (end.getTime() - start.getTime()) / (1000 * 60);
 
-          const key = `${assignment.vid || assignment.volunteer}-${assignment.cluster_id || assignment.cluster}-${assignment.date || new Date().toISOString().split('T')[0]}T${assignment.start_time || '09:00'}`;
+          const key = `${volunteerId}-${clusterId}-${date}T${startTime}`;
 
           if (!acc[key]) {
             acc[key] = {
-              volunteer: assignment.vid || assignment.volunteer_id || assignment.volunteer,
-              cluster: assignment.cluster_id || assignment.cluster,
-              datetime: `${assignment.date || new Date().toISOString().split('T')[0]}T${assignment.start_time || '09:00'}`,
+              volunteer: volunteerId,
+              cluster: clusterId,
+              datetime: `${date}T${startTime}`,
               duration,
               seniors: [],
             };
           }
 
           acc[key].seniors.push(assignment.sid || assignment.senior_id || assignment.senior);
-
           return acc;
         }, {})
       );
 
-      const assignmentsFromData = assignmentsProp.map(
-        (assignment: any) => ({
-          volunteer: assignment.vid || assignment.volunteer_id || assignment.volunteer,
-          cluster: assignment.cluster_id || assignment.cluster,
-          distance: assignment.distance || 0,
-        })
-      );
+      const assignmentsFromData = assignmentsProp.map((assignment: any) => ({
+        volunteer: assignment.vid || assignment.volunteer_id || assignment.volunteer,
+        cluster: assignment.cluster_id || assignment.cluster,
+        distance: assignment.distance || 0,
+      }));
 
-      // Process clusters data and convert radius to km
+      // Process clusters
       const processedClusters = clustersProp.map((cluster: any) => {
-        const centroid =
-          typeof cluster.centroid === "string"
-            ? JSON.parse(cluster.centroid)
-            : cluster.centroid || cluster.center;
+        const centroid = typeof cluster.centroid === "string" 
+          ? JSON.parse(cluster.centroid) 
+          : cluster.centroid || cluster.center;
 
-        // Convert coordinate-based radius to kilometers
-        // Approximate conversion: 1 degree ≈ 111 km at equator
-        const radiusInKm = (cluster.radius || 0.01) * 111;
+        const radiusInKm = (cluster.radius || 0.01) * 111; // Convert to km
 
-        // Collect *full senior objects* from schedules belonging to this cluster
+        // Collect senior objects from schedules
         const clusterSeniors = schedulesFromAssignments
           .filter((schedule) => schedule.cluster === cluster.id)
-          .flatMap(
-            (schedule) =>
-              schedule.seniors
-                .map((sid) => filteredSeniors.find((s) => s.uid === sid))
-                .filter((s): s is Senior => !!s) // keep only found seniors
+          .flatMap((schedule) =>
+            schedule.seniors
+              .map((sid) => filteredSeniors.find((s) => s.uid === sid))
+              .filter((s): s is Senior => !!s)
           );
 
         return {
           id: cluster.id,
           center: centroid,
           radius: radiusInKm,
-          seniors: clusterSeniors, // Senior[]
+          seniors: clusterSeniors,
         };
       });
 
@@ -246,29 +238,24 @@ export function InteractiveMap({
     return () => map.current?.remove();
   }, []);
 
-  // Focus when highlightedSeniorId prop changes (e.g., from high-priority dashboard)
+  // Focus when highlightedSeniorId prop changes
   useEffect(() => {
-    if (!map.current || !mapLoaded) return;
-    if (!highlightedSeniorId) return;
+    if (!map.current || !mapLoaded || !highlightedSeniorId) return;
 
     const s = seniors.find(x => x.uid === highlightedSeniorId);
     if (!s?.coords) return;
 
-    // Cancel any cluster focus while we're focusing a single senior
     setHighlightedCluster(null);
-    setLocallyFocusedSeniorId(s.uid); // NEW: ensure purple border even if parent doesn't re-render markers immediately
+    setLocallyFocusedSeniorId(s.uid);
 
-    // Open the senior popup (optional but nice)
-    const levels = { 1: "HIGH", 2: "MEDIUM", 3: "LOW" } as const;
-    const assessment = (levels[s.overall_wellbeing] || "LOW") as "HIGH" | "MEDIUM" | "LOW";
+    const assessment = getPriorityLevel(s.overall_wellbeing);
     showSeniorPopup(s, assessment);
 
-    // Focus the map on the senior (fitBounds prevents over-zoom)
     const bounds = new mapboxgl.LngLatBounds().extend([s.coords.lng, s.coords.lat]);
     map.current.fitBounds(bounds, { padding: 80, maxZoom: 15 });
   }, [highlightedSeniorId, mapLoaded, seniors]);
 
-  // NEW: listen for cross-component focus events (from dashboards)
+  // Listen for cross-component focus events
   useEffect(() => {
     if (!mapLoaded) return;
 
@@ -281,8 +268,7 @@ export function InteractiveMap({
       setHighlightedCluster(null);
       setLocallyFocusedSeniorId(s.uid);
 
-      const levels = { 1: "HIGH", 2: "MEDIUM", 3: "LOW" } as const;
-      const assessment = (levels[s.overall_wellbeing] || "LOW") as "HIGH" | "MEDIUM" | "LOW";
+      const assessment = getPriorityLevel(s.overall_wellbeing);
       showSeniorPopup(s, assessment);
 
       map.current?.flyTo({
@@ -351,27 +337,10 @@ export function InteractiveMap({
     locallyFocusedSeniorId,
   ]);
 
-  // --- Helper function to create circle polygon ---
-  interface CircleCenter {
-    0: number; // lng
-    1: number; // lat
-    length: 2;
-  }
-
-  type CirclePolygon = [number, number][];
-
-  interface CreateCirclePolygonFn {
-    (center: CircleCenter, radiusKm: number, points?: number): CirclePolygon;
-  }
-
-  const createCirclePolygon: CreateCirclePolygonFn = (
-    center,
-    radiusKm,
-    points = 64
-  ) => {
-    const coords: CirclePolygon = [];
-    const distanceX =
-      radiusKm / (111.32 * Math.cos((center[1] * Math.PI) / 180));
+  // Helper function to create circle polygon
+  const createCirclePolygon = (center: [number, number], radiusKm: number, points = 64): [number, number][] => {
+    const coords: [number, number][] = [];
+    const distanceX = radiusKm / (111.32 * Math.cos((center[1] * Math.PI) / 180));
     const distanceY = radiusKm / 110.54;
 
     for (let i = 0; i < points; i++) {
@@ -495,55 +464,43 @@ export function InteractiveMap({
     seniors.forEach((s) => {
       console.log(s.coords)
       if (!s.coords) return;
-      const levels = {
-        1: "HIGH",
-        2: "MEDIUM",
-        3: "LOW",
-      } as const;
-      const assessment = levels[s.overall_wellbeing] || "LOW";
+      
+      const assessment = getPriorityLevel(s.overall_wellbeing);
       const isInHighlightedCluster =
         highlightedCluster !== null &&
         clusters[highlightedCluster]?.seniors?.some(
           (clusterSenior) => clusterSenior.uid === s.uid
         );
 
-      // NEW: include local focus + prop focus
       const isIndividuallyHighlighted = s.uid === highlightedSeniorId;
       const isLocallyFocused = s.uid === locallyFocusedSeniorId;
-      const focused = isInHighlightedCluster || isIndividuallyHighlighted || isLocallyFocused; // NEW
+      const focused = isInHighlightedCluster || isIndividuallyHighlighted || isLocallyFocused;
 
-      const colorClass =
-        priorityColors[(assessment || "LOW") as "HIGH" | "MEDIUM" | "LOW"];
+      const colorClass = priorityColors[assessment];
       const sizeClass = focused ? "w-8 h-8" : "w-6 h-6";
-      const borderClass = focused
-        ? "border-4 border-purple-500"
-        : "border-2 border-white";
+      const borderClass = focused ? "border-4 border-purple-500" : "border-2 border-white";
 
       const el = document.createElement("div");
       el.className = `${sizeClass} ${colorClass} rounded-full ${borderClass} shadow-md cursor-pointer flex items-center justify-center text-xs relative z-20`;
       el.innerText = "👤";
-      // Store reference to this element for highlighting
       seniorMarkerElements.set(s.uid, el);
 
       const marker = new mapboxgl.Marker(el)
         .setLngLat([s.coords.lng, s.coords.lat])
         .addTo(map.current!);
+      
       el.addEventListener("click", (e) => {
         e.stopPropagation();
         setHighlightedCluster(null);
-        setLocallyFocusedSeniorId(s.uid); // NEW: border on this one
-        
+        setLocallyFocusedSeniorId(s.uid);
 
-        // NEW: focus now
         map.current?.flyTo({
           center: [s.coords.lng, s.coords.lat],
           zoom: Math.max(map.current!.getZoom(), 15),
           essential: true,
         });
           
-        showSeniorPopup(s, assessment as "HIGH" | "MEDIUM" | "LOW");
-
-        // if (onSeniorClick) onSeniorClick(s.uid);
+        showSeniorPopup(s, assessment);
       });
       markersRef.current.push(marker);
     });
@@ -552,16 +509,17 @@ export function InteractiveMap({
     volunteers.forEach((v) => {
       if (!v.coords) return;
       const el = document.createElement("div");
-      el.className =
-        "w-6 h-6 bg-blue-500 rounded-full border-2 border-white shadow-md flex items-center justify-center text-xs relative z-20";
+      el.className = "w-6 h-6 bg-blue-500 rounded-full border-2 border-white shadow-md flex items-center justify-center text-xs relative z-20";
       el.innerText = "🙋";
+      
       const marker = new mapboxgl.Marker(el)
         .setLngLat([v.coords.lng, v.coords.lat])
         .addTo(map.current!);
+      
       el.addEventListener("click", (e) => {
         e.stopPropagation();
         setHighlightedCluster(null);
-        setLocallyFocusedSeniorId(null); // NEW
+        setLocallyFocusedSeniorId(null);
         showVolunteerPopup(v);
       });
       markersRef.current.push(marker);
@@ -605,71 +563,53 @@ export function InteractiveMap({
     });
   };
 
-  const createSeniorPopupHTML = (
-    senior: Senior,
-    priority: "HIGH" | "MEDIUM" | "LOW",
-    wellbeingLabels: Record<number, string>
-  ) => {
+  // Helper functions for popups
+  const escapeHtml = (text: string) => {
+    const div = document.createElement("div");
+    div.textContent = text;
+    return div.innerHTML;
+  };
+
+  const getWellbeingIcon = (score: number | undefined) => {
+    if (score === undefined) return "❓";
+    if (score <= 2) return "🔴";
+    if (score <= 3) return "🟡";
+    return "🟢";
+  };
+
+  const getSkillIcon = (skill: number) => {
+    if (skill >= 3) return "⭐";
+    if (skill >= 2) return "🟡";
+    return "🔴";
+  };
+
+  const createSeniorPopupHTML = (senior: Senior, priority: "HIGH" | "MEDIUM" | "LOW") => {
     const lastVisit = senior.last_visit
       ? new Date(senior.last_visit).toLocaleDateString()
       : "Never visited";
 
     const priorityStyles = {
       HIGH: "bg-red-100 text-red-800",
-      MEDIUM: "bg-yellow-100 text-yellow-800",
+      MEDIUM: "bg-yellow-100 text-yellow-800", 
       LOW: "bg-green-100 text-green-800",
     };
 
-    const wellbeingIcon = (score: number | undefined) => {
-      if (score === undefined) return "❓";
-      if (score <= 2) return "🔴";
-      if (score <= 3) return "🟡";
-      return "🟢";
-    };
-
-    const escapeHtml = (text: string) => {
-      const div = document.createElement("div");
-      div.textContent = text;
-      return div.innerHTML;
-    };
-
     const wellbeingItems = [
-      {
-        icon: wellbeingIcon(senior.physical),
-        label: "Physical Health",
-        value: senior.physical,
-      },
-      {
-        icon: wellbeingIcon(senior.mental),
-        label: "Mental Health",
-        value: senior.mental,
-      },
-      {
-        icon: wellbeingIcon(senior.community),
-        label: "Community",
-        value: senior.community,
-      },
+      { icon: getWellbeingIcon(senior.physical), label: "Physical Health", value: senior.physical },
+      { icon: getWellbeingIcon(senior.mental), label: "Mental Health", value: senior.mental },
+      { icon: getWellbeingIcon(senior.community), label: "Community", value: senior.community },
     ];
 
-    // Show reason for appearing on map
-    const visitStatus = senior.last_visit
-      ? `Last visited: ${lastVisit}`
-      : "Never visited - needs attention";
+    const visitStatus = senior.last_visit ? `Last visited: ${lastVisit}` : "Never visited - needs attention";
 
     return `
     <div class="w-60 p-0 bg-white rounded-lg">
       <div class="pb-1">
         <div class="flex items-center gap-3">
-          <div class="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center text-lg">
-            👤
-          </div>
+          <div class="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center text-lg">👤</div>
           <div class="flex-1">
-            <h3 class="font-semibold text-base text-gray-900">${escapeHtml(
-              senior.name || senior.uid
-            )}</h3>
-            <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
-              priorityStyles[priority]
-            }">
+            <h3 class="font-semibold text-base text-gray-900">${escapeHtml(senior.name || senior.uid)}</h3>
+            <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${priorityStyles[priority]}">
               ${priority} Priority
             </span>
           </div>
@@ -677,89 +617,51 @@ export function InteractiveMap({
         
         <div class="space-y-2">
           <div class="p-2 bg-orange-50 border border-orange-200 rounded">
-            <span class="text-xs text-orange-800 font-medium">
-              📅 ${visitStatus}
-            </span>
+            <span class="text-xs text-orange-800 font-medium">📅 ${visitStatus}</span>
           </div>
           
           <div>
             <h4 class="text-sm font-medium text-gray-700 mb-2">Wellbeing Status</h4>
             <div class="space-y-2">
-              ${wellbeingItems
-                .map(
-                  (item) => `
+              ${wellbeingItems.map(item => `
                 <div class="flex items-center justify-between">
                   <span class="text-sm text-gray-600 flex items-center gap-2">
                     ${item.icon} ${item.label}
                   </span>
                   <span class="text-sm font-medium">
-                    ${
-                      item.value !== undefined
-                        ? wellbeingLabels[item.value]
-                        : "Unknown"
-                    }
+                    ${item.value !== undefined ? wellbeingLabels[item.value] : "Unknown"}
                   </span>
                 </div>
-              `
-                )
-                .join("")}
+              `).join("")}
             </div>
           </div>
           
-          ${
-            senior.cluster
-              ? `
+          ${senior.cluster ? `
           <div class="pt-2 border-t border-gray-100">
             <div class="flex items-center justify-between">
-              <span class="text-sm text-gray-600 flex items-center gap-2">
-                📍 Cluster
-              </span>
+              <span class="text-sm text-gray-600 flex items-center gap-2">📍 Cluster</span>
               <span class="text-sm font-medium">${senior.cluster}</span>
             </div>
           </div>
-          `
-              : ""
-          }
+          ` : ""}
         </div>
       </div>
     </div>
   `;
   };
 
-  const createVolunteerPopupHTML = (
-    volunteer: Volunteer,
-    assignment?: Assignment
-  ) => {
+  const createVolunteerPopupHTML = (volunteer: Volunteer, assignment?: Assignment) => {
     const isActive = isVolunteerActiveThisWeek(volunteer.vid);
-
-    const escapeHtml = (text: string) => {
-      const div = document.createElement("div");
-      div.textContent = text;
-      return div.innerHTML;
-    };
-
-    const availabilityStyle = isActive
-      ? "bg-green-100 text-green-800"
-      : "bg-gray-100 text-gray-800";
+    const availabilityStyle = isActive ? "bg-green-100 text-green-800" : "bg-gray-100 text-gray-800";
     const availabilityText = isActive ? "Active" : "Inactive";
-
-    const skillIcon = (skill: number) => {
-      if (skill >= 3) return "⭐";
-      if (skill >= 2) return "🟡";
-      return "🔴";
-    };
 
     return `
     <div class="w-60 p-0 bg-white rounded-lg">
       <div class="pb-1">
         <div class="flex items-center gap-3">
-          <div class="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center text-lg">
-            🙋
-          </div>
+          <div class="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center text-lg">🙋</div>
           <div class="flex-1">
-            <h3 class="font-semibold text-base text-gray-900">${escapeHtml(
-              volunteer.name || volunteer.vid
-            )}</h3>
+            <h3 class="font-semibold text-base text-gray-900">${escapeHtml(volunteer.name || volunteer.vid)}</h3>
             <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${availabilityStyle}">
               ${availabilityText}
             </span>
@@ -772,38 +674,22 @@ export function InteractiveMap({
             <div class="space-y-2">
               <div class="flex items-center justify-between">
                 <span class="text-sm text-gray-600 flex items-center gap-2">
-                  ${skillIcon(volunteer.skill)} Skill Level
+                  ${getSkillIcon(volunteer.skill)} Skill Level
                 </span>
-                <span class="text-sm font-medium">
-                  ${volunteer.skill}/3
-                </span>
+                <span class="text-sm font-medium">${volunteer.skill}/3</span>
               </div>
               <div class="flex items-center justify-between">
-                <span class="text-sm text-gray-600 flex items-center gap-2">
-                  📍 Assignment
-                </span>
+                <span class="text-sm text-gray-600 flex items-center gap-2">📍 Assignment</span>
                 <span class="text-sm font-medium">
-                  ${
-                    assignment
-                      ? `Cluster ${assignment.cluster}`
-                      : "Not Assigned"
-                  }
+                  ${assignment ? `Cluster ${assignment.cluster}` : "Not Assigned"}
                 </span>
               </div>
-              ${
-                assignment && assignment.distance
-                  ? `
+              ${assignment && assignment.distance ? `
               <div class="flex items-center justify-between">
-                <span class="text-sm text-gray-600 flex items-center gap-2">
-                  📏 Distance
-                </span>
-                <span class="text-sm font-medium">
-                  ${assignment.distance.toFixed(1)} km
-                </span>
+                <span class="text-sm text-gray-600 flex items-center gap-2">📏 Distance</span>
+                <span class="text-sm font-medium">${assignment.distance.toFixed(1)} km</span>
               </div>
-              `
-                  : ""
-              }
+              ` : ""}
             </div>
           </div>
         </div>
@@ -822,11 +708,7 @@ export function InteractiveMap({
     }
 
     const displayPriority = priority || "LOW";
-    const popupHTML = createSeniorPopupHTML(
-      s,
-      displayPriority,
-      wellbeingLabels
-    );
+    const popupHTML = createSeniorPopupHTML(s, displayPriority);
 
     popupRef.current = new mapboxgl.Popup({
       closeButton: false,

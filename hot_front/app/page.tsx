@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -23,7 +23,6 @@ import {
 import { InteractiveMap } from "@/components/interactive-map";
 import { ScheduleInterface } from "@/components/schedule-interface";
 import { DashboardHeader } from "@/components/dashboard-header";
-import { useRef } from "react";
 import { useUser } from "@clerk/nextjs";
 
 export interface Senior {
@@ -37,13 +36,6 @@ export interface Senior {
   cluster?: number;
   overall_wellbeing: 1 | 2 | 3;
   address?: string;
-}
-
-interface Assessment {
-  uid: string;
-  risk: number;
-  priority: "HIGH" | "MEDIUM" | "LOW";
-  needscare: boolean;
 }
 
 export interface Assignment {
@@ -83,7 +75,6 @@ export default function VolunteerDashboard() {
   const [assignments, setAssignments] = useState<Assignment[]>([]);
   const [clusters, setClusters] = useState<Cluster[]>([]);
   const [schedules, setSchedules] = useState<Schedule[]>([]);
-  const [assessments, setAssessments] = useState<Assessment[]>([]);
   const [loading, setLoading] = useState(true);
   const [isMapCollapsed, setIsMapCollapsed] = useState(false);
   const [isScheduleCollapsed, setIsScheduleCollapsed] = useState(false);
@@ -95,26 +86,24 @@ export default function VolunteerDashboard() {
   const [highlightedVolunteerId, setHighlightedVolunteerId] = useState<
     string | null
   >(null);
-  const [seniorMarkerElements, setSeniorMarkerElements] = useState<
-    Map<string, HTMLElement>
-  >(new Map());
-  const [volunteerMarkerElements, setVolunteerMarkerElements] = useState<
-    Map<string, HTMLElement>
-  >(new Map());
   const mapRef = useRef<mapboxgl.Map | null>(null);
   const { isLoaded, isSignedIn, user } = useUser();
   const [dlisLoading, setDLIsLoading] = useState(true);
-  const [userSchedule, setUserSchedule] = useState<Volunteer>();
   const [userCoordinates, setUserCoordinates] = useState<[number, number]>();
   const [constituencyName, setConstituencyName] = useState<string>("Singapore");
   const [hasLoadedUserDetails, setHasLoadedUserDetails] = useState(false);
 
   const wellbeingLabels: Record<number, string> = {
     1: "Very Poor",
-    2: "Poor",
+    2: "Poor", 
     3: "Normal",
     4: "Good",
     5: "Very Good",
+  };
+
+  // Unified priority mapping
+  const getPriorityLevel = (wellbeing: 1 | 2 | 3): "HIGH" | "MEDIUM" | "LOW" => {
+    return wellbeing === 1 ? "HIGH" : wellbeing === 2 ? "MEDIUM" : "LOW";
   };
 
   const loadDashboardData = async () => {
@@ -133,20 +122,6 @@ export default function VolunteerDashboard() {
       setVolunteers(volunteersRes.volunteers);
       setAssignments(assignmentsRes.assignments);
       setClusters(clusterRes.clusters);
-
-      // Derive assessments from seniors data
-      const derivedAssessments = seniorsRes.seniors.map((senior: Senior) => ({
-        uid: senior.uid,
-        risk: senior.overall_wellbeing,
-        priority:
-          senior.overall_wellbeing === 1
-            ? "HIGH"
-            : senior.overall_wellbeing === 2
-            ? "MEDIUM"
-            : "LOW",
-        needscare: senior.overall_wellbeing <= 2,
-      }));
-      setAssessments(derivedAssessments);
 
       // Derive schedules from assignments data
       const derivedSchedules = assignmentsRes.assignments.map(
@@ -236,82 +211,40 @@ async function fetch_dl_details(email: string) {
     );
   }
 
-  // Function to handle volunteer card click
-  const handleVolunteerCardClick = (volunteerId: string) => {
-    const volunteer = volunteers.find((v) => v.vid === volunteerId);
-    if (!volunteer) return;
+  // Unified function to handle map focus for both seniors and volunteers
+  const handleMapFocus = (type: 'senior' | 'volunteer', id: string) => {
+    const target = type === 'senior' 
+      ? seniors.find((s) => s.uid === id)
+      : volunteers.find((v) => v.vid === id);
+    
+    if (!target || !target.coords) return;
 
-    // Set highlighted volunteer
-    setHighlightedVolunteerId(volunteerId);
+    // Set appropriate highlights
+    if (type === 'senior') {
+      setHighlightedSeniorId(id);
+      setHighlightedVolunteerId(null);
+    } else {
+      setHighlightedVolunteerId(id);
+      setHighlightedSeniorId(null);
+    }
 
     // Expand map if collapsed
     if (isMapCollapsed) {
       setIsMapCollapsed(false);
     }
 
-    // Clear any senior highlights
-    setHighlightedSeniorId(null);
-
-    // Find the volunteer's marker and click it to show popup
+    // Dispatch custom event for map to handle
     setTimeout(() => {
-      const markerEl = volunteerMarkerElements.get(volunteerId);
-      if (markerEl) {
-        markerEl.click();
+      if (type === 'senior') {
+        window.dispatchEvent(new CustomEvent('focus-senior', { detail: { uid: id } }));
+      } else {
+        window.dispatchEvent(new CustomEvent('focus-volunteer', { detail: { vid: id } }));
       }
-
-      // Fly to volunteer's location
-      if (mapRef.current) {
-        mapRef.current.flyTo({
-          center: [volunteer.coords.lng, volunteer.coords.lat],
-          zoom: 18,
-          essential: true,
-        });
-      }
-    }, 100); // Small delay to ensure map is expanded
-  };
-
-  // Function to handle senior card click
-  const handleSeniorCardClick = (seniorId: string) => {
-    const senior = seniors.find((s) => s.uid === seniorId);
-    if (!senior) return;
-
-    // Set highlighted senior
-    setHighlightedSeniorId(seniorId);
-
-    // Expand map if collapsed
-    if (isMapCollapsed) {
-      setIsMapCollapsed(false);
-    }
-
-    // Clear any volunteer highlights
-    setHighlightedVolunteerId(null);
-
-    // Find the senior's marker and click it to show popup
-    setTimeout(() => {
-      const markerEl = seniorMarkerElements.get(seniorId);
-      if (markerEl) {
-        markerEl.click();
-      }
-
-      // Fly to senior's location
-      if (mapRef.current) {
-        mapRef.current.flyTo({
-          center: [senior.coords.lng, senior.coords.lat],
-          zoom: 18,
-          essential: true,
-        });
-      }
-    }, 100); // Small delay to ensure map is expanded
-  };
-
-  const levels: Record<1 | 2 | 3, string> = {
-    3: "LOW", // Changed: wellbeing 3 = priority LOW
-    2: "MEDIUM", // Changed: wellbeing 2 = priority MEDIUM
-    1: "HIGH", // Changed: wellbeing 1 = priority HIGH
+    }, 100);
   };
 
   const highPrioritySeniors = seniors.filter(
-    (s) => levels[s.overall_wellbeing] === "HIGH"
+    (s) => getPriorityLevel(s.overall_wellbeing) === "HIGH"
   );
 
   // Get current date boundaries for this week and this year
@@ -445,7 +378,7 @@ async function fetch_dl_details(email: string) {
                         key={senior.uid}
                         className="cursor-pointer rounded-lg border border-purple-500 p-4 hover:bg-purple-50 transition"
                         onClick={() => {
-                          handleSeniorCardClick(senior.uid);
+                          handleMapFocus('senior', senior.uid);
                           setShowHighRiskModal(false); // Close the modal
                         }}
                       >
@@ -667,7 +600,7 @@ async function fetch_dl_details(email: string) {
                           ? "border-blue-500 bg-blue-50 shadow-lg"
                           : ""
                       }`}
-                      onClick={() => handleVolunteerCardClick(v.vid)}
+                      onClick={() => handleMapFocus('volunteer', v.vid)}
                     >
                       <div className="flex justify-between mb-2">
                         <h4 className="font-medium">
