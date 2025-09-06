@@ -664,7 +664,7 @@ export function WeeklyTimeSlotForm() {
           <Button
             type="submit"
             size="lg"
-            className="px-8"
+            className="bg-red-600 hover:bg-red-700 text-white text-lg px-8 py-3 rounded-lg shadow-md"
             disabled={!isScheduleValid() || isSubmitting}
           >
             {isSubmitting ? (
