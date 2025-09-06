@@ -76,6 +76,7 @@ export default function VolunteerDashboard() {
   const [clusters, setClusters] = useState<Cluster[]>([]);
   const [schedules, setSchedules] = useState<Schedule[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [isMapCollapsed, setIsMapCollapsed] = useState(false);
   const [isScheduleCollapsed, setIsScheduleCollapsed] = useState(false);
   const [isAssignmentsCollapsed, setIsAssignmentsCollapsed] = useState(false);
@@ -108,17 +109,40 @@ export default function VolunteerDashboard() {
     return wellbeing === 1 ? "HIGH" : wellbeing === 2 ? "MEDIUM" : "LOW";
   };
 
-  const loadDashboardData = async () => {
+  const loadDashboardData = async (retryCount = 0) => {
+    const MAX_RETRIES = 3;
+    const RETRY_DELAY = 1000; // 1 second
+    
     try {
       setLoading(true);
+      setError(null); // Clear any previous errors
       const BASE_URL = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8000";
+
+      console.log(`Loading dashboard data (attempt ${retryCount + 1})`);
+
+      // Add individual error handling for each fetch
+      const fetchWithErrorHandling = async (url: string, name: string) => {
+        const response = await fetch(url, {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          signal: AbortSignal.timeout(15000) // 15 second timeout
+        });
+        
+        if (!response.ok) {
+          throw new Error(`Failed to fetch ${name}: ${response.status} ${response.statusText}`);
+        }
+        
+        return response.json();
+      };
 
       const [seniorsRes, volunteersRes, assignmentsRes, clusterRes] =
         await Promise.all([
-          fetch(`${BASE_URL}/seniors`).then((r) => r.json()),
-          fetch(`${BASE_URL}/volunteers`).then((r) => r.json()),
-          fetch(`${BASE_URL}/assignments`).then((r) => r.json()),
-          fetch(`${BASE_URL}/clusters`).then((r) => r.json()),
+          fetchWithErrorHandling(`${BASE_URL}/seniors`, 'seniors'),
+          fetchWithErrorHandling(`${BASE_URL}/volunteers`, 'volunteers'),
+          fetchWithErrorHandling(`${BASE_URL}/assignments`, 'assignments'),
+          fetchWithErrorHandling(`${BASE_URL}/clusters`, 'clusters'),
         ]);
 
       setSeniors(seniorsRes.seniors);
