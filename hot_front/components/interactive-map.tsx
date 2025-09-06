@@ -223,37 +223,46 @@ export function InteractiveMap({
       }
       // Add circle layer for cluster boundaries (added as the bottommost layers)
       // Try to insert before existing layers to ensure they stay at the bottom
-      const layerIds = map.current!.getStyle().layers?.map(layer => layer.id) || [];
-      const beforeLayer = layerIds.find(id => 
-        id.includes('building') || 
-        id.includes('road') || 
-        id.includes('label')
-      ) || undefined;
+      const layerIds =
+        map.current!.getStyle().layers?.map((layer) => layer.id) || [];
+      const beforeLayer =
+        layerIds.find(
+          (id) =>
+            id.includes("building") ||
+            id.includes("road") ||
+            id.includes("label")
+        ) || undefined;
 
-      map.current!.addLayer({
-        id: "cluster-circles-layer",
-        type: "fill",
-        source: "cluster-circles",
-        layout: {},
-        paint: {
-          "fill-color": "#8B5CF6", // Purple color matching cluster markers
-          "fill-opacity": 0.2,
-          "fill-outline-color": "#8B5CF6",
+      map.current!.addLayer(
+        {
+          id: "cluster-circles-layer",
+          type: "fill",
+          source: "cluster-circles",
+          layout: {},
+          paint: {
+            "fill-color": "#8B5CF6", // Purple color matching cluster markers
+            "fill-opacity": 0.2,
+            "fill-outline-color": "#8B5CF6",
+          },
         },
-      }, beforeLayer);
+        beforeLayer
+      );
 
       // Add circle outline layer
-      map.current!.addLayer({
-        id: "cluster-circles-outline",
-        type: "line",
-        source: "cluster-circles",
-        layout: {},
-        paint: {
-          "line-color": "#8B5CF6",
-          "line-width": 2,
-          "line-opacity": 0.8,
+      map.current!.addLayer(
+        {
+          id: "cluster-circles-outline",
+          type: "line",
+          source: "cluster-circles",
+          layout: {},
+          paint: {
+            "line-color": "#8B5CF6",
+            "line-width": 2,
+            "line-opacity": 0.8,
+          },
         },
-      }, beforeLayer);
+        beforeLayer
+      );
 
       renderMarkers();
     });
@@ -813,6 +822,12 @@ export function InteractiveMap({
       .setHTML(popupHTML)
       .addTo(map.current);
 
+    // Ensure popup is above all markers
+    const popupElement = popupRef.current.getElement();
+    if (popupElement) {
+      popupElement.style.zIndex = "10000";
+    }
+
     popupRef.current.on("close", () => {
       popupRef.current = null;
     });
@@ -841,6 +856,12 @@ export function InteractiveMap({
       .setHTML(popupHTML)
       .addTo(map.current);
 
+    // Ensure popup is above all markers
+    const popupElement = popupRef.current.getElement();
+    if (popupElement) {
+      popupElement.style.zIndex = "10000";
+    }
+
     popupRef.current.on("close", () => {
       popupRef.current = null;
     });
@@ -848,6 +869,19 @@ export function InteractiveMap({
 
   return (
     <div className="w-full h-[600px] relative overflow-hidden">
+      <style jsx>{`
+        :global(.mapboxgl-popup) {
+          z-index: 10000 !important;
+        }
+        :global(.mapboxgl-popup-content) {
+          z-index: 10001 !important;
+        }
+        :global(.popup-above-circles .mapboxgl-popup-content) {
+          background: white !important;
+          box-shadow: 0 10px 25px rgba(0, 0, 0, 0.3) !important;
+          border-radius: 8px !important;
+        }
+      `}</style>
       {mapError && (
         <div className="absolute inset-0 flex items-center justify-center bg-muted z-10">
           <div className="text-center p-4">
@@ -861,10 +895,17 @@ export function InteractiveMap({
           <p className="text-muted-foreground">Loading map...</p>
         </div>
       )}
-      <div ref={mapContainer} className="w-full h-full rounded-lg" style={{ position: 'relative', zIndex: 1 }} />
+      <div
+        ref={mapContainer}
+        className="w-full h-full rounded-lg"
+        style={{ position: "relative", zIndex: 1 }}
+      />
 
       {/* Legend */}
-      <div className="absolute bottom-4 left-4 bg-white p-3 rounded-lg shadow-lg" style={{ zIndex: 100 }}>
+      <div
+        className="absolute bottom-4 left-4 bg-white p-3 rounded-lg shadow-lg"
+        style={{ zIndex: 100 }}
+      >
         <h4 className="text-xs font-medium mb-2">Legend</h4>
         <div className="space-y-1">
           <LegendItem color="bg-red-500" label="High Priority Senior" />

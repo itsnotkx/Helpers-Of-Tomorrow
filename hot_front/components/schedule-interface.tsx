@@ -663,6 +663,21 @@ export function ScheduleInterface({ assignments }: ScheduleProps) {
                     );
                     const isActive = isVolunteerActiveThisWeek(volunteer.vid);
 
+                    // Get cluster assignment for this volunteer
+                    const volunteerCluster =
+                      volunteerSchedules.length > 0
+                        ? volunteerSchedules[0].cluster
+                        : null;
+
+                    // Sort schedules by date and time
+                    const sortedSchedules = [...volunteerSchedules].sort(
+                      (a, b) => {
+                        const dateA = new Date(`${a.date}T${a.start_time}`);
+                        const dateB = new Date(`${b.date}T${b.start_time}`);
+                        return dateA.getTime() - dateB.getTime();
+                      }
+                    );
+
                     return (
                       <Card key={volunteer.vid}>
                         <CardHeader className="pb-3">
@@ -684,26 +699,33 @@ export function ScheduleInterface({ assignments }: ScheduleProps) {
                                 </p>
                               </div>
                             </div>
-                            <Badge
-                              variant={isActive ? "default" : "secondary"}
-                              className={
-                                isActive
-                                  ? "bg-green-600 hover:bg-green-700 text-white"
-                                  : "bg-gray-400 hover:bg-gray-500 text-white"
-                              }
-                            >
-                              {isActive ? "Active" : "Inactive"}
-                            </Badge>
+                            <div className="flex items-center gap-2">
+                              {volunteerCluster && (
+                                <Badge variant="outline" className="h-6">
+                                  Cluster {volunteerCluster}
+                                </Badge>
+                              )}
+                              <Badge
+                                variant={isActive ? "default" : "secondary"}
+                                className={
+                                  isActive
+                                    ? "bg-green-600 hover:bg-green-700 text-white"
+                                    : "bg-gray-400 hover:bg-gray-500 text-white"
+                                }
+                              >
+                                {isActive ? "Active" : "Inactive"}
+                              </Badge>
+                            </div>
                           </div>
                         </CardHeader>
                         <CardContent>
-                          {volunteerSchedules.length === 0 ? (
+                          {sortedSchedules.length === 0 ? (
                             <p className="text-muted-foreground text-center py-4">
                               No scheduled visits
                             </p>
                           ) : (
                             <div className="space-y-2">
-                              {volunteerSchedules.map((schedule, idx) => (
+                              {sortedSchedules.map((schedule, idx) => (
                                 <div
                                   key={idx}
                                   className="flex items-center justify-between p-2 bg-muted/30 rounded"
@@ -723,9 +745,6 @@ export function ScheduleInterface({ assignments }: ScheduleProps) {
                                     </span>
                                   </div>
                                   <div className="flex items-center gap-2">
-                                    <Badge variant="outline">
-                                      Cluster: {schedule.cluster}
-                                    </Badge>
                                     <AcknowledgmentBadge
                                       isAcknowledged={schedule.is_acknowledged}
                                     />
