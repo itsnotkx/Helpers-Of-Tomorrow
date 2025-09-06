@@ -408,9 +408,6 @@ export default function VolunteerSchedule() {
                             <span className="text-sm font-semibold text-blue-800 mb-1">
                               Please acknowledge this assignment
                             </span>
-                            <span className="text-xs text-blue-600">
-                              Check the box and save to acknowledge this assignment. 
-                            </span>
                           </div>
                           <label className="flex items-center gap-3 cursor-pointer">
                             <input

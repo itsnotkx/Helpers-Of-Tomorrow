@@ -440,7 +440,7 @@ export function InteractiveMap({
       el.className =
         "w-10 h-10 bg-purple-500 rounded-full flex items-center justify-center text-white font-bold shadow-lg cursor-pointer relative z-10";
       el.innerText = cluster.id.toString(); // Show actual cluster ID instead of senior count
-      el.style.zIndex = "1000";
+      el.style.zIndex = "10"; // Reduced from 1000 so dialogs (z-50) overlay these
 
       // Add hover effect to highlight corresponding circle
       el.addEventListener("mouseenter", () => {

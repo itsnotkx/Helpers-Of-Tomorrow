@@ -76,20 +76,30 @@ export function ScheduleInterface({ assignments }: ScheduleProps) {
   const [searchQuery, setSearchQuery] = useState("");
 
   // Format utilities
-  const formatTime = (timeString: string) => timeString ? timeString.split(":").slice(0, 2).join(":") : timeString;
+  const formatTime = (timeString: string) =>
+    timeString ? timeString.split(":").slice(0, 2).join(":") : timeString;
   const formatDate = (dateString: string) => {
     if (!dateString) return dateString;
     const date = new Date(dateString);
-    return `${date.getDate().toString().padStart(2, "0")}-${(date.getMonth() + 1).toString().padStart(2, "0")}-${date.getFullYear()}`;
+    return `${date.getDate().toString().padStart(2, "0")}-${(
+      date.getMonth() + 1
+    )
+      .toString()
+      .padStart(2, "0")}-${date.getFullYear()}`;
   };
 
   // Reusable acknowledgment badge component
-  const AcknowledgmentBadge = ({ isAcknowledged }: { isAcknowledged: boolean }) => (
+  const AcknowledgmentBadge = ({
+    isAcknowledged,
+  }: {
+    isAcknowledged: boolean;
+  }) => (
     <Badge
       variant={isAcknowledged ? "default" : "secondary"}
-      className={isAcknowledged 
-        ? "bg-green-600 hover:bg-green-700 text-white"
-        : "bg-orange-100 text-orange-700 border-orange-200"
+      className={
+        isAcknowledged
+          ? "bg-green-600 hover:bg-green-700 text-white"
+          : "bg-orange-100 text-orange-700 border-orange-200"
       }
     >
       {isAcknowledged ? "Acknowledged" : "Pending"}
@@ -97,11 +107,25 @@ export function ScheduleInterface({ assignments }: ScheduleProps) {
   );
 
   // Reusable person info card
-  const PersonCard = ({ type, name, color }: { type: string; name: string; color: 'blue' | 'red' }) => (
-    <div className={`flex items-center gap-2 p-2 bg-${color}-50 rounded border-l-4 border-l-${color}-500`}>
+  const PersonCard = ({
+    type,
+    name,
+    color,
+  }: {
+    type: string;
+    name: string;
+    color: "blue" | "red";
+  }) => (
+    <div
+      className={`flex items-center gap-2 p-2 bg-${color}-50 rounded border-l-4 border-l-${color}-500`}
+    >
       <User className={`h-4 w-4 text-${color}-600`} />
       <div>
-        <div className={`text-xs font-medium text-${color}-700 uppercase tracking-wide`}>{type}</div>
+        <div
+          className={`text-xs font-medium text-${color}-700 uppercase tracking-wide`}
+        >
+          {type}
+        </div>
         <div className={`font-medium text-${color}-900`}>{name}</div>
       </div>
     </div>
@@ -121,20 +145,17 @@ export function ScheduleInterface({ assignments }: ScheduleProps) {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const BASE_URL = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8000";
-        
-        const schedulesResponse = await fetch(
-          `${BASE_URL}/assignments`
-        );
+        const BASE_URL =
+          process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8000";
+
+        const schedulesResponse = await fetch(`${BASE_URL}/assignments`);
         if (!schedulesResponse.ok) {
           console.error("Failed to fetch schedules:", schedulesResponse.status);
           return;
         }
         const schedulesData = await schedulesResponse.json();
 
-        const volunteersResponse = await fetch(
-          `${BASE_URL}/volunteers`
-        );
+        const volunteersResponse = await fetch(`${BASE_URL}/volunteers`);
         const volunteersData = await volunteersResponse.json();
 
         const seniorsResponse = await fetch(`${BASE_URL}/seniors`);
@@ -167,8 +188,10 @@ export function ScheduleInterface({ assignments }: ScheduleProps) {
   }, []);
 
   // Helpers - simplified inline lookups
-  const getVolunteerName = (vid: string) => volunteers.find((v) => v.vid === vid)?.name || vid;
-  const getSeniorName = (uid: string) => seniors.find((s) => s.uid === uid)?.name || uid;
+  const getVolunteerName = (vid: string) =>
+    volunteers.find((v) => v.vid === vid)?.name || vid;
+  const getSeniorName = (uid: string) =>
+    seniors.find((s) => s.uid === uid)?.name || uid;
 
   // Week days (7 days from today)
   const weekDays = useMemo(() => {
@@ -244,9 +267,24 @@ export function ScheduleInterface({ assignments }: ScheduleProps) {
   // Simplified weekly assignment helpers
   const getVolunteerWeeklyAssignments = (volunteerId: string) => {
     const weekDayKeys = weekDays.map((day) => day.toISOString().split("T")[0]);
-    return schedules.filter(s => s.volunteer === volunteerId && weekDayKeys.includes(s.date?.split("T")[0])).length;
+    return schedules.filter(
+      (s) =>
+        s.volunteer === volunteerId &&
+        weekDayKeys.includes(s.date?.split("T")[0])
+    ).length;
   };
-  const isVolunteerActiveThisWeek = (volunteerId: string) => getVolunteerWeeklyAssignments(volunteerId) > 0;
+  const isVolunteerActiveThisWeek = (volunteerId: string) =>
+    getVolunteerWeeklyAssignments(volunteerId) > 0;
+
+  // Filter volunteer schedules to current week only
+  const getVolunteerWeeklySchedules = (volunteerId: string) => {
+    const weekDayKeys = weekDays.map((day) => day.toISOString().split("T")[0]);
+    return schedules.filter(
+      (s) =>
+        s.volunteer === volunteerId &&
+        weekDayKeys.includes(s.date?.split("T")[0])
+    );
+  };
 
   return (
     <div className="">
@@ -437,15 +475,17 @@ export function ScheduleInterface({ assignments }: ScheduleProps) {
 
                                     {/* Volunteer and Senior info */}
                                     <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                                      <PersonCard 
-                                        type="Volunteer" 
-                                        name={getVolunteerName(schedule.volunteer)} 
-                                        color="blue" 
+                                      <PersonCard
+                                        type="Volunteer"
+                                        name={getVolunteerName(
+                                          schedule.volunteer
+                                        )}
+                                        color="blue"
                                       />
-                                      <PersonCard 
-                                        type="Senior" 
-                                        name={getSeniorName(schedule.senior)} 
-                                        color="red" 
+                                      <PersonCard
+                                        type="Senior"
+                                        name={getSeniorName(schedule.senior)}
+                                        color="red"
                                       />
                                     </div>
 
@@ -455,7 +495,11 @@ export function ScheduleInterface({ assignments }: ScheduleProps) {
                                         <span className="text-xs text-muted-foreground">
                                           Acknowledgement Status:
                                         </span>
-                                        <AcknowledgmentBadge isAcknowledged={schedule.is_acknowledged} />
+                                        <AcknowledgmentBadge
+                                          isAcknowledged={
+                                            schedule.is_acknowledged
+                                          }
+                                        />
                                       </div>
                                     </div>
                                   </div>
@@ -506,7 +550,11 @@ export function ScheduleInterface({ assignments }: ScheduleProps) {
                   .map((volunteer) => (
                     <Button
                       key={volunteer.vid}
-                      variant={selectedVolunteer === volunteer.vid ? "default" : "outline"}
+                      variant={
+                        selectedVolunteer === volunteer.vid
+                          ? "default"
+                          : "outline"
+                      }
                       size="sm"
                       onClick={() => {
                         setSelectedVolunteer(volunteer.vid);
@@ -528,8 +576,8 @@ export function ScheduleInterface({ assignments }: ScheduleProps) {
                       vol.name.toLowerCase().includes(searchQuery.toLowerCase())
                   )
                   .map((volunteer) => {
-                    const volunteerSchedules = schedules.filter(
-                      (s) => s.volunteer === volunteer.vid
+                    const volunteerSchedules = getVolunteerWeeklySchedules(
+                      volunteer.vid
                     );
                     const weeklyAssignments = getVolunteerWeeklyAssignments(
                       volunteer.vid
@@ -599,7 +647,9 @@ export function ScheduleInterface({ assignments }: ScheduleProps) {
                                     <Badge variant="outline">
                                       Cluster: {schedule.cluster}
                                     </Badge>
-                                    <AcknowledgmentBadge isAcknowledged={schedule.is_acknowledged} />
+                                    <AcknowledgmentBadge
+                                      isAcknowledged={schedule.is_acknowledged}
+                                    />
                                   </div>
                                 </div>
                               ))}
