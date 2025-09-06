@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from "react";
 import mapboxgl from "mapbox-gl";
 import "mapbox-gl/dist/mapbox-gl.css";
-import { Assignment, Cluster , Senior, Volunteer} from "@/app/page";
+import { Assignment, Cluster, Senior, Volunteer } from "@/app/page";
 
 interface Schedule {
   volunteer: string;
@@ -15,7 +15,7 @@ interface Schedule {
 
 const priorityColors: Record<"HIGH" | "MEDIUM" | "LOW", string> = {
   HIGH: "bg-red-500",
-  MEDIUM: "bg-yellow-500", 
+  MEDIUM: "bg-yellow-500",
   LOW: "bg-green-500",
 };
 
@@ -27,7 +27,7 @@ const getPriorityLevel = (wellbeing: 1 | 2 | 3): "HIGH" | "MEDIUM" | "LOW" => {
 const wellbeingLabels: Record<number, string> = {
   1: "Very Poor",
   2: "Poor",
-  3: "Normal", 
+  3: "Normal",
   4: "Good",
   5: "Very Good",
 };
@@ -41,7 +41,7 @@ export function InteractiveMap({
   seniors: seniorsProp,
   volunteers: volunteersProp,
   assignments: assignmentsProp,
-  clusters: clustersProp
+  clusters: clustersProp,
 }: {
   highlightedSeniorId?: string | null;
   onMapUnfocus?: () => void;
@@ -53,7 +53,7 @@ export function InteractiveMap({
   assignments?: Assignment[];
   clusters?: Cluster[];
 }) {
-  console.log(centerCoordinates)
+  console.log(centerCoordinates);
   const mapContainer = useRef<HTMLDivElement>(null);
   const map = useRef<mapboxgl.Map | null>(null);
   const markersRef = useRef<mapboxgl.Marker[]>([]);
@@ -72,7 +72,9 @@ export function InteractiveMap({
   const [clusters, setClusters] = useState<Cluster[]>([]);
 
   // NEW: local focused senior id (for clicks from map or external events)
-  const [locallyFocusedSeniorId, setLocallyFocusedSeniorId] = useState<string | null>(null);
+  const [locallyFocusedSeniorId, setLocallyFocusedSeniorId] = useState<
+    string | null
+  >(null);
 
   // --- Update internal state when props change ---
   useEffect(() => {
@@ -81,33 +83,51 @@ export function InteractiveMap({
         seniors: seniorsProp.length,
         volunteers: volunteersProp.length,
         assignments: assignmentsProp.length,
-        clusters: clustersProp.length
+        clusters: clustersProp.length,
       });
 
-      // Filter seniors: only show those who haven't been visited this year
+      // Filter seniors: show those who haven't been visited this year, OR high risk seniors not visited in past 4 months
       const currentYear = new Date().getFullYear();
+      const fourMonthsAgo = new Date();
+      fourMonthsAgo.setMonth(fourMonthsAgo.getMonth() - 4);
+
       const filteredSeniors = seniorsProp.filter((senior) => {
-        if (!senior.last_visit) return true;
-        return new Date(senior.last_visit).getFullYear() < currentYear;
+        if (!senior.last_visit) return true; // Never visited - always show
+
+        const lastVisitDate = new Date(senior.last_visit);
+
+        // For high risk seniors (wellbeing = 1), show if not visited in past 4 months
+        if (senior.overall_wellbeing === 1) {
+          return lastVisitDate < fourMonthsAgo;
+        }
+
+        // For other seniors, show if not visited this year
+        return lastVisitDate.getFullYear() < currentYear;
       });
 
       // Filter volunteers: only show those with assignments
       const volunteersWithAssignments = volunteersProp.filter((volunteer) =>
         assignmentsProp.some((assignment: any) =>
-          [assignment.vid, assignment.volunteer_id, assignment.volunteer].includes(volunteer.vid)
+          [
+            assignment.vid,
+            assignment.volunteer_id,
+            assignment.volunteer,
+          ].includes(volunteer.vid)
         )
       );
 
       // Process assignments and schedules
       const schedulesFromAssignments: Schedule[] = Object.values(
         assignmentsProp.reduce((acc: any, assignment: any) => {
-          const volunteerId = assignment.vid || assignment.volunteer_id || assignment.volunteer;
+          const volunteerId =
+            assignment.vid || assignment.volunteer_id || assignment.volunteer;
           const clusterId = assignment.cluster_id || assignment.cluster;
-          const date = assignment.date || new Date().toISOString().split('T')[0];
-          const startTime = assignment.start_time || '09:00';
-          
+          const date =
+            assignment.date || new Date().toISOString().split("T")[0];
+          const startTime = assignment.start_time || "09:00";
+
           const start = new Date(`1970-01-01T${startTime}`);
-          const end = new Date(`1970-01-01T${assignment.end_time || '10:00'}`);
+          const end = new Date(`1970-01-01T${assignment.end_time || "10:00"}`);
           const duration = (end.getTime() - start.getTime()) / (1000 * 60);
 
           const key = `${volunteerId}-${clusterId}-${date}T${startTime}`;
@@ -122,22 +142,26 @@ export function InteractiveMap({
             };
           }
 
-          acc[key].seniors.push(assignment.sid || assignment.senior_id || assignment.senior);
+          acc[key].seniors.push(
+            assignment.sid || assignment.senior_id || assignment.senior
+          );
           return acc;
         }, {})
       );
 
       const assignmentsFromData = assignmentsProp.map((assignment: any) => ({
-        volunteer: assignment.vid || assignment.volunteer_id || assignment.volunteer,
+        volunteer:
+          assignment.vid || assignment.volunteer_id || assignment.volunteer,
         cluster: assignment.cluster_id || assignment.cluster,
         distance: assignment.distance || 0,
       }));
 
       // Process clusters
       const processedClusters = clustersProp.map((cluster: any) => {
-        const centroid = typeof cluster.centroid === "string" 
-          ? JSON.parse(cluster.centroid) 
-          : cluster.centroid || cluster.center;
+        const centroid =
+          typeof cluster.centroid === "string"
+            ? JSON.parse(cluster.centroid)
+            : cluster.centroid || cluster.center;
 
         const radiusInKm = (cluster.radius || 0.01) * 111; // Convert to km
 
@@ -242,7 +266,7 @@ export function InteractiveMap({
   useEffect(() => {
     if (!map.current || !mapLoaded || !highlightedSeniorId) return;
 
-    const s = seniors.find(x => x.uid === highlightedSeniorId);
+    const s = seniors.find((x) => x.uid === highlightedSeniorId);
     if (!s?.coords) return;
 
     setHighlightedCluster(null);
@@ -251,7 +275,10 @@ export function InteractiveMap({
     const assessment = getPriorityLevel(s.overall_wellbeing);
     showSeniorPopup(s, assessment);
 
-    const bounds = new mapboxgl.LngLatBounds().extend([s.coords.lng, s.coords.lat]);
+    const bounds = new mapboxgl.LngLatBounds().extend([
+      s.coords.lng,
+      s.coords.lat,
+    ]);
     map.current.fitBounds(bounds, { padding: 80, maxZoom: 15 });
   }, [highlightedSeniorId, mapLoaded, seniors]);
 
@@ -295,25 +322,34 @@ export function InteractiveMap({
     };
 
     window.addEventListener("focus-senior", onFocusSenior as EventListener);
-    window.addEventListener("focus-volunteer", onFocusVolunteer as EventListener);
+    window.addEventListener(
+      "focus-volunteer",
+      onFocusVolunteer as EventListener
+    );
     return () => {
-      window.removeEventListener("focus-senior", onFocusSenior as EventListener);
-      window.removeEventListener("focus-volunteer", onFocusVolunteer as EventListener);
+      window.removeEventListener(
+        "focus-senior",
+        onFocusSenior as EventListener
+      );
+      window.removeEventListener(
+        "focus-volunteer",
+        onFocusVolunteer as EventListener
+      );
     };
   }, [mapLoaded, seniors, volunteers]);
 
   // --- Re-render markers when data changes ---
   useEffect(() => {
     if (!map.current || !mapLoaded) return;
-    
+
     console.log("Re-rendering markers with data:", {
       seniors: seniors.length,
       volunteers: volunteers.length,
-      clusters: clusters.length
+      clusters: clusters.length,
     });
-    
+
     renderMarkers();
-    
+
     // Clicking elsewhere on the map unfocuses
     if (map.current && onMapUnfocus) {
       map.current.on("click", () => {
@@ -338,9 +374,14 @@ export function InteractiveMap({
   ]);
 
   // Helper function to create circle polygon
-  const createCirclePolygon = (center: [number, number], radiusKm: number, points = 64): [number, number][] => {
+  const createCirclePolygon = (
+    center: [number, number],
+    radiusKm: number,
+    points = 64
+  ): [number, number][] => {
     const coords: [number, number][] = [];
-    const distanceX = radiusKm / (111.32 * Math.cos((center[1] * Math.PI) / 180));
+    const distanceX =
+      radiusKm / (111.32 * Math.cos((center[1] * Math.PI) / 180));
     const distanceY = radiusKm / 110.54;
 
     for (let i = 0; i < points; i++) {
@@ -462,9 +503,9 @@ export function InteractiveMap({
 
     // Senior markers
     seniors.forEach((s) => {
-      console.log(s.coords)
+      console.log(s.coords);
       if (!s.coords) return;
-      
+
       const assessment = getPriorityLevel(s.overall_wellbeing);
       const isInHighlightedCluster =
         highlightedCluster !== null &&
@@ -474,11 +515,14 @@ export function InteractiveMap({
 
       const isIndividuallyHighlighted = s.uid === highlightedSeniorId;
       const isLocallyFocused = s.uid === locallyFocusedSeniorId;
-      const focused = isInHighlightedCluster || isIndividuallyHighlighted || isLocallyFocused;
+      const focused =
+        isInHighlightedCluster || isIndividuallyHighlighted || isLocallyFocused;
 
       const colorClass = priorityColors[assessment];
       const sizeClass = focused ? "w-8 h-8" : "w-6 h-6";
-      const borderClass = focused ? "border-4 border-purple-500" : "border-2 border-white";
+      const borderClass = focused
+        ? "border-4 border-purple-500"
+        : "border-2 border-white";
 
       const el = document.createElement("div");
       el.className = `${sizeClass} ${colorClass} rounded-full ${borderClass} shadow-md cursor-pointer flex items-center justify-center text-xs relative z-20`;
@@ -488,7 +532,7 @@ export function InteractiveMap({
       const marker = new mapboxgl.Marker(el)
         .setLngLat([s.coords.lng, s.coords.lat])
         .addTo(map.current!);
-      
+
       el.addEventListener("click", (e) => {
         e.stopPropagation();
         setHighlightedCluster(null);
@@ -499,7 +543,7 @@ export function InteractiveMap({
           zoom: Math.max(map.current!.getZoom(), 15),
           essential: true,
         });
-          
+
         showSeniorPopup(s, assessment);
       });
       markersRef.current.push(marker);
@@ -509,13 +553,14 @@ export function InteractiveMap({
     volunteers.forEach((v) => {
       if (!v.coords) return;
       const el = document.createElement("div");
-      el.className = "w-6 h-6 bg-blue-500 rounded-full border-2 border-white shadow-md flex items-center justify-center text-xs relative z-20";
+      el.className =
+        "w-6 h-6 bg-blue-500 rounded-full border-2 border-white shadow-md flex items-center justify-center text-xs relative z-20";
       el.innerText = "🙋";
-      
+
       const marker = new mapboxgl.Marker(el)
         .setLngLat([v.coords.lng, v.coords.lat])
         .addTo(map.current!);
-      
+
       el.addEventListener("click", (e) => {
         e.stopPropagation();
         setHighlightedCluster(null);
@@ -583,24 +628,41 @@ export function InteractiveMap({
     return "🔴";
   };
 
-  const createSeniorPopupHTML = (senior: Senior, priority: "HIGH" | "MEDIUM" | "LOW") => {
+  const createSeniorPopupHTML = (
+    senior: Senior,
+    priority: "HIGH" | "MEDIUM" | "LOW"
+  ) => {
     const lastVisit = senior.last_visit
       ? new Date(senior.last_visit).toLocaleDateString()
       : "Never visited";
 
     const priorityStyles = {
       HIGH: "bg-red-100 text-red-800",
-      MEDIUM: "bg-yellow-100 text-yellow-800", 
+      MEDIUM: "bg-yellow-100 text-yellow-800",
       LOW: "bg-green-100 text-green-800",
     };
 
     const wellbeingItems = [
-      { icon: getWellbeingIcon(senior.physical), label: "Physical Health", value: senior.physical },
-      { icon: getWellbeingIcon(senior.mental), label: "Mental Health", value: senior.mental },
-      { icon: getWellbeingIcon(senior.community), label: "Community", value: senior.community },
+      {
+        icon: getWellbeingIcon(senior.physical),
+        label: "Physical Health",
+        value: senior.physical,
+      },
+      {
+        icon: getWellbeingIcon(senior.mental),
+        label: "Mental Health",
+        value: senior.mental,
+      },
+      {
+        icon: getWellbeingIcon(senior.community),
+        label: "Community",
+        value: senior.community,
+      },
     ];
 
-    const visitStatus = senior.last_visit ? `Last visited: ${lastVisit}` : "Never visited - needs attention";
+    const visitStatus = senior.last_visit
+      ? `Last visited: ${lastVisit}`
+      : "Never visited - needs attention";
 
     return `
     <div class="w-60 p-0 bg-white rounded-lg">
@@ -608,8 +670,12 @@ export function InteractiveMap({
         <div class="flex items-center gap-3">
           <div class="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center text-lg">👤</div>
           <div class="flex-1">
-            <h3 class="font-semibold text-base text-gray-900">${escapeHtml(senior.name || senior.uid)}</h3>
-            <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${priorityStyles[priority]}">
+            <h3 class="font-semibold text-base text-gray-900">${escapeHtml(
+              senior.name || senior.uid
+            )}</h3>
+            <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
+              priorityStyles[priority]
+            }">
               ${priority} Priority
             </span>
           </div>
@@ -623,36 +689,53 @@ export function InteractiveMap({
           <div>
             <h4 class="text-sm font-medium text-gray-700 mb-2">Wellbeing Status</h4>
             <div class="space-y-2">
-              ${wellbeingItems.map(item => `
+              ${wellbeingItems
+                .map(
+                  (item) => `
                 <div class="flex items-center justify-between">
                   <span class="text-sm text-gray-600 flex items-center gap-2">
                     ${item.icon} ${item.label}
                   </span>
                   <span class="text-sm font-medium">
-                    ${item.value !== undefined ? wellbeingLabels[item.value] : "Unknown"}
+                    ${
+                      item.value !== undefined
+                        ? wellbeingLabels[item.value]
+                        : "Unknown"
+                    }
                   </span>
                 </div>
-              `).join("")}
+              `
+                )
+                .join("")}
             </div>
           </div>
           
-          ${senior.cluster ? `
+          ${
+            senior.cluster
+              ? `
           <div class="pt-2 border-t border-gray-100">
             <div class="flex items-center justify-between">
               <span class="text-sm text-gray-600 flex items-center gap-2">📍 Cluster</span>
               <span class="text-sm font-medium">${senior.cluster}</span>
             </div>
           </div>
-          ` : ""}
+          `
+              : ""
+          }
         </div>
       </div>
     </div>
   `;
   };
 
-  const createVolunteerPopupHTML = (volunteer: Volunteer, assignment?: Assignment) => {
+  const createVolunteerPopupHTML = (
+    volunteer: Volunteer,
+    assignment?: Assignment
+  ) => {
     const isActive = isVolunteerActiveThisWeek(volunteer.vid);
-    const availabilityStyle = isActive ? "bg-green-100 text-green-800" : "bg-gray-100 text-gray-800";
+    const availabilityStyle = isActive
+      ? "bg-green-100 text-green-800"
+      : "bg-gray-100 text-gray-800";
     const availabilityText = isActive ? "Active" : "Inactive";
 
     return `
@@ -661,7 +744,9 @@ export function InteractiveMap({
         <div class="flex items-center gap-3">
           <div class="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center text-lg">🙋</div>
           <div class="flex-1">
-            <h3 class="font-semibold text-base text-gray-900">${escapeHtml(volunteer.name || volunteer.vid)}</h3>
+            <h3 class="font-semibold text-base text-gray-900">${escapeHtml(
+              volunteer.name || volunteer.vid
+            )}</h3>
             <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${availabilityStyle}">
               ${availabilityText}
             </span>
@@ -681,15 +766,25 @@ export function InteractiveMap({
               <div class="flex items-center justify-between">
                 <span class="text-sm text-gray-600 flex items-center gap-2">📍 Assignment</span>
                 <span class="text-sm font-medium">
-                  ${assignment ? `Cluster ${assignment.cluster}` : "Not Assigned"}
+                  ${
+                    assignment
+                      ? `Cluster ${assignment.cluster}`
+                      : "Not Assigned"
+                  }
                 </span>
               </div>
-              ${assignment && assignment.distance ? `
+              ${
+                assignment && assignment.distance
+                  ? `
               <div class="flex items-center justify-between">
                 <span class="text-sm text-gray-600 flex items-center gap-2">📏 Distance</span>
-                <span class="text-sm font-medium">${assignment.distance.toFixed(1)} km</span>
+                <span class="text-sm font-medium">${assignment.distance.toFixed(
+                  1
+                )} km</span>
               </div>
-              ` : ""}
+              `
+                  : ""
+              }
             </div>
           </div>
         </div>

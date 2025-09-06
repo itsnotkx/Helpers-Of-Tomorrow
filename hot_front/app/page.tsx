@@ -95,14 +95,16 @@ export default function VolunteerDashboard() {
 
   const wellbeingLabels: Record<number, string> = {
     1: "Very Poor",
-    2: "Poor", 
+    2: "Poor",
     3: "Normal",
     4: "Good",
     5: "Very Good",
   };
 
   // Unified priority mapping
-  const getPriorityLevel = (wellbeing: 1 | 2 | 3): "HIGH" | "MEDIUM" | "LOW" => {
+  const getPriorityLevel = (
+    wellbeing: 1 | 2 | 3
+  ): "HIGH" | "MEDIUM" | "LOW" => {
     return wellbeing === 1 ? "HIGH" : wellbeing === 2 ? "MEDIUM" : "LOW";
   };
 
@@ -111,12 +113,13 @@ export default function VolunteerDashboard() {
       setLoading(true);
       const BASE_URL = "http://localhost:8000";
 
-      const [seniorsRes, volunteersRes, assignmentsRes, clusterRes] = await Promise.all([
-        fetch(`${BASE_URL}/seniors`).then((r) => r.json()),
-        fetch(`${BASE_URL}/volunteers`).then((r) => r.json()),
-        fetch(`${BASE_URL}/assignments`).then((r) => r.json()),
-        fetch(`${BASE_URL}/clusters`).then((r) => r.json()),
-      ]);
+      const [seniorsRes, volunteersRes, assignmentsRes, clusterRes] =
+        await Promise.all([
+          fetch(`${BASE_URL}/seniors`).then((r) => r.json()),
+          fetch(`${BASE_URL}/volunteers`).then((r) => r.json()),
+          fetch(`${BASE_URL}/assignments`).then((r) => r.json()),
+          fetch(`${BASE_URL}/clusters`).then((r) => r.json()),
+        ]);
 
       setSeniors(seniorsRes.seniors);
       setVolunteers(volunteersRes.volunteers);
@@ -162,43 +165,43 @@ export default function VolunteerDashboard() {
     return userCoordinates ? (userCoordinates as [number, number]) : undefined;
   }, [userCoordinates]);
 
-async function fetch_dl_details(email: string) {
-  try {
-    setDLIsLoading(true);
-    const BASE_URL = "http://localhost:8000";
-    if (email != "") {
-      const res = await fetch(`${BASE_URL}/dl/${email}`, {
-        method: "GET",
-        headers: {
-          "Content-Type": "application/json",
-        },
-      }).then((res) => res.json());
+  async function fetch_dl_details(email: string) {
+    try {
+      setDLIsLoading(true);
+      const BASE_URL = "http://localhost:8000";
+      if (email != "") {
+        const res = await fetch(`${BASE_URL}/dl/${email}`, {
+          method: "GET",
+          headers: {
+            "Content-Type": "application/json",
+          },
+        }).then((res) => res.json());
 
-      console.log("Fetched user information:", res.dl_info[0]);
-      if (res.dl_info[0] != null) {
-        if (
-          res.dl_info[0].constituency.centre_lat &&
-          res.dl_info[0].constituency.centre_long
-        ) {
-          const coordinates: [number, number] = [
-            res.dl_info[0].constituency.centre_long,
-            res.dl_info[0].constituency.centre_lat,
-          ];
-          setUserCoordinates(coordinates);
-          console.log("Setting user coordinates to:", coordinates); // Log the actual values being set
-        }
-        if (res.dl_info[0].constituency_name) {
-          setConstituencyName(res.dl_info[0].constituency_name);
+        console.log("Fetched user information:", res.dl_info[0]);
+        if (res.dl_info[0] != null) {
+          if (
+            res.dl_info[0].constituency.centre_lat &&
+            res.dl_info[0].constituency.centre_long
+          ) {
+            const coordinates: [number, number] = [
+              res.dl_info[0].constituency.centre_long,
+              res.dl_info[0].constituency.centre_lat,
+            ];
+            setUserCoordinates(coordinates);
+            console.log("Setting user coordinates to:", coordinates); // Log the actual values being set
+          }
+          if (res.dl_info[0].constituency_name) {
+            setConstituencyName(res.dl_info[0].constituency_name);
+          }
         }
       }
+    } catch (error) {
+      console.error("Error fetching schedules:", error);
+    } finally {
+      setDLIsLoading(false);
+      setHasLoadedUserDetails(true); // Mark as loaded to prevent re-fetching
     }
-  } catch (error) {
-    console.error("Error fetching schedules:", error);
-  } finally {
-    setDLIsLoading(false);
-    setHasLoadedUserDetails(true); // Mark as loaded to prevent re-fetching
   }
-}
 
   if (dlisLoading && !hasLoadedUserDetails) {
     return (
@@ -212,15 +215,16 @@ async function fetch_dl_details(email: string) {
   }
 
   // Unified function to handle map focus for both seniors and volunteers
-  const handleMapFocus = (type: 'senior' | 'volunteer', id: string) => {
-    const target = type === 'senior' 
-      ? seniors.find((s) => s.uid === id)
-      : volunteers.find((v) => v.vid === id);
-    
+  const handleMapFocus = (type: "senior" | "volunteer", id: string) => {
+    const target =
+      type === "senior"
+        ? seniors.find((s) => s.uid === id)
+        : volunteers.find((v) => v.vid === id);
+
     if (!target || !target.coords) return;
 
     // Set appropriate highlights
-    if (type === 'senior') {
+    if (type === "senior") {
       setHighlightedSeniorId(id);
       setHighlightedVolunteerId(null);
     } else {
@@ -235,10 +239,14 @@ async function fetch_dl_details(email: string) {
 
     // Dispatch custom event for map to handle
     setTimeout(() => {
-      if (type === 'senior') {
-        window.dispatchEvent(new CustomEvent('focus-senior', { detail: { uid: id } }));
+      if (type === "senior") {
+        window.dispatchEvent(
+          new CustomEvent("focus-senior", { detail: { uid: id } })
+        );
       } else {
-        window.dispatchEvent(new CustomEvent('focus-volunteer', { detail: { vid: id } }));
+        window.dispatchEvent(
+          new CustomEvent("focus-volunteer", { detail: { vid: id } })
+        );
       }
     }, 100);
   };
@@ -265,7 +273,8 @@ async function fetch_dl_details(email: string) {
   endOfWeek.setDate(startOfWeek.getDate() + 6); // 6 days later
   endOfWeek.setHours(23, 59, 59, 999);
 
-  const startOfYear = new Date(new Date().getFullYear(), 0, 1);
+  const fourMonthsAgo = new Date(now);
+  fourMonthsAgo.setMonth(fourMonthsAgo.getMonth() - 4);
   const today = new Date().toDateString();
 
   // Helper to get volunteer's assignments count for this week
@@ -296,11 +305,11 @@ async function fetch_dl_details(email: string) {
     return scheduleDate === today;
   });
 
-  // Seniors needing immediate care: high priority AND not visited this year
+  // Seniors needing immediate care: high priority AND not visited in the past 4 months
   const seniorsNeedingImmediateCare = highPrioritySeniors.filter((senior) => {
     if (!senior.last_visit) return true; // Never visited
     const lastVisitDate = new Date(senior.last_visit);
-    return lastVisitDate < startOfYear; // Not visited this year
+    return lastVisitDate < fourMonthsAgo; // Not visited in the past 4 months
   });
 
   const highRiskCount = highPrioritySeniors.length;
@@ -311,7 +320,7 @@ async function fetch_dl_details(email: string) {
     const bNeedsCare = seniorsNeedingImmediateCare.includes(b);
     return aNeedsCare === bNeedsCare ? 0 : aNeedsCare ? -1 : 1;
   });
- 
+
   return (
     <div className="min-h-screen bg-background">
       <DashboardHeader
@@ -378,7 +387,7 @@ async function fetch_dl_details(email: string) {
                         key={senior.uid}
                         className="cursor-pointer rounded-lg border border-purple-500 p-4 hover:bg-purple-50 transition"
                         onClick={() => {
-                          handleMapFocus('senior', senior.uid);
+                          handleMapFocus("senior", senior.uid);
                           setShowHighRiskModal(false); // Close the modal
                         }}
                       >
@@ -600,7 +609,7 @@ async function fetch_dl_details(email: string) {
                           ? "border-blue-500 bg-blue-50 shadow-lg"
                           : ""
                       }`}
-                      onClick={() => handleMapFocus('volunteer', v.vid)}
+                      onClick={() => handleMapFocus("volunteer", v.vid)}
                     >
                       <div className="flex justify-between mb-2">
                         <h4 className="font-medium">

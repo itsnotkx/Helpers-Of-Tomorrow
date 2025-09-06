@@ -48,20 +48,37 @@ Deno.serve(async (req) => {
     // Calculate start of current year
     const currentYear = new Date().getFullYear()
     const startOfYear = `${currentYear}-01-01`
+    const startOfYearDate = new Date(startOfYear)
 
-    // Fetch seniors who haven't been visited this year
+    // Fetch seniors (filter in code to apply 4-month rule for wellbeing=1)
     const { data: seniorsData, error: seniorsError } = await supabase
       .from('seniors')
       .select('uid, overall_wellbeing, coords, last_visit')
-      .or(`last_visit.is.null,last_visit.lt.${startOfYear}`)
 
     if (seniorsError) throw seniorsError
 
     // Parse coordinates for seniors
-    const seniors = seniorsData.map(s => ({
+    const allSeniors = seniorsData.map(s => ({
       ...s,
       coords: typeof s.coords === 'string' ? JSON.parse(s.coords) : s.coords
     }))
+
+    // Apply eligibility rules:
+    // - wellbeing 1: last_visit null OR older than 4 months
+    // - wellbeing >1: last_visit null OR last_visit < start of year
+    const today = new Date()
+    const fourMonthsAgo = new Date(today)
+    fourMonthsAgo.setMonth(fourMonthsAgo.getMonth() - 4)
+
+    const seniors = allSeniors.filter(s => {
+      const lastVisit = s.last_visit ? new Date(s.last_visit) : null
+      if (s.overall_wellbeing === 1) {
+        return !lastVisit || lastVisit < fourMonthsAgo
+      }
+      return !lastVisit || lastVisit < startOfYearDate
+    })
+
+    console.log(`Eligibility filter: ${allSeniors.length} total seniors, ${seniors.length} eligible for scheduling`)
 
     // Fetch volunteers with their skills and coordinates
     const { data: volunteersData, error: volunteersError } = await supabase
@@ -77,11 +94,8 @@ Deno.serve(async (req) => {
     }))
 
     // Calculate date range: Monday to Sunday after current Sunday
-    const today = new Date()
+    // NOTE: reuse 'today' from above to avoid redeclaration
     const dayOfWeek = today.getDay() // 0 = Sunday
-    
-    // If today is Sunday, get Monday-Sunday of the following week
-    // If today is any other day, this shouldn't run, but handle gracefully
     const daysUntilNextMonday = dayOfWeek === 0 ? 1 : (8 - dayOfWeek) % 7
     const nextMonday = new Date(today.getTime() + daysUntilNextMonday * 24 * 60 * 60 * 1000)
     const nextSunday = new Date(nextMonday.getTime() + 6 * 24 * 60 * 60 * 1000)
@@ -96,9 +110,36 @@ Deno.serve(async (req) => {
 
     if (availabilitiesError) throw availabilitiesError
 
-    console.log(`Found ${availabilities.length} availability slots for the target week`)
+    let availList = availabilities ?? []
+    console.log(`Found ${availList.length} availability slots for the target week`)
 
-    // Perform geographical K-means clustering with overlap avoidance
+    // Fallback: if no next-week availability, try current week (Mon–Sun including today)
+    if (availList.length === 0) {
+      const currentDow = today.getDay()
+      const currentMonday = new Date(today)
+      currentMonday.setDate(today.getDate() - (currentDow === 0 ? 6 : currentDow - 1))
+      currentMonday.setHours(0, 0, 0, 0)
+      const currentSunday = new Date(currentMonday)
+      currentSunday.setDate(currentMonday.getDate() + 6)
+      currentSunday.setHours(23, 59, 59, 999)
+
+      console.log(`No next-week availability. Falling back to current week: ${currentMonday.toISOString().split('T')[0]} to ${currentSunday.toISOString().split('T')[0]}`)
+
+      const { data: fallbackAvail, error: fallbackErr } = await supabase
+        .from('availabilities')
+        .select('date, start_t, end_t, volunteer_email')
+        .gte('date', currentMonday.toISOString().split('T')[0])
+        .lte('date', currentSunday.toISOString().split('T')[0])
+
+      if (fallbackErr) {
+        console.error('Error fetching fallback current-week availability:', fallbackErr)
+      } else {
+        availList = fallbackAvail ?? []
+        console.log(`Found ${availList.length} availability slots for the current week`)
+      }
+    }
+
+    // Perform geographical K-means clustering on eligible seniors
     const clusters = performGeographicalClustering(seniors, volunteers)
     
     console.log('Generated clusters:', clusters.length)
@@ -141,7 +182,7 @@ Deno.serve(async (req) => {
     }
     
     // Generate schedules with one visit per senior maximum
-    const schedules = generateOptimalSchedules(clusters, volunteers, availabilities)
+    const schedules = generateOptimalSchedules(clusters, volunteers, availList)
     
     // Insert schedules into assignments table
     if (schedules.length > 0) {
@@ -205,6 +246,7 @@ function performGeographicalClustering(seniors: Senior[], _volunteers: Volunteer
   if (seniors.length === 0) return []
 
   const targetSize = 7
+  const maxSoftSize = targetSize + 1 // allow slight overflow when it clearly prevents sub-clusters
   const k = Math.ceil(seniors.length / targetSize)
 
   type Point = { lat: number; lng: number; senior: Senior }
@@ -238,40 +280,51 @@ function performGeographicalClustering(seniors: Senior[], _volunteers: Volunteer
   const maxIter = 20
 
   for (let iter = 0; iter < maxIter; iter++) {
-    // Init clusters and capacities
+    // Init clusters
     clusters = centroids.map((c, id) => ({
       seniors: [],
       centroid: { lat: c.lat, lng: c.lng },
       id: id + 1
     }))
-    const capacity = new Array(centroids.length).fill(targetSize)
 
-    // Build preferences (closest centroids first)
+    // Track sizes with soft capacity
+    const counts = new Array(centroids.length).fill(0)
+
+    // Build ordered centroid preferences with distances
     const prefs = pts.map(p => {
-      const order = centroids
+      const ordered = centroids
         .map((c, i) => ({ i, d: euclid(p, c) }))
         .sort((a, b) => a.d - b.d)
-        .map(o => o.i)
-      return { p, order, bestDist: euclid(p, centroids[order[0]]) }
+      return { p, ordered }
     })
 
-    // Assign nearest-first with capacity constraint to avoid oversized clusters
-    prefs.sort((a, b) => a.bestDist - b.bestDist)
+    // Assign with soft capacity:
+    // - Prefer underfull clusters (< targetSize) if distance is comparable (<= 1.2x of nearest)
+    // - Otherwise, allow best cluster to go up to maxSoftSize
+    // - As a last resort, place in nearest (keeps convergence)
+    const comparableFactor = 1.2
     for (const pref of prefs) {
-      let placed = false
-      for (const ci of pref.order) {
-        if (capacity[ci] > 0) {
-          clusters[ci].seniors.push({ ...pref.p.senior, cluster: clusters[ci].id })
-          capacity[ci]--
-          placed = true
-          break
+      const best = pref.ordered[0]
+      const underCandidate = pref.ordered.find(o => counts[o.i] < targetSize)
+      let chosenIdx = -1
+
+      if (counts[best.i] < targetSize) {
+        chosenIdx = best.i
+      } else if (underCandidate) {
+        if (underCandidate.d <= best.d * comparableFactor) {
+          chosenIdx = underCandidate.i
+        } else if (counts[best.i] < maxSoftSize) {
+          chosenIdx = best.i
+        } else {
+          chosenIdx = underCandidate.i
         }
+      } else {
+        // No underfull clusters remain; allow soft overflow if possible, else nearest
+        chosenIdx = counts[best.i] < maxSoftSize ? best.i : best.i
       }
-      if (!placed) {
-        // Fallback (should be rare): assign to absolute nearest ignoring capacity
-        const ci = pref.order[0]
-        clusters[ci].seniors.push({ ...pref.p.senior, cluster: clusters[ci].id })
-      }
+
+      clusters[chosenIdx].seniors.push({ ...pref.p.senior, cluster: clusters[chosenIdx].id })
+      counts[chosenIdx]++
     }
 
     // Update centroids
@@ -296,7 +349,6 @@ function performGeographicalClustering(seniors: Senior[], _volunteers: Volunteer
     c.centroid = { lat: avgLat, lng: avgLng }
   })
 
-  // Compute density/radius
   clusters.forEach(c => {
     c.density = calculateClusterDensity(c.seniors)
     c.radius = calculateClusterRadius(c.seniors, c.centroid)
@@ -305,18 +357,20 @@ function performGeographicalClustering(seniors: Senior[], _volunteers: Volunteer
   // Split outlier-radius clusters to avoid “spanning” ones
   const radii = clusters.map(c => c.radius || 0).sort((a, b) => a - b)
   const median = radii.length ? radii[Math.floor(radii.length / 2)] : 0
-  const threshold = median > 0 ? median * 2.5 : 0 // outlier if > 2.5x median
+  const threshold = median > 0 ? median * 2.5 : 0
 
   if (threshold > 0) {
     const next: Cluster[] = []
     for (const c of clusters) {
       if ((c.radius || 0) > threshold && c.seniors.length > 4) {
-        // Split into two by farthest-pair seeding (2-means within cluster)
         const arr = c.seniors
         let a = 0, b = 1, maxD = -1
         for (let i = 0; i < arr.length; i++) {
           for (let j = i + 1; j < arr.length; j++) {
-            const d = euclid(arr[i].coords, arr[j].coords)
+            const d = Math.sqrt(
+              Math.pow(arr[i].coords.lat - arr[j].coords.lat, 2) +
+              Math.pow(arr[i].coords.lng - arr[j].coords.lng, 2)
+            )
             if (d > maxD) { maxD = d; a = i; b = j }
           }
         }
@@ -326,8 +380,8 @@ function performGeographicalClustering(seniors: Senior[], _volunteers: Volunteer
         const part1: Senior[] = []
         const part2: Senior[] = []
         for (const s of arr) {
-          const d1 = euclid(s.coords, seed1)
-          const d2 = euclid(s.coords, seed2)
+          const d1 = Math.sqrt(Math.pow(s.coords.lat - seed1.lat, 2) + Math.pow(s.coords.lng - seed1.lng, 2))
+          const d2 = Math.sqrt(Math.pow(s.coords.lat - seed2.lat, 2) + Math.pow(s.coords.lng - seed2.lng, 2))
           if (d1 <= d2) part1.push({ ...s })
           else part2.push({ ...s })
         }
@@ -343,7 +397,7 @@ function performGeographicalClustering(seniors: Senior[], _volunteers: Volunteer
         }
 
         if (part1.length === 0 || part2.length === 0) {
-          next.push(c) // degenerate split; keep as-is
+          next.push(c)
         } else {
           next.push(mkCluster(part1 as unknown as Senior))
           next.push(mkCluster(part2 as unknown as Senior))
@@ -352,8 +406,6 @@ function performGeographicalClustering(seniors: Senior[], _volunteers: Volunteer
         next.push(c)
       }
     }
-
-    // Reindex and fix members
     next.forEach((c, idx) => {
       c.id = idx + 1
       c.seniors.forEach(s => (s.cluster = c.id))
@@ -361,7 +413,6 @@ function performGeographicalClustering(seniors: Senior[], _volunteers: Volunteer
     clusters = next
   }
 
-  // Final density/radius update
   clusters.forEach(c => {
     c.density = calculateClusterDensity(c.seniors)
     c.radius = calculateClusterRadius(c.seniors, c.centroid)
