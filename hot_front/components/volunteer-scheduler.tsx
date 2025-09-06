@@ -489,7 +489,7 @@ export default function VolunteerSchedule() {
 
           <div className="flex items-center justify-center gap-2 mb-6 mt-8">
             <h4 className="text-xl font-semibold text-red-600">
-              Outstanding Assignments
+              Acknowledged Assignments
             </h4>
           </div>
           <div className="mb-4"></div>
@@ -556,7 +556,7 @@ export default function VolunteerSchedule() {
                 <CardContent>
                   <CheckCircle2 className="h-12 w-12 text-gray-400 mx-auto mb-2" />
                   <p className="text-gray-500">
-                    No outstanding assignments available.
+                    No acknowledged assignments available.
                   </p>
                 </CardContent>
               </Card>
