@@ -71,80 +71,14 @@ def health():
     }
 
 @app.get("/seniors")
-def get_seniors():
-    try:
-        response = supabase.table("seniors").select("*").execute()
-        logger.info(f"Fetched {len(response.data)} seniors")
+def get_seniors(): 
+    response = supabase.table("seniors").select("*").execute()
+    logger.info(f"Fetched {len(response.data)} seniors")
+    return {"seniors": response.data}
         
-        # Add static addresses based on coordinates
-        seniors_with_address = []
-        for senior in response.data:
-            senior_data = senior.copy()
-            
-            # Use static_address if available, otherwise generate from coordinates
-            if senior.get("static_address"):
-                senior_data["address"] = senior["static_address"]
-            elif senior.get("coords") and isinstance(senior["coords"], dict):
-                coords = senior["coords"]
-                if "lat" in coords and "lng" in coords:
-                    try:
-                        lat, lng = float(coords["lat"]), float(coords["lng"])
-                        senior_data["address"] = get_nearest_area(lat, lng)
-                        logger.debug(f"Generated address for senior {senior['uid'][:8]}: {senior_data['address']}")
-                    except (ValueError, TypeError):
-                        senior_data["address"] = "Singapore"
-                else:
-                    senior_data["address"] = "Singapore"
-            else:
-                senior_data["address"] = "Singapore"
-                
-            seniors_with_address.append(senior_data)
-        
-        logger.info(f"Processed {len(seniors_with_address)} seniors with addresses")
-        return {"seniors": seniors_with_address}
-        
-    except Exception as e:
-        logger.error(f"Error in get_seniors: {str(e)}")
-        return {"seniors": []}
-
-# Add a separate endpoint for batch geocoding (run manually/scheduled)
-@app.post("/seniors/geocode")
-def batch_geocode_seniors():
-    """
-    Batch geocode all seniors and store addresses in database.
-    This should be run separately, not during normal API calls.
-    """
-    try:
-        response = supabase.table("seniors").select("*").execute()
-        
-        geocoded_count = 0
-        for senior in response.data:
-            coords = senior.get("coords")
-            if coords and not senior.get("address"):  # Only geocode if no address exists
-                try:
-                    time.sleep(1)  # Respectful delay
-                    lat, lng = coords["lat"], coords["lng"]
-                    address = geocoder.get_singapore_address(lat, lng)
-                    
-                    if address:
-                        # Update the database with the address
-                        supabase.table("seniors").update({
-                            "address": address
-                        }).eq("uid", senior["uid"]).execute()
-                        geocoded_count += 1
-                        logger.info(f"Geocoded senior {senior['uid'][:8]}")
-                        
-                except Exception as e:
-                    logger.warning(f"Failed to geocode {senior['uid'][:8]}: {str(e)[:50]}")
-                    continue
-        
-        return {"message": f"Geocoded {geocoded_count} seniors"}
-    except Exception as e:
-        logger.error(f"Batch geocoding error: {str(e)}")
-        return {"error": "Batch geocoding failed"}
 
 @app.get("/volunteers")
-def get_volunteers():  # This was correct but adding logging
+def get_volunteers():  
     response = supabase.table("volunteers").select("*").execute()
     logger.info(f"Fetched {len(response.data)} volunteers")
     return {"volunteers": response.data}

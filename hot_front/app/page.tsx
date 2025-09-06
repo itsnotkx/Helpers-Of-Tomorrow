@@ -113,37 +113,40 @@ export default function VolunteerDashboard() {
   const loadDashboardData = async (retryCount = 0) => {
     const MAX_RETRIES = 3;
     const RETRY_DELAY = 1000; // 1 second
-    
+
     try {
       setLoading(true);
       setError(null); // Clear any previous errors
-      const BASE_URL = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8000";
+      const BASE_URL =
+        process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8000";
 
       console.log(`Loading dashboard data (attempt ${retryCount + 1})`);
 
       // Add individual error handling for each fetch
       const fetchWithErrorHandling = async (url: string, name: string) => {
         const response = await fetch(url, {
-          method: 'GET',
+          method: "GET",
           headers: {
-            'Content-Type': 'application/json',
+            "Content-Type": "application/json",
           },
-          signal: AbortSignal.timeout(15000) // 15 second timeout
+          signal: AbortSignal.timeout(15000), // 15 second timeout
         });
-        
+
         if (!response.ok) {
-          console.error(`Failed to fetch ${name}: ${response.status} ${response.statusText}`);
+          console.error(
+            `Failed to fetch ${name}: ${response.status} ${response.statusText}`
+          );
         }
-        
+
         return response.json();
       };
 
       const [seniorsRes, volunteersRes, assignmentsRes, clusterRes] =
         await Promise.all([
-          fetchWithErrorHandling(`${BASE_URL}/seniors`, 'seniors'),
-          fetchWithErrorHandling(`${BASE_URL}/volunteers`, 'volunteers'),
-          fetchWithErrorHandling(`${BASE_URL}/assignments`, 'assignments'),
-          fetchWithErrorHandling(`${BASE_URL}/clusters`, 'clusters'),
+          fetchWithErrorHandling(`${BASE_URL}/seniors`, "seniors"),
+          fetchWithErrorHandling(`${BASE_URL}/volunteers`, "volunteers"),
+          fetchWithErrorHandling(`${BASE_URL}/assignments`, "assignments"),
+          fetchWithErrorHandling(`${BASE_URL}/clusters`, "clusters"),
         ]);
 
       setSeniors(seniorsRes.seniors);
@@ -190,17 +193,18 @@ export default function VolunteerDashboard() {
     return userCoordinates ? (userCoordinates as [number, number]) : undefined;
   }, [userCoordinates]);
 
-async function fetch_dl_details(email: string) {
-  try {
-    setDLIsLoading(true);
-    const BASE_URL = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8000";
-    if (email != "") {
-      const res = await fetch(`${BASE_URL}/dl/${email}`, {
-        method: "GET",
-        headers: {
-          "Content-Type": "application/json",
-        },
-      }).then((res) => res.json());
+  async function fetch_dl_details(email: string) {
+    try {
+      setDLIsLoading(true);
+      const BASE_URL =
+        process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8000";
+      if (email != "") {
+        const res = await fetch(`${BASE_URL}/dl/${email}`, {
+          method: "GET",
+          headers: {
+            "Content-Type": "application/json",
+          },
+        }).then((res) => res.json());
 
         if (res.dl_info[0] != null) {
           if (
@@ -264,8 +268,8 @@ async function fetch_dl_details(email: string) {
     setTimeout(() => {
       if (mapSectionRef.current) {
         mapSectionRef.current.scrollIntoView({
-          behavior: 'smooth',
-          block: 'start'
+          behavior: "smooth",
+          block: "start",
         });
       }
     }, 100);
@@ -501,10 +505,7 @@ async function fetch_dl_details(email: string) {
                               <div>
                                 <p className="text-sm font-medium">Location</p>
                                 <p className="text-sm text-muted-foreground">
-                                  {senior.address ||
-                                    `${senior.coords.lat.toFixed(
-                                      4
-                                    )}, ${senior.coords.lng.toFixed(4)}`}
+                                  {senior.address || "Address not available"}
                                 </p>
                               </div>
                               {senior.cluster && (
