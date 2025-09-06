@@ -121,8 +121,10 @@ export function ScheduleInterface({ assignments }: ScheduleProps) {
   useEffect(() => {
     const fetchData = async () => {
       try {
+        const BASE_URL = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8000";
+        
         const schedulesResponse = await fetch(
-          "http://localhost:8000/assignments"
+          `${BASE_URL}/assignments`
         );
         if (!schedulesResponse.ok) {
           console.error("Failed to fetch schedules:", schedulesResponse.status);
@@ -131,11 +133,11 @@ export function ScheduleInterface({ assignments }: ScheduleProps) {
         const schedulesData = await schedulesResponse.json();
 
         const volunteersResponse = await fetch(
-          "http://localhost:8000/volunteers"
+          `${BASE_URL}/volunteers`
         );
         const volunteersData = await volunteersResponse.json();
 
-        const seniorsResponse = await fetch("http://localhost:8000/seniors");
+        const seniorsResponse = await fetch(`${BASE_URL}/seniors`);
         const seniorsData = await seniorsResponse.json();
 
         // Map database fields to component interface

@@ -109,7 +109,7 @@ export default function VolunteerDashboard() {
   const loadDashboardData = async () => {
     try {
       setLoading(true);
-      const BASE_URL = "http://localhost:8000";
+      const BASE_URL = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8000";
 
       const [seniorsRes, volunteersRes, assignmentsRes, clusterRes] = await Promise.all([
         fetch(`${BASE_URL}/seniors`).then((r) => r.json()),
@@ -165,7 +165,7 @@ export default function VolunteerDashboard() {
 async function fetch_dl_details(email: string) {
   try {
     setDLIsLoading(true);
-    const BASE_URL = "http://localhost:8000";
+    const BASE_URL = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8000";
     if (email != "") {
       const res = await fetch(`${BASE_URL}/dl/${email}`, {
         method: "GET",

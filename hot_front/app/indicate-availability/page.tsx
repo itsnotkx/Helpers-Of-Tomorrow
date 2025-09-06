@@ -20,10 +20,7 @@ export default function Home() {
           title="Volunteer Availability"
           subtitle={`Managing care for Singapore`}
           selectedDistrict="Singapore"
-          needButton={true}
-          textToInput="See Your Schedule"
-          onRefresh={push}
-        />
+          />
         <WeeklyTimeSlotForm />
       </div>
     </main>
