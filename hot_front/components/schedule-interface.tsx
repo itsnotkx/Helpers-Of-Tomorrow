@@ -146,53 +146,51 @@ export function ScheduleInterface({ assignments }: ScheduleProps) {
     const fetchData = async (retryCount = 0) => {
       const MAX_RETRIES = 3;
       const RETRY_DELAY = 1000; // 1 second
-      
+
       try {
-        const BASE_URL = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8000";
-        
-        const schedulesResponse = await fetch(
-          `${BASE_URL}/assignments`, 
-          {
-            method: 'GET',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            // Add timeout
-            signal: AbortSignal.timeout(10000) // 10 second timeout
-          }
-        );
+        const BASE_URL =
+          process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8000";
+
+        const schedulesResponse = await fetch(`${BASE_URL}/assignments`, {
+          method: "GET",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          // Add timeout
+          signal: AbortSignal.timeout(10000), // 10 second timeout
+        });
         if (!schedulesResponse.ok) {
-          throw new Error(`Failed to fetch schedules: ${schedulesResponse.status} ${schedulesResponse.statusText}`);
+          throw new Error(
+            `Failed to fetch schedules: ${schedulesResponse.status} ${schedulesResponse.statusText}`
+          );
         }
         const schedulesData = await schedulesResponse.json();
 
-        const volunteersResponse = await fetch(
-          `${BASE_URL}/volunteers`,
-          {
-            method: 'GET',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            signal: AbortSignal.timeout(10000)
-          }
-        );
+        const volunteersResponse = await fetch(`${BASE_URL}/volunteers`, {
+          method: "GET",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          signal: AbortSignal.timeout(10000),
+        });
         if (!volunteersResponse.ok) {
-          throw new Error(`Failed to fetch volunteers: ${volunteersResponse.status} ${volunteersResponse.statusText}`);
+          throw new Error(
+            `Failed to fetch volunteers: ${volunteersResponse.status} ${volunteersResponse.statusText}`
+          );
         }
         const volunteersData = await volunteersResponse.json();
 
-        const seniorsResponse = await fetch(
-          `${BASE_URL}/seniors`,
-          {
-            method: 'GET',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            signal: AbortSignal.timeout(10000)
-          }
-        );
+        const seniorsResponse = await fetch(`${BASE_URL}/seniors`, {
+          method: "GET",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          signal: AbortSignal.timeout(10000),
+        });
         if (!seniorsResponse.ok) {
-          throw new Error(`Failed to fetch seniors: ${seniorsResponse.status} ${seniorsResponse.statusText}`);
+          throw new Error(
+            `Failed to fetch seniors: ${seniorsResponse.status} ${seniorsResponse.statusText}`
+          );
         }
         const seniorsData = await seniorsResponse.json();
 
@@ -214,11 +212,14 @@ export function ScheduleInterface({ assignments }: ScheduleProps) {
         setSchedules(mappedSchedules);
         setVolunteers(volunteersData.volunteers || volunteersData || []);
         setSeniors(seniorsData.seniors || seniorsData || []);
-        
+
         console.log("Successfully fetched all data");
       } catch (error) {
-        console.error(`Failed to fetch data (attempt ${retryCount + 1}):`, error);
-        
+        console.error(
+          `Failed to fetch data (attempt ${retryCount + 1}):`,
+          error
+        );
+
         // Retry logic
         if (retryCount < MAX_RETRIES - 1) {
           console.log(`Retrying in ${RETRY_DELAY}ms...`);
@@ -226,7 +227,9 @@ export function ScheduleInterface({ assignments }: ScheduleProps) {
             fetchData(retryCount + 1);
           }, RETRY_DELAY * (retryCount + 1)); // Exponential backoff
         } else {
-          console.error("All retry attempts failed. Please check your backend connection.");
+          console.error(
+            "All retry attempts failed. Please check your backend connection."
+          );
           // You could set an error state here to show to the user
         }
       }
@@ -479,25 +482,53 @@ export function ScheduleInterface({ assignments }: ScheduleProps) {
               <div className="mx-auto w-full max-w-3xl px-4 md:px-6 pb-12 pt-4">
                 <div className="space-y-2">
                   {selectedDay &&
-                    timeSlots.map((timeSlot) => {
-                      const schedulesAtTime = (
-                        weekSchedules[selectedDay] || []
-                      ).filter((s) => formatTime(s.start_time) === timeSlot);
-                      return (
-                        <div
-                          key={timeSlot}
-                          className="flex items-start gap-4 p-3 md:p-4 border-b border-border/50"
-                        >
-                          <div className="w-16 text-sm font-medium text-muted-foreground flex items-center gap-1">
-                            <Clock className="h-3 w-3" />
-                            {timeSlot}
+                    (() => {
+                      const daySchedules = weekSchedules[selectedDay] || [];
+
+                      if (daySchedules.length === 0) {
+                        return (
+                          <div className="text-center py-8">
+                            <div className="text-sm text-muted-foreground italic">
+                              No visits scheduled for this day
+                            </div>
                           </div>
-                          <div className="flex-1">
-                            {schedulesAtTime.length === 0 ? (
-                              <div className="text-sm text-muted-foreground italic">
-                                No visits scheduled
-                              </div>
-                            ) : (
+                        );
+                      }
+
+                      // Group schedules by start time
+                      const schedulesByTime = daySchedules.reduce(
+                        (acc, schedule) => {
+                          const time = formatTime(schedule.start_time);
+                          if (!acc[time]) {
+                            acc[time] = [];
+                          }
+                          acc[time].push(schedule);
+                          return acc;
+                        },
+                        {} as Record<string, typeof daySchedules>
+                      );
+
+                      // Sort times chronologically
+                      const sortedTimes = Object.keys(schedulesByTime).sort(
+                        (a, b) => {
+                          const timeA = new Date(`1970-01-01T${a}:00`);
+                          const timeB = new Date(`1970-01-01T${b}:00`);
+                          return timeA.getTime() - timeB.getTime();
+                        }
+                      );
+
+                      return sortedTimes.map((timeSlot) => {
+                        const schedulesAtTime = schedulesByTime[timeSlot];
+                        return (
+                          <div
+                            key={timeSlot}
+                            className="flex items-start gap-4 p-3 md:p-4 border-b border-border/50"
+                          >
+                            <div className="w-16 text-sm font-medium text-muted-foreground flex items-center gap-1">
+                              <Clock className="h-3 w-3" />
+                              {timeSlot}
+                            </div>
+                            <div className="flex-1">
                               <div className="space-y-2">
                                 {schedulesAtTime.map((schedule, idx) => (
                                   <div
@@ -553,11 +584,11 @@ export function ScheduleInterface({ assignments }: ScheduleProps) {
                                   </div>
                                 ))}
                               </div>
-                            )}
+                            </div>
                           </div>
-                        </div>
-                      );
-                    })}
+                        );
+                      });
+                    })()}
                 </div>
               </div>
             </SheetContent>
