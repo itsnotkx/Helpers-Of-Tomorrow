@@ -75,22 +75,37 @@ export function ScheduleInterface({ assignments }: ScheduleProps) {
   );
   const [searchQuery, setSearchQuery] = useState("");
 
-  // Format time as HH:MM (supports HH:MM:SS)
-  const formatTime = (timeString: string) => {
-    if (!timeString) return timeString;
-    const [hh = "", mm = ""] = timeString.split(":");
-    return `${hh}:${mm}`;
-  };
-
-  // Format date as DD-MM-YYYY
+  // Format utilities
+  const formatTime = (timeString: string) => timeString ? timeString.split(":").slice(0, 2).join(":") : timeString;
   const formatDate = (dateString: string) => {
     if (!dateString) return dateString;
     const date = new Date(dateString);
-    const day = date.getDate().toString().padStart(2, "0");
-    const month = (date.getMonth() + 1).toString().padStart(2, "0");
-    const year = date.getFullYear();
-    return `${day}-${month}-${year}`;
+    return `${date.getDate().toString().padStart(2, "0")}-${(date.getMonth() + 1).toString().padStart(2, "0")}-${date.getFullYear()}`;
   };
+
+  // Reusable acknowledgment badge component
+  const AcknowledgmentBadge = ({ isAcknowledged }: { isAcknowledged: boolean }) => (
+    <Badge
+      variant={isAcknowledged ? "default" : "secondary"}
+      className={isAcknowledged 
+        ? "bg-green-600 hover:bg-green-700 text-white"
+        : "bg-orange-100 text-orange-700 border-orange-200"
+      }
+    >
+      {isAcknowledged ? "Acknowledged" : "Pending"}
+    </Badge>
+  );
+
+  // Reusable person info card
+  const PersonCard = ({ type, name, color }: { type: string; name: string; color: 'blue' | 'red' }) => (
+    <div className={`flex items-center gap-2 p-2 bg-${color}-50 rounded border-l-4 border-l-${color}-500`}>
+      <User className={`h-4 w-4 text-${color}-600`} />
+      <div>
+        <div className={`text-xs font-medium text-${color}-700 uppercase tracking-wide`}>{type}</div>
+        <div className={`font-medium text-${color}-900`}>{name}</div>
+      </div>
+    </div>
+  );
 
   // Generate time slots (9 AM to 6 PM)
   const timeSlots = useMemo(() => {
@@ -149,12 +164,9 @@ export function ScheduleInterface({ assignments }: ScheduleProps) {
     fetchData();
   }, []);
 
-  // Helpers
-  const getVolunteerName = (vid: string) =>
-    volunteers.find((v) => v.vid === vid)?.name || vid;
-
-  const getSeniorName = (uid: string) =>
-    seniors.find((s) => s.uid === uid)?.name || uid;
+  // Helpers - simplified inline lookups
+  const getVolunteerName = (vid: string) => volunteers.find((v) => v.vid === vid)?.name || vid;
+  const getSeniorName = (uid: string) => seniors.find((s) => s.uid === uid)?.name || uid;
 
   // Week days (7 days from today)
   const weekDays = useMemo(() => {
@@ -227,21 +239,12 @@ export function ScheduleInterface({ assignments }: ScheduleProps) {
     ? weekDays.findIndex((d) => d.toISOString().split("T")[0] === selectedDay)
     : -1;
 
-  // Helper to get volunteer's assignments count for this week
+  // Simplified weekly assignment helpers
   const getVolunteerWeeklyAssignments = (volunteerId: string) => {
     const weekDayKeys = weekDays.map((day) => day.toISOString().split("T")[0]);
-    const volunteerSchedules = schedules.filter(
-      (s) =>
-        s.volunteer === volunteerId &&
-        weekDayKeys.includes(s.date?.split("T")[0])
-    );
-    return volunteerSchedules.length;
+    return schedules.filter(s => s.volunteer === volunteerId && weekDayKeys.includes(s.date?.split("T")[0])).length;
   };
-
-  // Helper to check if volunteer is active this week
-  const isVolunteerActiveThisWeek = (volunteerId: string) => {
-    return getVolunteerWeeklyAssignments(volunteerId) > 0;
-  };
+  const isVolunteerActiveThisWeek = (volunteerId: string) => getVolunteerWeeklyAssignments(volunteerId) > 0;
 
   return (
     <div className="">
@@ -432,33 +435,16 @@ export function ScheduleInterface({ assignments }: ScheduleProps) {
 
                                     {/* Volunteer and Senior info */}
                                     <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                                      {/* Volunteer */}
-                                      <div className="flex items-center gap-2 p-2 bg-blue-50 rounded border-l-4 border-l-blue-500">
-                                        <User className="h-4 w-4 text-blue-600" />
-                                        <div>
-                                          <div className="text-xs font-medium text-blue-700 uppercase tracking-wide">
-                                            Volunteer
-                                          </div>
-                                          <div className="font-medium text-blue-900">
-                                            {getVolunteerName(
-                                              schedule.volunteer
-                                            )}
-                                          </div>
-                                        </div>
-                                      </div>
-
-                                      {/* Senior */}
-                                      <div className="flex items-center gap-2 p-2 bg-red-50 rounded border-l-4 border-l-red-500">
-                                        <User className="h-4 w-4 text-red-600" />
-                                        <div>
-                                          <div className="text-xs font-medium text-red-700 uppercase tracking-wide">
-                                            Senior
-                                          </div>
-                                          <div className="font-medium text-red-900">
-                                            {getSeniorName(schedule.senior)}
-                                          </div>
-                                        </div>
-                                      </div>
+                                      <PersonCard 
+                                        type="Volunteer" 
+                                        name={getVolunteerName(schedule.volunteer)} 
+                                        color="blue" 
+                                      />
+                                      <PersonCard 
+                                        type="Senior" 
+                                        name={getSeniorName(schedule.senior)} 
+                                        color="red" 
+                                      />
                                     </div>
 
                                     {/* Acknowledgement Status */}
@@ -467,22 +453,7 @@ export function ScheduleInterface({ assignments }: ScheduleProps) {
                                         <span className="text-xs text-muted-foreground">
                                           Acknowledgement Status:
                                         </span>
-                                        <Badge
-                                          variant={
-                                            schedule.is_acknowledged
-                                              ? "default"
-                                              : "secondary"
-                                          }
-                                          className={
-                                            schedule.is_acknowledged
-                                              ? "bg-green-600 hover:bg-green-700 text-white"
-                                              : "bg-orange-100 text-orange-700 border-orange-200"
-                                          }
-                                        >
-                                          {schedule.is_acknowledged
-                                            ? "Acknowledged"
-                                            : "Pending"}
-                                        </Badge>
+                                        <AcknowledgmentBadge isAcknowledged={schedule.is_acknowledged} />
                                       </div>
                                     </div>
                                   </div>
@@ -626,22 +597,7 @@ export function ScheduleInterface({ assignments }: ScheduleProps) {
                                     <Badge variant="outline">
                                       Cluster: {schedule.cluster}
                                     </Badge>
-                                    <Badge
-                                      variant={
-                                        schedule.is_acknowledged
-                                          ? "default"
-                                          : "secondary"
-                                      }
-                                      className={
-                                        schedule.is_acknowledged
-                                          ? "bg-green-600 hover:bg-green-700 text-white"
-                                          : "bg-orange-100 text-orange-700 border-orange-200"
-                                      }
-                                    >
-                                      {schedule.is_acknowledged
-                                        ? "Acknowledged"
-                                        : "Pending"}
-                                    </Badge>
+                                    <AcknowledgmentBadge isAcknowledged={schedule.is_acknowledged} />
                                   </div>
                                 </div>
                               ))}
