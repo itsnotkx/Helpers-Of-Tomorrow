@@ -106,16 +106,39 @@ export function InteractiveMap({
         return lastVisitDate.getFullYear() < currentYear;
       });
 
-      // Filter volunteers: only show those with assignments
-      const volunteersWithAssignments = volunteersProp.filter((volunteer) =>
-        assignmentsProp.some((assignment: any) =>
-          [
+      // Get current week boundaries
+      const now = new Date();
+      now.setHours(0, 0, 0, 0);
+      const currentDay = now.getDay();
+      const daysToMonday = currentDay === 0 ? 6 : currentDay - 1;
+      const startOfWeek = new Date(now);
+      startOfWeek.setDate(now.getDate() - daysToMonday);
+      const endOfWeek = new Date(startOfWeek);
+      endOfWeek.setDate(startOfWeek.getDate() + 6);
+
+      // Filter volunteers: only show those with assignments THIS WEEK
+      const volunteersWithAssignments = volunteersProp.filter((volunteer) => {
+        return assignmentsProp.some((assignment: any) => {
+          // Check if volunteer ID matches
+          const volunteerMatches = [
             assignment.vid,
             assignment.volunteer_id,
             assignment.volunteer,
-          ].includes(volunteer.vid)
-        )
-      );
+          ].includes(volunteer.vid);
+
+          if (!volunteerMatches) return false;
+
+          // Check if assignment is for this week
+          const assignmentDate = new Date(
+            assignment.date ||
+              assignment.scheduled_date ||
+              new Date().toISOString().split("T")[0]
+          );
+          assignmentDate.setHours(0, 0, 0, 0);
+
+          return assignmentDate >= startOfWeek && assignmentDate <= endOfWeek;
+        });
+      });
 
       // Process assignments and schedules
       const schedulesFromAssignments: Schedule[] = Object.values(
@@ -344,7 +367,10 @@ export function InteractiveMap({
     };
 
     window.addEventListener("focus-senior", onFocusSenior as EventListener);
-    window.addEventListener("focus-volunteer", onFocusVolunteer as EventListener);
+    window.addEventListener(
+      "focus-volunteer",
+      onFocusVolunteer as EventListener
+    );
     return () => {
       window.removeEventListener(
         "focus-senior",
@@ -568,16 +594,16 @@ export function InteractiveMap({
     // Volunteer markers
     volunteers.forEach((v) => {
       if (!v.coords) return;
-      
+
       const isIndividuallyHighlighted = v.vid === highlightedVolunteerId;
       const isLocallyFocused = v.vid === locallyFocusedVolunteerId;
       const focused = isIndividuallyHighlighted || isLocallyFocused;
-      
+
       const sizeClass = focused ? "w-8 h-8" : "w-6 h-6";
       const borderClass = focused
         ? "border-4 border-purple-500"
         : "border-2 border-white";
-      
+
       const el = document.createElement("div");
       el.className = `${sizeClass} bg-blue-500 rounded-full ${borderClass} shadow-md cursor-pointer flex items-center justify-center text-xs relative z-20`;
       el.style.zIndex = "1001"; // Ensure it's above cluster circles and layers
@@ -869,7 +895,24 @@ export function InteractiveMap({
       popupRef.current = null;
     }
 
-    const assignment = assignments.find((a) => a.volunteer === v.vid);
+    // Get assignment from current week's schedules only
+    const { startOfWeek, endOfWeek } = getWeekBoundaries();
+    const currentWeekSchedule = schedules.find((schedule) => {
+      if (schedule.volunteer !== v.vid) return false;
+      const scheduleDate = new Date(schedule.datetime.split("T")[0]);
+      return scheduleDate >= startOfWeek && scheduleDate <= endOfWeek;
+    });
+
+    // Create assignment object from current week's schedule
+    const assignment = currentWeekSchedule
+      ? {
+          volunteer: currentWeekSchedule.volunteer,
+          cluster: currentWeekSchedule.cluster.toString(),
+          distance:
+            assignments.find((a) => a.volunteer === v.vid)?.distance || 0,
+        }
+      : undefined;
+
     const popupHTML = createVolunteerPopupHTML(v, assignment);
 
     popupRef.current = new mapboxgl.Popup({
@@ -932,7 +975,7 @@ export function InteractiveMap({
       {/* Legend */}
       <div
         className="absolute bottom-4 left-4 bg-white p-3 rounded-lg shadow-lg"
-        style={{ zIndex: 100 }}
+        style={{ zIndex: 10 }}
       >
         <h4 className="text-xs font-medium mb-2">Legend</h4>
         <div className="space-y-1">

@@ -401,9 +401,10 @@ function performGeographicalClustering(seniors: Senior[], _volunteers: Volunteer
 }
 
 function assignVolunteersToClusters(clusters: Cluster[], volunteers: Volunteer[], availabilities: Availability[]): Map<string, number> {
-  // Two-pass assignment:
-  //   1) Try to ensure each cluster gets at least one available volunteer (by proximity, higher density first)
-  //   2) Assign remaining volunteers to their closest clusters
+  // Two-pass assignment algorithm:
+  // Pass 1: Ensure each cluster gets at least one volunteer (distance-based)
+  // Pass 2: Enhanced assignment considering workload and priority for remaining volunteers
+  
   const availabilityMap = new Map<string, Availability[]>()
   availabilities.forEach(avail => {
     if (!availabilityMap.has(avail.volunteer_email)) {
@@ -423,14 +424,10 @@ function assignVolunteersToClusters(clusters: Cluster[], volunteers: Volunteer[]
 
   const assignedVolunteers = new Set<string>()
 
-  // Sort clusters by density desc, then by number of seniors desc
-  const sortedClusters = [...clusters].sort((a, b) => {
-    const densityDiff = (b.density || 0) - (a.density || 0)
-    if (Math.abs(densityDiff) < 0.0001) return b.seniors.length - a.seniors.length
-    return densityDiff
-  })
+  // Pass 1: Ensure each cluster gets at least one volunteer (closest volunteer by distance)
+  // Sort clusters by total seniors (highest first) to prioritize coverage for larger clusters
+  const sortedClusters = [...clusters].sort((a, b) => b.seniors.length - a.seniors.length)
 
-  // Pass 1: ensure coverage (one volunteer per cluster where possible)
   for (const cluster of sortedClusters) {
     let bestVolunteer: Volunteer | null = null
     let minDistance = Infinity
@@ -447,38 +444,107 @@ function assignVolunteersToClusters(clusters: Cluster[], volunteers: Volunteer[]
     if (bestVolunteer) {
       volunteerClusterAssignment.set(bestVolunteer.email, cluster.id)
       assignedVolunteers.add(bestVolunteer.email)
-      console.log(`Assigned ${bestVolunteer.email} to cluster ${cluster.id} (d=${minDistance.toFixed(4)})`)
+      console.log(`Pass 1 - Assigned ${bestVolunteer.email} to cluster ${cluster.id} (${cluster.seniors.length} seniors, distance: ${minDistance.toFixed(4)})`)
     } else {
       console.warn(`No unassigned available volunteer found for cluster ${cluster.id}`)
     }
   }
 
-  // Pass 2: assign remaining volunteers by proximity (allows multiple volunteers per cluster)
+  // Calculate cluster metrics for enhanced assignment
+  const clusterMetrics = clusters.map(cluster => {
+    const highRiskCount = cluster.seniors.filter(s => s.overall_wellbeing === 1).length
+    const totalSeniors = cluster.seniors.length
+    
+    // Priority score: high-risk seniors get 3x weight, regular seniors get 1x weight
+    const priorityScore = (highRiskCount * 3) + (totalSeniors - highRiskCount)
+    
+    // Count currently assigned volunteers
+    const assignedCount = Array.from(volunteerClusterAssignment.values()).filter(cid => cid === cluster.id).length
+    
+    return {
+      id: cluster.id,
+      centroid: cluster.centroid,
+      totalSeniors,
+      highRiskCount,
+      priorityScore,
+      assignedVolunteers: assignedCount
+    }
+  })
+
+  console.log('Cluster metrics after Pass 1:')
+  clusterMetrics.forEach(metric => {
+    console.log(`Cluster ${metric.id}: ${metric.assignedVolunteers} volunteers, ${metric.totalSeniors} seniors (${metric.highRiskCount} high-risk), priority score: ${metric.priorityScore}`)
+  })
+
+  // Pass 2: Assign remaining volunteers using enhanced scoring
   const remaining = availableVolunteers.filter(v => !assignedVolunteers.has(v.email))
+  
+  console.log(`Pass 2: Assigning ${remaining.length} remaining volunteers using enhanced scoring`)
+  
   for (const volunteer of remaining) {
     let bestClusterId = -1
-    let minDistance = Infinity
-    for (const cluster of clusters) {
-      const d = distance(volunteer.coords, cluster.centroid)
-      if (d < minDistance) {
-        minDistance = d
-        bestClusterId = cluster.id
+    let bestScore = -Infinity
+
+    for (const clusterMetric of clusterMetrics) {
+      const dist = distance(volunteer.coords, clusterMetric.centroid)
+      
+      // Calculate volunteer-to-workload ratio (lower is better - means cluster needs more help)
+      const workloadRatio = clusterMetric.assignedVolunteers / Math.max(clusterMetric.priorityScore, 1)
+      
+      // Scoring components:
+      // 1. Distance Score: Closer volunteers get higher scores
+      const distanceScore = 1 / (dist + 0.001) // Add small value to avoid division by zero
+      
+      // 2. Workload Balance Score: Clusters with fewer volunteers relative to their workload get priority
+      const workloadScore = 1 / (workloadRatio + 0.1) // Lower ratio = higher score
+      
+      // 3. High-Risk Priority Score: Extra weight for clusters with high-risk seniors
+      const highRiskScore = clusterMetric.highRiskCount > 0 ? clusterMetric.highRiskCount * 2 : 0
+      
+      // 4. Total Seniors Score: More seniors = more need for volunteers
+      const totalSeniorsScore = clusterMetric.totalSeniors / 10 // Scale to reasonable range
+      
+      // Combine scores with balanced weights:
+      // - Distance (30%): Geographic efficiency
+      // - Workload balance (30%): Fair distribution based on current assignments
+      // - High-risk priority (25%): Emergency/priority care
+      // - Total seniors (15%): General workload consideration
+      const totalScore = (distanceScore * 0.30) + 
+                        (workloadScore * 0.30) + 
+                        (highRiskScore * 0.25) + 
+                        (totalSeniorsScore * 0.15)
+      
+      if (totalScore > bestScore) {
+        bestScore = totalScore
+        bestClusterId = clusterMetric.id
       }
     }
+
     if (bestClusterId !== -1) {
       volunteerClusterAssignment.set(volunteer.email, bestClusterId)
-      console.log(`Additional assignment: ${volunteer.email} -> cluster ${bestClusterId} (d=${minDistance.toFixed(4)})`)
+      // Update the assigned count for this cluster
+      const clusterMetric = clusterMetrics.find(c => c.id === bestClusterId)!
+      clusterMetric.assignedVolunteers++
+      
+      const dist = distance(volunteer.coords, clusterMetric.centroid)
+      const highRisk = clusterMetric.highRiskCount
+      console.log(`Pass 2 - Assigned ${volunteer.email} to cluster ${bestClusterId} (score: ${bestScore.toFixed(4)}, distance: ${dist.toFixed(4)}, ${clusterMetric.totalSeniors} seniors, ${highRisk} high-risk)`)
     }
   }
 
-  // Report coverage
+  // Report final assignment statistics
   const clusterCounts = new Map<number, number>()
   volunteerClusterAssignment.forEach(cid => clusterCounts.set(cid, (clusterCounts.get(cid) || 0) + 1))
-  console.log('Volunteers per cluster:', Object.fromEntries(clusterCounts))
-
-  for (const cluster of clusters) {
-    if (!clusterCounts.has(cluster.id)) {
-      console.warn(`Cluster ${cluster.id} has no assigned volunteers`)
+  
+  console.log('\n=== Final Assignment Report ===')
+  console.log('Volunteers per cluster:')
+  for (const clusterMetric of clusterMetrics) {
+    const volunteerCount = clusterCounts.get(clusterMetric.id) || 0
+    const ratio = volunteerCount / Math.max(clusterMetric.priorityScore, 1)
+    console.log(`Cluster ${clusterMetric.id}: ${volunteerCount} volunteers, ${clusterMetric.totalSeniors} seniors (${clusterMetric.highRiskCount} high-risk), ratio: ${ratio.toFixed(3)}`)
+    
+    if (volunteerCount === 0) {
+      console.warn(`⚠️  Cluster ${clusterMetric.id} has no assigned volunteers!`)
     }
   }
 

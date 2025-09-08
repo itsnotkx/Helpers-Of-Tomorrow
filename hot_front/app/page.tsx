@@ -80,6 +80,7 @@ export default function VolunteerDashboard() {
   const [isMapCollapsed, setIsMapCollapsed] = useState(false);
   const [isScheduleCollapsed, setIsScheduleCollapsed] = useState(false);
   const [isAssignmentsCollapsed, setIsAssignmentsCollapsed] = useState(false);
+  const [showAllVolunteers, setShowAllVolunteers] = useState(false);
   const [showHighRiskModal, setShowHighRiskModal] = useState(false);
   const [highlightedSeniorId, setHighlightedSeniorId] = useState<string | null>(
     null
@@ -295,6 +296,7 @@ export default function VolunteerDashboard() {
 
   // Get current date boundaries for this week and this year
   const now = new Date();
+  now.setHours(0, 0, 0, 0); // Reset time to start of day
   const currentDay = now.getDay(); // 0 = Sunday, 1 = Monday, etc.
   const startOfWeek = new Date(now);
 
@@ -303,7 +305,8 @@ export default function VolunteerDashboard() {
     startOfWeek.setHours(0, 0, 0, 0);
   } else {
     // For any other day, get Monday of current week
-    startOfWeek.setDate(now.getDate() - currentDay + 1); // Monday of this week
+    const daysToMonday = currentDay - 1; // Days to get back to Monday
+    startOfWeek.setDate(now.getDate() - daysToMonday);
     startOfWeek.setHours(0, 0, 0, 0);
   }
 
@@ -627,66 +630,108 @@ export default function VolunteerDashboard() {
           {!isAssignmentsCollapsed && (
             <CardContent>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {volunteers.map((v, i) => {
-                  const weeklyAssignments = getVolunteerWeeklyAssignments(
-                    v.vid
-                  );
-                  const isActive = isVolunteerActiveThisWeek(v.vid);
-                  const assigned = schedules.filter(
-                    (a) => a.volunteer === v.vid
-                  );
-                  const cluster = assigned[0]?.cluster ?? "-";
-                  const isHighlighted = highlightedVolunteerId === v.vid;
-                  return (
-                    <div
-                      key={i}
-                      className={`p-4 border rounded-lg cursor-pointer hover:bg-muted transition ${
-                        isHighlighted
-                          ? "border-blue-500 bg-blue-50 shadow-lg"
-                          : ""
-                      }`}
-                      onClick={() => handleMapFocus("volunteer", v.vid)}
-                    >
-                      <div className="flex justify-between mb-2">
-                        <h4 className="font-medium">
-                          {v.name || "Unknown Volunteer"}
-                        </h4>
-                        <Badge variant="secondary" className="h-6">
-                          Cluster {cluster}
-                        </Badge>
-                      </div>
-                      <p className="text-sm text-muted-foreground">
-                        {weeklyAssignments > 0
-                          ? `${weeklyAssignments} assignment${
-                              weeklyAssignments > 1 ? "s" : ""
-                            } this week`
-                          : "No assignments this week"}
-                      </p>
-                      <p className="text-sm text-muted-foreground">
-                        Skill Level: {v.skill ?? "N/A"}
-                      </p>
-                      <p className="text-sm text-muted-foreground flex items-center gap-1">
-                        Status:{" "}
-                        <Badge
-                          variant={isActive ? "default" : "secondary"}
-                          className={`text-xs ${
-                            isActive
-                              ? "bg-green-600 hover:bg-green-700 text-white"
-                              : "bg-gray-400 hover:bg-gray-500 text-white"
-                          }`}
-                        >
-                          {isActive ? "Active" : "Inactive"}
-                        </Badge>
-                      </p>
-                      {isHighlighted && (
-                        <div className="text-xs text-blue-600 mt-2 font-medium">
-                          📍 Located on map
+                {volunteers
+                  .sort((a, b) => {
+                    // Sort active volunteers first, then inactive
+                    const aActive = isVolunteerActiveThisWeek(a.vid);
+                    const bActive = isVolunteerActiveThisWeek(b.vid);
+                    if (aActive === bActive) return 0;
+                    return aActive ? -1 : 1;
+                  })
+                  .slice(0, showAllVolunteers ? volunteers.length : 21)
+                  .map((v, i) => {
+                    const weeklyAssignments = getVolunteerWeeklyAssignments(
+                      v.vid
+                    );
+                    const isActive = isVolunteerActiveThisWeek(v.vid);
+
+                    // Get cluster from current week's assignments only
+                    const currentWeekAssignments = schedules.filter(
+                      (schedule) => {
+                        const scheduleDate = new Date(schedule.date);
+                        return (
+                          schedule.volunteer === v.vid &&
+                          scheduleDate >= startOfWeek &&
+                          scheduleDate <= endOfWeek
+                        );
+                      }
+                    );
+                    const cluster = currentWeekAssignments[0]?.cluster ?? "-";
+
+                    const isHighlighted = highlightedVolunteerId === v.vid;
+                    return (
+                      <div
+                        key={v.vid}
+                        className={`p-4 border rounded-lg cursor-pointer hover:bg-muted transition ${
+                          isHighlighted
+                            ? "border-blue-500 bg-blue-50 shadow-lg"
+                            : ""
+                        }`}
+                        onClick={() => handleMapFocus("volunteer", v.vid)}
+                      >
+                        <div className="flex justify-between mb-2">
+                          <h4 className="font-medium">
+                            {v.name || "Unknown Volunteer"}
+                          </h4>
+                          <Badge variant="secondary" className="h-6">
+                            Cluster {cluster}
+                          </Badge>
                         </div>
-                      )}
-                    </div>
-                  );
-                })}
+                        <p className="text-sm text-muted-foreground">
+                          {weeklyAssignments > 0
+                            ? `${weeklyAssignments} assignment${
+                                weeklyAssignments > 1 ? "s" : ""
+                              } this week`
+                            : "No assignments this week"}
+                        </p>
+                        <p className="text-sm text-muted-foreground">
+                          Skill Level: {v.skill ?? "N/A"}
+                        </p>
+                        <p className="text-sm text-muted-foreground flex items-center gap-1">
+                          Status:{" "}
+                          <Badge
+                            variant={isActive ? "default" : "secondary"}
+                            className={`text-xs ${
+                              isActive
+                                ? "bg-green-600 hover:bg-green-700 text-white"
+                                : "bg-gray-400 hover:bg-gray-500 text-white"
+                            }`}
+                          >
+                            {isActive ? "Active" : "Inactive"}
+                          </Badge>
+                        </p>
+                        {isHighlighted && (
+                          <div className="text-xs text-blue-600 mt-2 font-medium">
+                            📍 Located on map
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
               </div>
+
+              {/* Show/Hide button for volunteers */}
+              {volunteers.length > 20 && (
+                <div className="flex justify-center mt-6">
+                  <Button
+                    variant="outline"
+                    onClick={() => setShowAllVolunteers(!showAllVolunteers)}
+                    className="flex items-center gap-2"
+                  >
+                    {showAllVolunteers ? (
+                      <>
+                        <ChevronUp className="h-4 w-4" />
+                        Show Less
+                      </>
+                    ) : (
+                      <>
+                        <ChevronDown className="h-4 w-4" />
+                        Show All
+                      </>
+                    )}
+                  </Button>
+                </div>
+              )}
             </CardContent>
           )}
         </Card>

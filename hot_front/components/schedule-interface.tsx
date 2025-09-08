@@ -65,6 +65,7 @@ export function ScheduleInterface({ assignments }: ScheduleProps) {
     Array<{
       uid: string;
       name: string;
+      address?: string;
     }>
   >([]);
 
@@ -243,31 +244,46 @@ export function ScheduleInterface({ assignments }: ScheduleProps) {
     volunteers.find((v) => v.vid === vid)?.name || vid;
   const getSeniorName = (uid: string) =>
     seniors.find((s) => s.uid === uid)?.name || uid;
+  const getSeniorAddress = (uid: string) =>
+    seniors.find((s) => s.uid === uid)?.address || "Address not available";
 
-  // Week days (7 days from today)
+  // Week days (7 days from Monday to Sunday)
   const weekDays = useMemo(() => {
     const days: Date[] = [];
     const today = new Date();
+    today.setHours(0, 0, 0, 0); // Reset time to start of day
     const dayOfWeek = today.getDay(); // 0 = Sunday, 1 = Monday, etc.
 
-    let startOfWeek: Date;
+    console.log("Today:", today.toDateString(), "Day of week:", dayOfWeek);
 
+    // Calculate Monday of current week
+    const startOfWeek = new Date(today);
+
+    // Calculate days to go back to Monday
+    let daysBack: number;
     if (dayOfWeek === 0) {
-      // If today is Sunday, start from today (Sunday) and go to next Sunday
-      startOfWeek = new Date(today);
+      // If today is Sunday, go back 6 days to get Monday of current week
+      daysBack = 6;
     } else {
-      // For any other day, get Monday of current week
-      startOfWeek = new Date(today);
-      const daysToMonday = 1 - dayOfWeek; // Days to get back to Monday
-      startOfWeek.setDate(today.getDate() + daysToMonday);
+      // For any other day, go back (dayOfWeek - 1) days to get Monday
+      daysBack = dayOfWeek - 1;
     }
 
-    // Generate 7 days from the start date
+    startOfWeek.setDate(today.getDate() - daysBack);
+
+    console.log("Start of week (Monday):", startOfWeek.toDateString());
+
+    // Generate 7 days from Monday
     for (let i = 0; i < 7; i++) {
       const date = new Date(startOfWeek);
       date.setDate(startOfWeek.getDate() + i);
       days.push(date);
     }
+
+    console.log(
+      "Generated week days:",
+      days.map((d) => d.toDateString())
+    );
     return days;
   }, []);
 
@@ -280,16 +296,38 @@ export function ScheduleInterface({ assignments }: ScheduleProps) {
     return `${fmt(start)} – ${fmt(end)}`;
   }, [weekDays]);
 
+  // Helper function to format date without timezone issues
+  const formatDateKey = (date: Date) => {
+    const year = date.getFullYear();
+    const month = (date.getMonth() + 1).toString().padStart(2, "0");
+    const day = date.getDate().toString().padStart(2, "0");
+    return `${year}-${month}-${day}`;
+  };
+
   // Schedules grouped by date
   const weekSchedules = useMemo(() => {
     const weekData: Record<string, typeof schedules> = {};
     weekDays.forEach((day) => {
-      const dayKey = day.toISOString().split("T")[0];
+      const dayKey = formatDateKey(day);
       weekData[dayKey] = schedules.filter((s) => {
         const scheduleDate = s.date;
-        return scheduleDate === dayKey || scheduleDate?.startsWith(dayKey);
+        // Normalize both dates to YYYY-MM-DD format for comparison
+        const normalizedScheduleDate = scheduleDate?.split("T")[0];
+        return normalizedScheduleDate === dayKey;
       });
     });
+
+    // Debug logging
+    console.log(
+      "Week days (formatted):",
+      weekDays.map((d) => formatDateKey(d))
+    );
+    console.log(
+      "Schedule dates:",
+      schedules.map((s) => s.date)
+    );
+    console.log("Week schedules:", weekData);
+
     return weekData;
   }, [schedules, weekDays]);
 
@@ -301,23 +339,21 @@ export function ScheduleInterface({ assignments }: ScheduleProps) {
   // Drawer day navigation (within this week)
   const changeDay = (delta: number) => {
     if (!selectedDay) return;
-    const idx = weekDays.findIndex(
-      (d) => d.toISOString().split("T")[0] === selectedDay
-    );
+    const idx = weekDays.findIndex((d) => formatDateKey(d) === selectedDay);
     if (idx === -1) return;
     const newIdx = idx + delta;
     if (newIdx < 0 || newIdx >= weekDays.length) return;
-    setSelectedDay(weekDays[newIdx].toISOString().split("T")[0]);
+    setSelectedDay(formatDateKey(weekDays[newIdx]));
   };
 
   const selectedDateObj = selectedDay ? new Date(selectedDay) : null;
   const selectedIndex = selectedDay
-    ? weekDays.findIndex((d) => d.toISOString().split("T")[0] === selectedDay)
+    ? weekDays.findIndex((d) => formatDateKey(d) === selectedDay)
     : -1;
 
   // Simplified weekly assignment helpers
   const getVolunteerWeeklyAssignments = (volunteerId: string) => {
-    const weekDayKeys = weekDays.map((day) => day.toISOString().split("T")[0]);
+    const weekDayKeys = weekDays.map((day) => formatDateKey(day));
     return schedules.filter(
       (s) =>
         s.volunteer === volunteerId &&
@@ -329,7 +365,7 @@ export function ScheduleInterface({ assignments }: ScheduleProps) {
 
   // Filter volunteer schedules to current week only
   const getVolunteerWeeklySchedules = (volunteerId: string) => {
-    const weekDayKeys = weekDays.map((day) => day.toISOString().split("T")[0]);
+    const weekDayKeys = weekDays.map((day) => formatDateKey(day));
     return schedules.filter(
       (s) =>
         s.volunteer === volunteerId &&
@@ -357,7 +393,7 @@ export function ScheduleInterface({ assignments }: ScheduleProps) {
             <CardContent>
               <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-7 gap-2">
                 {weekDays.map((day, index) => {
-                  const dayKey = day.toISOString().split("T")[0];
+                  const dayKey = formatDateKey(day);
                   const daySchedules = weekSchedules[dayKey] || [];
                   const isToday =
                     day.toDateString() === new Date().toDateString();
@@ -391,17 +427,29 @@ export function ScheduleInterface({ assignments }: ScheduleProps) {
                           <div className="text-xs font-medium text-center mb-1">
                             {daySchedules.length} visits
                           </div>
-                          {daySchedules.slice(0, 3).map((schedule, idx) => (
-                            <div
-                              key={idx}
-                              className="text-xs p-1 bg-muted rounded text-center"
-                            >
-                              <div>{formatTime(schedule.start_time)}</div>
-                              <div className="text-muted-foreground">
-                                {getSeniorName(schedule.senior)}
+                          {daySchedules
+                            .sort((a, b) => {
+                              // Sort by start time (earliest first)
+                              const timeA = new Date(
+                                `1970-01-01T${a.start_time}:00`
+                              );
+                              const timeB = new Date(
+                                `1970-01-01T${b.start_time}:00`
+                              );
+                              return timeA.getTime() - timeB.getTime();
+                            })
+                            .slice(0, 3)
+                            .map((schedule, idx) => (
+                              <div
+                                key={idx}
+                                className="text-xs p-1 bg-muted rounded text-center mb-1"
+                              >
+                                <div>{formatTime(schedule.start_time)}</div>
+                                <div className="text-muted-foreground">
+                                  {getSeniorName(schedule.senior)}
+                                </div>
                               </div>
-                            </div>
-                          ))}
+                            ))}
                           {daySchedules.length > 3 && (
                             <div className="text-xs text-muted-foreground text-center">
                               +{daySchedules.length - 3} more
@@ -535,7 +583,7 @@ export function ScheduleInterface({ assignments }: ScheduleProps) {
                                     key={idx}
                                     className="p-4 bg-muted/40 rounded-lg hover:bg-muted/60 transition-colors border border-border/30"
                                   >
-                                    {/* Time and cluster header */}
+                                    {/* Time and address header */}
                                     <div className="flex items-center justify-between mb-3">
                                       <div className="flex items-center gap-2">
                                         <Clock className="h-4 w-4 text-muted-foreground" />
@@ -546,9 +594,9 @@ export function ScheduleInterface({ assignments }: ScheduleProps) {
                                       </div>
                                       <div className="flex items-center gap-2">
                                         <MapPin className="h-4 w-4 text-chart-2" />
-                                        <Badge variant="outline">
-                                          Cluster {schedule.cluster}
-                                        </Badge>
+                                        <span className="text-xs text-muted-foreground">
+                                          {getSeniorAddress(schedule.senior)}
+                                        </span>
                                       </div>
                                     </div>
 
