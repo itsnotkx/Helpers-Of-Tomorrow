@@ -532,10 +532,12 @@ export default function VolunteerDashboard() {
               <CardTitle className="text-sm font-medium">
                 Active Volunteers
               </CardTitle>
-              <Activity className="h-4 w-4 text-muted-foreground" />
+              <Activity className="h-4 w-4 text-green-600" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{activeVolunteers}</div>
+              <div className="text-2xl font-bold text-green-600">
+                {activeVolunteers}
+              </div>
               <p className="text-xs text-muted-foreground">
                 of {volunteers.length} total
               </p>
