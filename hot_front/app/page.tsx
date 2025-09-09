@@ -218,8 +218,9 @@ export default function VolunteerDashboard() {
             ];
             setUserCoordinates(coordinates);
           }
-          if (res.dl_info[0].constituency) {
-            setConstituencyName(res.dl_info[0].constituency);
+          if (res.dl_info[0].constituency_name) {
+            console.log("Constituency found:", res.dl_info[0]);
+            setConstituencyName(res.dl_info[0].constituency_name);
           }
         }
       }

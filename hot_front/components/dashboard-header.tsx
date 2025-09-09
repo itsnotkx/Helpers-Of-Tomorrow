@@ -31,7 +31,11 @@ export function DashboardHeader({ title, subtitle, selectedDistrict, onShowHighP
             {selectedDistrict && (
               <Badge variant="outline" className="text-base px-4 py-2 font-semibold">
                 <MapPin className="h-5 w-5 mr-2" />
-                {selectedDistrict}
+                {typeof selectedDistrict === "object" && selectedDistrict !== null
+                  ? ("name" in selectedDistrict && (selectedDistrict as any).name)
+                    || ("district" in selectedDistrict && (selectedDistrict as any).district)
+                    || JSON.stringify(selectedDistrict)
+                  : selectedDistrict}
               </Badge>
             )}
 

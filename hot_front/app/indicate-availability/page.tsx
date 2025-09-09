@@ -19,7 +19,7 @@ export default function Home() {
         <DashboardHeader  
           title="Volunteer Availability"
           subtitle={`Managing care for Singapore`}
-          selectedDistrict=""
+          selectedDistrict="Singapore"
           />
         <WeeklyTimeSlotForm />
       </div>

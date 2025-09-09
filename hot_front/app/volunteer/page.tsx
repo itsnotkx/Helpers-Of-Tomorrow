@@ -18,8 +18,8 @@ export default function Scheduler() {
       <DashboardHeader
         title="Your Volunteer Schedule"
         subtitle="Managing care for Singapore"
-        selectedDistrict=""
-       />
+        selectedDistrict="Singapore"
+      />
 
       {/* Change colour here */}
       <div className="flex justify-end mt-4 mb-6">
