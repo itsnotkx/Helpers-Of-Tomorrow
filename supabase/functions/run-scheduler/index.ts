@@ -425,18 +425,40 @@ function assignVolunteersToClusters(clusters: Cluster[], volunteers: Volunteer[]
   const assignedVolunteers = new Set<string>()
 
   // Pass 1: Ensure each cluster gets at least one volunteer (closest volunteer by distance)
-  // Sort clusters by total seniors (highest first) to prioritize coverage for larger clusters
-  const sortedClusters = [...clusters].sort((a, b) => b.seniors.length - a.seniors.length)
+  // Sort clusters by high-risk count first, then by total seniors to prioritize high-need clusters
+  const sortedClusters = [...clusters].sort((a, b) => {
+    const aHighRisk = a.seniors.filter(s => s.overall_wellbeing === 1).length
+    const bHighRisk = b.seniors.filter(s => s.overall_wellbeing === 1).length
+    
+    // First priority: clusters with more high-risk seniors
+    if (aHighRisk !== bHighRisk) return bHighRisk - aHighRisk
+    
+    // Second priority: clusters with more total seniors
+    return b.seniors.length - a.seniors.length
+  })
 
   for (const cluster of sortedClusters) {
+    const clusterHighRisk = cluster.seniors.filter(s => s.overall_wellbeing === 1).length
+    
     let bestVolunteer: Volunteer | null = null
-    let minDistance = Infinity
+    let bestScore = -Infinity
 
     for (const volunteer of availableVolunteers) {
       if (assignedVolunteers.has(volunteer.email)) continue
-      const d = distance(volunteer.coords, cluster.centroid)
-      if (d < minDistance) {
-        minDistance = d
+      
+      const dist = distance(volunteer.coords, cluster.centroid)
+      
+      // Scoring for Pass 1:
+      // - Distance score (normalized)
+      // - Skill bonus for high-risk clusters
+      const distanceScore = 1 / (dist + 0.001)
+      const skillBonus = clusterHighRisk > 0 ? volunteer.skill * 2 : volunteer.skill * 0.5
+      
+      // Combined score: distance (70%) + skill consideration (30%)
+      const totalScore = (distanceScore * 0.7) + (skillBonus * 0.3)
+      
+      if (totalScore > bestScore) {
+        bestScore = totalScore
         bestVolunteer = volunteer
       }
     }
@@ -444,7 +466,8 @@ function assignVolunteersToClusters(clusters: Cluster[], volunteers: Volunteer[]
     if (bestVolunteer) {
       volunteerClusterAssignment.set(bestVolunteer.email, cluster.id)
       assignedVolunteers.add(bestVolunteer.email)
-      console.log(`Pass 1 - Assigned ${bestVolunteer.email} to cluster ${cluster.id} (${cluster.seniors.length} seniors, distance: ${minDistance.toFixed(4)})`)
+      const highRiskCount = cluster.seniors.filter(s => s.overall_wellbeing === 1).length
+      console.log(`Pass 1 - Assigned ${bestVolunteer.email} (skill: ${bestVolunteer.skill}) to cluster ${cluster.id} (${cluster.seniors.length} seniors, ${highRiskCount} high-risk, distance: ${distance(bestVolunteer.coords, cluster.centroid).toFixed(4)})`)
     } else {
       console.warn(`No unassigned available volunteer found for cluster ${cluster.id}`)
     }
@@ -504,15 +527,22 @@ function assignVolunteersToClusters(clusters: Cluster[], volunteers: Volunteer[]
       // 4. Total Seniors Score: More seniors = more need for volunteers
       const totalSeniorsScore = clusterMetric.totalSeniors / 10 // Scale to reasonable range
       
+      // 5. Skill Match Score: Higher skill volunteers get bonus for high-risk clusters
+      const skillMatchScore = clusterMetric.highRiskCount > 0 ? 
+        volunteer.skill * clusterMetric.highRiskCount * 0.5 : // High skill bonus for high-risk clusters
+        volunteer.skill * 0.2 // Small skill consideration for regular clusters
+      
       // Combine scores with balanced weights:
-      // - Distance (30%): Geographic efficiency
-      // - Workload balance (30%): Fair distribution based on current assignments
-      // - High-risk priority (25%): Emergency/priority care
+      // - Distance (25%): Geographic efficiency
+      // - Workload balance (25%): Fair distribution based on current assignments
+      // - High-risk priority (20%): Emergency/priority care
       // - Total seniors (15%): General workload consideration
-      const totalScore = (distanceScore * 0.30) + 
-                        (workloadScore * 0.30) + 
-                        (highRiskScore * 0.25) + 
-                        (totalSeniorsScore * 0.15)
+      // - Skill match (15%): Skilled volunteers for high-risk clusters
+      const totalScore = (distanceScore * 0.25) + 
+                        (workloadScore * 0.25) + 
+                        (highRiskScore * 0.20) + 
+                        (totalSeniorsScore * 0.15) + 
+                        (skillMatchScore * 0.15)
       
       if (totalScore > bestScore) {
         bestScore = totalScore
@@ -528,7 +558,7 @@ function assignVolunteersToClusters(clusters: Cluster[], volunteers: Volunteer[]
       
       const dist = distance(volunteer.coords, clusterMetric.centroid)
       const highRisk = clusterMetric.highRiskCount
-      console.log(`Pass 2 - Assigned ${volunteer.email} to cluster ${bestClusterId} (score: ${bestScore.toFixed(4)}, distance: ${dist.toFixed(4)}, ${clusterMetric.totalSeniors} seniors, ${highRisk} high-risk)`)
+      console.log(`Pass 2 - Assigned ${volunteer.email} (skill: ${volunteer.skill}) to cluster ${bestClusterId} (score: ${bestScore.toFixed(4)}, distance: ${dist.toFixed(4)}, ${clusterMetric.totalSeniors} seniors, ${highRisk} high-risk)`)
     }
   }
 
