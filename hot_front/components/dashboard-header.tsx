@@ -4,15 +4,17 @@ import Image from "next/image"
 import { Badge } from "@/components/ui/badge"
 import { MapPin } from "lucide-react"
 import { UserButton } from "@clerk/nextjs"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 
 interface DashboardHeaderProps {
   title: string
   subtitle: string
   selectedDistrict: string
   onShowHighPriority?: () => void
+  onDistrictChange: (district: "All" | "Jurong" | "Sembawang") => void
 }
 
-export function DashboardHeader({ title, subtitle, selectedDistrict, onShowHighPriority }: DashboardHeaderProps) {
+export function DashboardHeader({ title, subtitle, selectedDistrict, onShowHighPriority, onDistrictChange }: DashboardHeaderProps) {
   return (
     <header className="border-b bg-card">
       <div className="container mx-auto px-6 py-4">
@@ -27,17 +29,17 @@ export function DashboardHeader({ title, subtitle, selectedDistrict, onShowHighP
           </div>
 
           {/* Right Side Controls */}
-          <div className="flex items-center gap-6">
-            {selectedDistrict && (
-              <Badge variant="outline" className="text-base px-4 py-2 font-semibold">
-                <MapPin className="h-5 w-5 mr-2" />
-                {typeof selectedDistrict === "object" && selectedDistrict !== null
-                  ? ("name" in selectedDistrict && (selectedDistrict as any).name)
-                    || ("district" in selectedDistrict && (selectedDistrict as any).district)
-                    || JSON.stringify(selectedDistrict)
-                  : selectedDistrict}
-              </Badge>
-            )}
+        <div className="flex items-center gap-6">
+          <Select value={selectedDistrict} onValueChange={v => onDistrictChange(v as any)}>
+            <SelectTrigger className="w-[180px]">
+              <SelectValue placeholder="Select Constituency" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="All">All</SelectItem>
+              <SelectItem value="Jurong">Jurong</SelectItem>
+              <SelectItem value="Sembawang">Sembawang</SelectItem>
+            </SelectContent>
+          </Select>
 
             <UserButton
               showName

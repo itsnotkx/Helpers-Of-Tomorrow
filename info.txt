@@ -1,0 +1,5 @@
+Our solution consists of one webapp split into 2 different sections, one for volunteers and one for District Leaders(DLs).
+
+We have added hackathon.techseries2025@gmail.com as DL and kaiwen.lim.2024@computing.smu.edu.sg as Volunteer.
+
+Do sign into our webapp using both accounts to get both perspectives!

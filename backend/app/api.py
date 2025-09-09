@@ -83,16 +83,17 @@ def get_volunteers():
 
 @app.get("/dl/{user_email}")
 def get_user_schedules(user_email: str):
-    response = supabase.table("volunteers").select("*, constituency(centre_lat, centre_long)").eq("email", user_email).execute()
+    response = supabase.table("volunteers").select("*").eq("email", user_email).execute()
     logger.info(f"Fetched DL information for user {user_email}")
+    logger.info(f"\nDL RETURN OBJECT: {response.data}, USER EMAIL: {user_email}\n")
     return {"dl_info": response.data}
 
 @app.get("/assignments")
 def get_assignments():
     response = supabase.table("assignments").select("*").execute()
     logger.info(f"Fetched {len(response.data)} assignments")
-    logger.info(f"Assignments data: {response.data}")
-    logger.info(f"Assignments columns: {list(response.data[0].keys()) if response.data else 'No data'}")
+    # logger.info(f"Assignments data: {response.data}")
+    # logger.info(f"Assignments columns: {list(response.data[0].keys()) if response.data else 'No data'}")
     return {"assignments": response.data}
 
 @app.get("/clusters")

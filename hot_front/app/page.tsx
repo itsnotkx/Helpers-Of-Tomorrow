@@ -36,6 +36,7 @@ export interface Senior {
   cluster?: number;
   overall_wellbeing: 1 | 2 | 3;
   address?: string;
+  constituency_name?:string;
 }
 
 export interface Assignment {
@@ -50,6 +51,7 @@ export interface Volunteer {
   coords: { lat: number; lng: number };
   skill: number;
   available: boolean | string[];
+  constituency_name?: string;
 }
 
 interface Schedule {
@@ -95,6 +97,7 @@ export default function VolunteerDashboard() {
   const [constituencyName, setConstituencyName] = useState<string>("Singapore");
   const [hasLoadedUserDetails, setHasLoadedUserDetails] = useState(false);
   const mapSectionRef = useRef<HTMLDivElement>(null);
+  const [selectedDistrict, setSelectedDistrict] = useState<"" | "All" | "Jurong" | "Sembawang">("")
 
   const wellbeingLabels: Record<number, string> = {
     1: "Very Poor",
@@ -207,20 +210,23 @@ export default function VolunteerDashboard() {
           },
         }).then((res) => res.json());
 
+        console.log(res);
+
         if (res.dl_info[0] != null) {
           if (
-            res.dl_info[0].constituency.centre_lat &&
-            res.dl_info[0].constituency.centre_long
+            res.dl_info[0].coords.lat &&
+            res.dl_info[0].coords.long
           ) {
             const coordinates: [number, number] = [
-              res.dl_info[0].constituency.centre_long,
-              res.dl_info[0].constituency.centre_lat,
+              res.dl_info[0].coords.long,
+              res.dl_info[0].coords.lat,
             ];
             setUserCoordinates(coordinates);
           }
           if (res.dl_info[0].constituency_name) {
             console.log("Constituency found:", res.dl_info[0]);
             setConstituencyName(res.dl_info[0].constituency_name);
+            setSelectedDistrict(res.dl_info[0].constituency_name);
           }
         }
       }
@@ -368,7 +374,8 @@ export default function VolunteerDashboard() {
       <DashboardHeader
         title="Senior Care Volunteer Dashboard"
         subtitle={`Managing care for ${constituencyName}`}
-        selectedDistrict={constituencyName}
+        selectedDistrict={selectedDistrict}
+        onDistrictChange={setSelectedDistrict}
       />
 
       <div className="container mx-auto px-6 py-6">
@@ -590,6 +597,7 @@ export default function VolunteerDashboard() {
                 volunteers={volunteers}
                 assignments={assignments}
                 clusters={clusters}
+                selectedDistrict={selectedDistrict}
               />
             </CardContent>
           )}
