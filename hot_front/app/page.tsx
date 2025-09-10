@@ -23,6 +23,7 @@ import {
 import { InteractiveMap } from "@/components/interactive-map";
 import { ScheduleInterface } from "@/components/schedule-interface";
 import { DashboardHeader } from "@/components/dashboard-header";
+import { SeniorsReportSheet } from "@/components/seniors-report-sheet";
 import { useUser } from "@clerk/nextjs";
 
 export interface Senior {
@@ -36,7 +37,12 @@ export interface Senior {
   cluster?: number;
   overall_wellbeing: 1 | 2 | 3;
   address?: string;
-  constituency_name?:string;
+  constituency_name?: string;
+  dl_intervention?: boolean;
+  rece_gov_sup?: boolean;
+  making_ends_meet?: string;
+  living_situation?: string;
+  age?: number;
 }
 
 export interface Assignment {
@@ -84,6 +90,7 @@ export default function VolunteerDashboard() {
   const [isAssignmentsCollapsed, setIsAssignmentsCollapsed] = useState(false);
   const [showAllVolunteers, setShowAllVolunteers] = useState(false);
   const [showHighRiskModal, setShowHighRiskModal] = useState(false);
+  const [showSeniorsReportModal, setShowSeniorsReportModal] = useState(false);
   const [highlightedSeniorId, setHighlightedSeniorId] = useState<string | null>(
     null
   );
@@ -97,8 +104,14 @@ export default function VolunteerDashboard() {
   const [constituencyName, setConstituencyName] = useState<string>("Singapore");
   const [hasLoadedUserDetails, setHasLoadedUserDetails] = useState(false);
   const mapSectionRef = useRef<HTMLDivElement>(null);
-  const [selectedDistrict, setSelectedDistrict] = useState<"" | "All" | "Jurong" | "Sembawang">("")
-
+  const [districtCoords, setDistrictCoords] = useState([
+        { coords: [103.722, 1.3315], name: "Jurong" },
+        { coords: [103.8184, 1.4491], name: "Sembawang" },
+        { coords: [103.8198, 1.3521], name: "All" }
+      ]);
+  const [selectedDistrict, setSelectedDistrict] = useState<
+    "" | "All" | "Jurong" | "Sembawang"
+  >("");
   const wellbeingLabels: Record<number, string> = {
     1: "Very Poor",
     2: "Poor",
@@ -124,7 +137,7 @@ export default function VolunteerDashboard() {
       const BASE_URL =
         process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8000";
 
-      console.log(`Loading dashboard data (attempt ${retryCount + 1})`);
+
 
       // Add individual error handling for each fetch
       const fetchWithErrorHandling = async (url: string, name: string) => {
@@ -192,10 +205,15 @@ export default function VolunteerDashboard() {
     }
   }, [isLoaded, isSignedIn, user, hasLoadedUserDetails]);
 
-  // Memoize centerCoordinates to prevent unnecessary re-renders
-  const memoizedCenterCoordinates = useMemo(() => {
-    return userCoordinates ? (userCoordinates as [number, number]) : undefined;
-  }, [userCoordinates]);
+  useEffect(() => {
+    console.log("District changed to:", selectedDistrict);
+    const selectedCoords = districtCoords.find(
+      (district) => district.name === selectedDistrict)?.coords; 
+    window.dispatchEvent(
+      new CustomEvent("focus-district", { detail: { district: selectedDistrict, center: selectedCoords } })
+    );
+  }, [selectedDistrict]);
+
 
   async function fetch_dl_details(email: string) {
     try {
@@ -210,21 +228,16 @@ export default function VolunteerDashboard() {
           },
         }).then((res) => res.json());
 
-        console.log(res);
-
         if (res.dl_info[0] != null) {
-          if (
-            res.dl_info[0].coords.lat &&
-            res.dl_info[0].coords.long
-          ) {
-            const coordinates: [number, number] = [
-              res.dl_info[0].coords.long,
+          if (res.dl_info[0].coords.lat && res.dl_info[0].coords.lng) {
+              const coordinates: [number, number] = [
+              res.dl_info[0].coords.lng,
               res.dl_info[0].coords.lat,
             ];
             setUserCoordinates(coordinates);
           }
           if (res.dl_info[0].constituency_name) {
-            console.log("Constituency found:", res.dl_info[0]);
+            // console.log("Constituency found:", res.dl_info[0]);
             setConstituencyName(res.dl_info[0].constituency_name);
             setSelectedDistrict(res.dl_info[0].constituency_name);
           }
@@ -238,7 +251,7 @@ export default function VolunteerDashboard() {
     }
   }
 
-  if (dlisLoading && !hasLoadedUserDetails) {
+  if (dlisLoading || !hasLoadedUserDetails) {
     return (
       <div className="flex justify-center items-center min-h-screen">
         <div className="text-center">
@@ -263,8 +276,8 @@ export default function VolunteerDashboard() {
       setHighlightedSeniorId(id);
       setHighlightedVolunteerId(null);
     } else {
-      setHighlightedVolunteerId(id);
       setHighlightedSeniorId(null);
+      setHighlightedVolunteerId(id);
     }
 
     // Expand map if collapsed
@@ -289,7 +302,7 @@ export default function VolunteerDashboard() {
           new CustomEvent("focus-senior", { detail: { uid: id } })
         );
       } else {
-        console.log("Dispatching focus-volunteer event for", id);
+        // console.log("Dispatching focus-volunteer event for", id);
         window.dispatchEvent(
           new CustomEvent("focus-volunteer", { detail: { vid: id } })
         );
@@ -297,7 +310,21 @@ export default function VolunteerDashboard() {
     }, 200);
   };
 
-  const highPrioritySeniors = seniors.filter(
+  // District filtering helper
+  const filterByDistrict = <T extends { constituency_name?: string }>(
+    items: T[]
+  ): T[] => {
+    if (!selectedDistrict || selectedDistrict === "All") {
+      return items;
+    }
+    return items.filter((item) => item.constituency_name === selectedDistrict);
+  };
+
+  // Apply district filtering to all data
+  const filteredSeniors = filterByDistrict(seniors);
+  const filteredVolunteers = filterByDistrict(volunteers);
+
+  const highPrioritySeniors = filteredSeniors.filter(
     (s) => getPriorityLevel(s.overall_wellbeing) === "HIGH"
   );
 
@@ -342,15 +369,23 @@ export default function VolunteerDashboard() {
     return getVolunteerWeeklyAssignments(volunteerId) > 0;
   };
 
-  // Active volunteers: those with assignments this week
-  const activeVolunteers = volunteers.filter((volunteer) =>
+  // Active volunteers: those with assignments this week (filtered by district)
+  const activeVolunteers = filteredVolunteers.filter((volunteer) =>
     isVolunteerActiveThisWeek(volunteer.vid)
   ).length;
 
-  // Today's visits: schedules that match today's date
+  // Today's visits: schedules that match today's date (for volunteers in selected district)
   const todaySchedules = schedules.filter((schedule) => {
     const scheduleDate = new Date(schedule.date).toDateString();
-    return scheduleDate === today;
+    const isToday = scheduleDate === today;
+
+    // Check if the volunteer belongs to the selected district
+    if (!selectedDistrict || selectedDistrict === "All") {
+      return isToday;
+    }
+
+    const volunteer = volunteers.find((v) => v.vid === schedule.volunteer);
+    return isToday && volunteer?.constituency_name === selectedDistrict;
   });
 
   // Seniors needing immediate care: high priority AND not visited in the past 4 months
@@ -369,6 +404,14 @@ export default function VolunteerDashboard() {
     return aNeedsCare === bNeedsCare ? 0 : aNeedsCare ? -1 : 1;
   });
 
+  const handleDistrictChange = (newDistrict: any) =>{
+  // Do other things here (e.g., analytics, logging, filtering, etc.)
+    setSelectedDistrict(newDistrict);
+    console.log("District changed to:", selectedDistrict);
+   }
+
+
+
   return (
     <div className="min-h-screen bg-background">
       <DashboardHeader
@@ -380,21 +423,31 @@ export default function VolunteerDashboard() {
 
       <div className="container mx-auto px-6 py-6">
         <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-          <Card>
-            <CardHeader className="flex justify-between pb-2">
-              <CardTitle className="text-sm font-medium">
-                Total Seniors
-              </CardTitle>
-              <Users className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{seniors.length}</div>
-              <p className="text-xs text-muted-foreground">
-                {highRiskCount} high risk
-              </p>
-            </CardContent>
-          </Card>
-
+          <SeniorsReportSheet
+            filteredSeniors={filteredSeniors}
+            selectedDistrict={selectedDistrict}
+            constituencyName={constituencyName}
+            isOpen={showSeniorsReportModal}
+            onOpenChange={setShowSeniorsReportModal}
+            onSeniorClick={(seniorId) => handleMapFocus("senior", seniorId)}
+          >
+            <Card className="cursor-pointer hover:bg-muted/50 transition-colors">
+              <CardHeader className="flex justify-between pb-2">
+                <CardTitle className="text-sm font-medium">
+                  Total Seniors
+                </CardTitle>
+                <Users className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">
+                  {filteredSeniors.length}
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  {highRiskCount} high risk
+                </p>
+              </CardContent>
+            </Card>
+          </SeniorsReportSheet>
           <Dialog open={showHighRiskModal} onOpenChange={setShowHighRiskModal}>
             <DialogTrigger asChild>
               <Card className="cursor-pointer hover:bg-muted/50 transition-colors">
@@ -547,7 +600,7 @@ export default function VolunteerDashboard() {
                 {activeVolunteers}
               </div>
               <p className="text-xs text-muted-foreground">
-                of {volunteers.length} total
+                of {filteredVolunteers.length} total
               </p>
             </CardContent>
           </Card>
@@ -555,7 +608,7 @@ export default function VolunteerDashboard() {
           <Card>
             <CardHeader className="flex justify-between pb-2">
               <CardTitle className="text-sm font-medium">
-                Today's Visits
+                Today&apos;s Visits
               </CardTitle>
               <Calendar className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
@@ -584,6 +637,7 @@ export default function VolunteerDashboard() {
             </Button>
           </CardHeader>
           {!isMapCollapsed && (
+            // console.log("Rendering InteractiveMap with centerCoordinates:", userCoordinates),
             <CardContent>
               <InteractiveMap
                 highlightedSeniorId={highlightedSeniorId}
@@ -592,7 +646,7 @@ export default function VolunteerDashboard() {
                   setHighlightedSeniorId(null);
                   setHighlightedVolunteerId(null);
                 }}
-                centerCoordinates={memoizedCenterCoordinates}
+                centerCoordinates={userCoordinates}
                 seniors={seniors}
                 volunteers={volunteers}
                 assignments={assignments}
@@ -620,7 +674,10 @@ export default function VolunteerDashboard() {
             </Button>
           </CardHeader>
           {!isScheduleCollapsed && (
-            <ScheduleInterface assignments={assignments} />
+            <ScheduleInterface
+              assignments={assignments}
+              selectedDistrict={selectedDistrict}
+            />
           )}
         </Card>
         <Card className="mt-6">
@@ -641,7 +698,7 @@ export default function VolunteerDashboard() {
           {!isAssignmentsCollapsed && (
             <CardContent>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {volunteers
+                {filteredVolunteers
                   .sort((a, b) => {
                     // Sort active volunteers first, then inactive
                     const aActive = isVolunteerActiveThisWeek(a.vid);
@@ -649,8 +706,8 @@ export default function VolunteerDashboard() {
                     if (aActive === bActive) return 0;
                     return aActive ? -1 : 1;
                   })
-                  .slice(0, showAllVolunteers ? volunteers.length : 21)
-                  .map((v, i) => {
+                  .slice(0, showAllVolunteers ? filteredVolunteers.length : 21)
+                  .map((v) => {
                     const weeklyAssignments = getVolunteerWeeklyAssignments(
                       v.vid
                     );
@@ -722,7 +779,7 @@ export default function VolunteerDashboard() {
               </div>
 
               {/* Show/Hide button for volunteers */}
-              {volunteers.length > 20 && (
+              {filteredVolunteers.length > 20 && (
                 <div className="flex justify-center mt-6">
                   <Button
                     variant="outline"

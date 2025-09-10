@@ -93,23 +93,33 @@ Deno.serve(async (req) => {
       coords: typeof v.coords === 'string' ? JSON.parse(v.coords) : v.coords
     }))
 
-    // Calculate date range: Monday to Sunday after current Sunday
-    // NOTE: reuse 'today' from above to avoid redeclaration
+    // Calculate date range: 
+    // - If today is Sunday, schedule for the following week (Monday-Sunday)
+    // - If today is any other day, schedule for the current week (Monday-Sunday)
     const dayOfWeek = today.getDay() // 0 = Sunday
     
-    // If today is Sunday, get Monday-Sunday of the following week
-    // If today is any other day, this shouldn't run, but handle gracefully
-    const daysUntilNextMonday = dayOfWeek === 0 ? 1 : (8 - dayOfWeek) % 7
-    const nextMonday = new Date(today.getTime() + daysUntilNextMonday * 24 * 60 * 60 * 1000)
-    const nextSunday = new Date(nextMonday.getTime() + 6 * 24 * 60 * 60 * 1000)
+    let weekStart: Date
+    let weekEnd: Date
     
-    console.log(`Scheduling for week: ${nextMonday.toISOString().split('T')[0]} to ${nextSunday.toISOString().split('T')[0]}`)
+    if (dayOfWeek === 0) {
+      // Today is Sunday - schedule for next week
+      const daysUntilNextMonday = 1
+      weekStart = new Date(today.getTime() + daysUntilNextMonday * 24 * 60 * 60 * 1000)
+      weekEnd = new Date(weekStart.getTime() + 6 * 24 * 60 * 60 * 1000)
+      console.log(`Today is Sunday - scheduling for NEXT week: ${weekStart.toISOString().split('T')[0]} to ${weekEnd.toISOString().split('T')[0]}`)
+    } else {
+      // Today is Monday-Saturday - schedule for current week
+      const daysFromMonday = dayOfWeek - 1 // Monday = 0, Tuesday = 1, etc.
+      weekStart = new Date(today.getTime() - daysFromMonday * 24 * 60 * 60 * 1000)
+      weekEnd = new Date(weekStart.getTime() + 6 * 24 * 60 * 60 * 1000)
+      console.log(`Today is ${['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'][dayOfWeek]} - scheduling for CURRENT week: ${weekStart.toISOString().split('T')[0]} to ${weekEnd.toISOString().split('T')[0]}`)
+    }
     
     const { data: availabilities, error: availabilitiesError } = await supabase
       .from('availabilities')
       .select('date, start_t, end_t, volunteer_email')
-      .gte('date', nextMonday.toISOString().split('T')[0])
-      .lte('date', nextSunday.toISOString().split('T')[0])
+      .gte('date', weekStart.toISOString().split('T')[0])
+      .lte('date', weekEnd.toISOString().split('T')[0])
 
     if (availabilitiesError) throw availabilitiesError
 
@@ -218,7 +228,9 @@ function calculateClusterRadius(seniors: Senior[], centroid: { lat: number; lng:
   if (seniors.length === 0) return 0
   
   const distances = seniors.map(senior => distance(senior.coords, centroid))
-  return Math.max(...distances)
+  const maxDistance = Math.max(...distances)
+
+  return maxDistance 
 }
 
 function performGeographicalClustering(seniors: Senior[], _volunteers: Volunteer[]): Cluster[] {
@@ -582,13 +594,84 @@ function assignVolunteersToClusters(clusters: Cluster[], volunteers: Volunteer[]
 }
 
 function generateOptimalSchedules(clusters: Cluster[], volunteers: Volunteer[], availabilities: Availability[]) {
-  const schedules = []
+  const schedules: any[] = []
   
   console.log(`Starting schedule generation with ${availabilities.length} availability slots`)
   
-  // Clear existing assignments first to ensure fresh scheduling
-  const usedSlots = new Set<string>()
+  // Track used time slots per volunteer per day with 2-hour spacing
+  const volunteerDaySchedules = new Map<string, Map<string, Array<{start: Date, end: Date}>>>()
   const scheduledSeniors = new Set<string>()
+  
+  // Helper function to generate possible 1-hour time slots within an availability window
+  const generateTimeSlots = (startTime: string, endTime: string): Array<{start: string, end: string}> => {
+    const slots: Array<{start: string, end: string}> = []
+    const start = new Date(`1970-01-01T${startTime}`)
+    const end = new Date(`1970-01-01T${endTime}`)
+    
+    // Generate 1-hour slots within the availability window
+    let current = new Date(start)
+    while (current.getTime() + 60 * 60 * 1000 <= end.getTime()) {
+      const slotEnd = new Date(current.getTime() + 60 * 60 * 1000)
+      slots.push({
+        start: current.toTimeString().slice(0, 8),
+        end: slotEnd.toTimeString().slice(0, 8)
+      })
+      // Move to next hour
+      current = new Date(current.getTime() + 60 * 60 * 1000)
+    }
+    
+    return slots
+  }
+  
+  // Helper function to check if a time slot conflicts with existing schedules (2-hour gap required)
+  const hasTimeConflict = (volunteerEmail: string, date: string, proposedStart: string): boolean => {
+    const volunteerSchedules = volunteerDaySchedules.get(volunteerEmail)
+    if (!volunteerSchedules) return false
+    
+    const daySchedules = volunteerSchedules.get(date)
+    if (!daySchedules || daySchedules.length === 0) return false
+    
+    const proposedStartTime = new Date(`1970-01-01T${proposedStart}`)
+    const proposedEndTime = new Date(proposedStartTime.getTime() + 60 * 60 * 1000)
+    
+    // Check against all existing appointments for this volunteer on this day
+    for (const existing of daySchedules) {
+      // Calculate time difference between appointments
+      const timeBetweenEnd = Math.abs(existing.end.getTime() - proposedStartTime.getTime()) / (1000 * 60 * 60) // hours
+      const timeBetweenStart = Math.abs(proposedEndTime.getTime() - existing.start.getTime()) / (1000 * 60 * 60) // hours
+      
+      // Ensure at least 2 hours between end of one appointment and start of next
+      if (timeBetweenEnd < 2 || timeBetweenStart < 2) {
+        return true // Conflict found
+      }
+    }
+    
+    return false // No conflict
+  }
+  
+  // Helper function to add a schedule to tracking
+  const addScheduleToTracking = (volunteerEmail: string, date: string, startTime: string) => {
+    if (!volunteerDaySchedules.has(volunteerEmail)) {
+      volunteerDaySchedules.set(volunteerEmail, new Map())
+    }
+    const volunteerSchedules = volunteerDaySchedules.get(volunteerEmail)!
+    
+    if (!volunteerSchedules.has(date)) {
+      volunteerSchedules.set(date, [])
+    }
+    const daySchedules = volunteerSchedules.get(date)!
+    
+    const startDateTime = new Date(`1970-01-01T${startTime}`)
+    const endDateTime = new Date(startDateTime.getTime() + 60 * 60 * 1000)
+    
+    daySchedules.push({
+      start: startDateTime,
+      end: endDateTime
+    })
+    
+    // Sort by start time for easier conflict checking
+    daySchedules.sort((a, b) => a.start.getTime() - b.start.getTime())
+  }
   
   // Get volunteer-to-cluster assignments using weighted distance
   const volunteerClusterAssignment = assignVolunteersToClusters(clusters, volunteers, availabilities)
@@ -611,13 +694,13 @@ function generateOptimalSchedules(clusters: Cluster[], volunteers: Volunteer[], 
     // Sort seniors by priority (lower wellbeing = higher priority)
     const sortedSeniors = [...cluster.seniors].sort((a, b) => a.overall_wellbeing - b.overall_wellbeing)
     
-    // Get volunteers assigned to this cluster (using 0-based cluster.id for comparison)
+    // Get volunteers assigned to this cluster
     const clusterVolunteers = volunteers.filter(v => 
       volunteerClusterAssignment.get(v.email) === cluster.id &&
       availabilityMap.has(v.email)
     )
     
-    console.log(`Cluster ${cluster.id} (DB ID: ${cluster.id}) has ${clusterVolunteers.length} volunteers and ${sortedSeniors.length} seniors`)
+    console.log(`Cluster ${cluster.id} has ${clusterVolunteers.length} volunteers and ${sortedSeniors.length} seniors`)
     
     if (clusterVolunteers.length === 0) {
       console.log(`No volunteers available for cluster ${cluster.id}, skipping`)
@@ -649,45 +732,45 @@ function generateOptimalSchedules(clusters: Cluster[], volunteers: Volunteer[], 
         
         const volunteerSlots = availabilityMap.get(volunteer.email) || []
         
-        // Find first available slot
-        for (const slot of volunteerSlots) {
-          const slotKey = `${volunteer.email}_${slot.date}_${slot.start_t}`
+        // Try each availability slot for this volunteer
+        for (const availSlot of volunteerSlots) {
+          if (seniorScheduled) break
           
-          if (usedSlots.has(slotKey)) continue
+          // Generate all possible 1-hour time slots within this availability window
+          const possibleTimeSlots = generateTimeSlots(availSlot.start_t, availSlot.end_t)
           
-          // Calculate end time (1 hour duration)
-          const startTime = new Date(`1970-01-01T${slot.start_t}`)
-          const endTime = new Date(startTime.getTime() + 60 * 60 * 1000) // Add 1 hour
-          const endTimeString = endTime.toTimeString().slice(0, 8) // Format as HH:MM:SS
-          
-          // Check if assignment end time is within volunteer's available slot
-          const slotEndTime = new Date(`1970-01-01T${slot.end_t}`)
-          if (endTime > slotEndTime) {
-            console.log(`Skipping slot for ${volunteer.email}: assignment would end at ${endTimeString} but slot ends at ${slot.end_t}`)
-            continue
+          // Try each possible time slot
+          for (const timeSlot of possibleTimeSlots) {
+            if (seniorScheduled) break
+            
+            // Check if this time slot conflicts with volunteer's existing appointments
+            if (hasTimeConflict(volunteer.email, availSlot.date, timeSlot.start)) {
+              continue // Try next time slot
+            }
+            
+            // Create schedule entry
+            schedules.push({
+              vid: volunteer.vid,
+              sid: senior.uid,
+              date: availSlot.date,
+              start_time: timeSlot.start,
+              end_time: timeSlot.end,
+              volunteer_email: volunteer.email,
+              is_acknowledged: false,
+              cluster_id: cluster.id
+            })
+            
+            // Add this appointment to tracking
+            addScheduleToTracking(volunteer.email, availSlot.date, timeSlot.start)
+            scheduledSeniors.add(senior.uid)
+            seniorScheduled = true
+            
+            const existingCount = volunteerDaySchedules.get(volunteer.email)?.get(availSlot.date)?.length || 0
+            console.log(`Scheduled senior ${senior.uid} with volunteer ${volunteer.email} on ${availSlot.date} at ${timeSlot.start}-${timeSlot.end} for cluster ${cluster.id} (${existingCount} appointments this day)`)
+            
+            // Move to next senior (one visit per senior maximum)
+            break
           }
-          
-          // Create schedule entry
-          schedules.push({
-            vid: volunteer.vid,
-            sid: senior.uid,
-            date: slot.date,
-            start_time: slot.start_t,
-            end_time: endTimeString,
-            volunteer_email: volunteer.email,
-            is_acknowledged: false,
-            cluster_id: cluster.id // No conversion needed - already starts from 1
-          })
-          
-          // Mark slot as used and senior as scheduled
-          usedSlots.add(slotKey)
-          scheduledSeniors.add(senior.uid)
-          seniorScheduled = true
-          
-          console.log(`Scheduled senior ${senior.uid} with volunteer ${volunteer.email} on ${slot.date} at ${slot.start_t} for cluster ${cluster.id}`)
-          
-          // Move to next senior (one visit per senior maximum)
-          break
         }
       }
       
@@ -697,7 +780,25 @@ function generateOptimalSchedules(clusters: Cluster[], volunteers: Volunteer[], 
     }
   }
   
+  // Log final scheduling statistics
+  console.log(`\n=== Final Scheduling Statistics ===`)
   console.log(`Total schedules generated: ${schedules.length}`)
+  
+  volunteerDaySchedules.forEach((daySchedules, volunteerEmail) => {
+    let totalAppointments = 0
+    daySchedules.forEach((appointments, date) => {
+      totalAppointments += appointments.length
+      if (appointments.length > 1) {
+        console.log(`${volunteerEmail} on ${date}: ${appointments.length} appointments`)
+        appointments.forEach((apt, idx) => {
+          console.log(`  ${idx + 1}. ${apt.start.toTimeString().slice(0, 8)} - ${apt.end.toTimeString().slice(0, 8)}`)
+        })
+      }
+    })
+    if (totalAppointments > 0) {
+      console.log(`${volunteerEmail}: ${totalAppointments} total appointments across all days`)
+    }
+  })
   
   return schedules
 }
