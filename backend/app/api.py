@@ -96,9 +96,13 @@ def get_user_schedules(user_email: str):
 def get_assignments():
     response = supabase.table("assignments").select("*").execute()
     logger.info(f"Fetched {len(response.data)} assignments")
-    # logger.info(f"Assignments data: {response.data}")
-    # logger.info(f"Assignments columns: {list(response.data[0].keys()) if response.data else 'No data'}")
     return {"assignments": response.data}
+
+@app.get("/assignmentarchive")
+def get_assignment_archive():
+    response = supabase.table("assignments_archive").select("*").execute()
+    logger.info(f"Fetched {len(response.data)} archived assignments")
+    return {"assignment_archive": response.data}
 
 @app.get("/clusters")
 def get_clusters():
@@ -180,6 +184,55 @@ def update_acknowledgements(acknowledgements: dict):
             "success": False,
             "error": f"Failed to update acknowledgements: {str(e)}"
         }
+
+@app.put("/confirm-visit")
+def confirm_visit(data: dict):
+    try:
+        aid = data.get("aid")
+        if not aid:
+            return {"success": False, "error": "Assignment ID is required"}
+        
+        # First, get the archived assignment to find the senior and date
+        archive_response = supabase.table("assignments_archive").select("*").eq("aid", aid).execute()
+        
+        if not archive_response.data or len(archive_response.data) == 0:
+            return {"success": False, "error": "Archived assignment not found"}
+        
+        assignment = archive_response.data[0]
+        sid = assignment.get("sid")
+        visit_date = assignment.get("date")
+        
+        if not sid or not visit_date:
+            return {"success": False, "error": "Invalid assignment data"}
+        
+        # Update has_visited in assignments_archive
+        archive_update = supabase.table("assignments_archive").update({
+            "has_visited": True
+        }).eq("aid", aid).execute()
+        
+        if not archive_update.data:
+            return {"success": False, "error": "Failed to update assignment archive"}
+        
+        # Update last_visit in seniors table
+        senior_update = supabase.table("seniors").update({
+            "last_visit": visit_date
+        }).eq("uid", sid).execute()
+        
+        if not senior_update.data:
+            logger.warning(f"Failed to update last_visit for senior {sid}, but assignment was marked as visited")
+        
+        logger.info(f"Successfully confirmed visit for assignment {aid}, senior {sid}")
+        return {
+            "success": True,
+            "message": "Visit confirmed successfully",
+            "assignment_id": aid,
+            "senior_id": sid,
+            "visit_date": visit_date
+        }
+        
+    except Exception as e:
+        logger.error(f"Error confirming visit: {str(e)}", exc_info=True)
+        return {"success": False, "error": f"Internal server error: {str(e)}"}
 
 # Add a debug endpoint to check all table structures
 @app.get("/debug/tables")
