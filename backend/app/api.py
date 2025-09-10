@@ -6,11 +6,10 @@ import time
 import asyncio
 from threading import Thread
 
-from config.settings import CORS_ORIGINS
+from config.settings import CORS_ORIGINS, supabase, logger
+
 from utils.helpers import get_iso_time
 from services.assessments import classify_seniors
-from config.settings import supabase, logger
-
 app = FastAPI(title="AIC Senior Care MVP")
 
 app.add_middleware(

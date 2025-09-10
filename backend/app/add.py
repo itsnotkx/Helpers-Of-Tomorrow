@@ -4,7 +4,7 @@ from config.settings import supabase, logger
 SINGAPORE_NEIGHBOURHOODS = {
     "Yishun": [103.8454, 1.4382],
     "Tampines": [103.9568, 1.3496],
-    "Jurong": [103.7436, 1.3404],
+    "Jurong": [103.722, 1.3315],
     "Bedok": [103.9273, 1.3236],
     "Hougang": [103.8924, 1.3612],
     "Sembawang": [103.8184, 1.4491],

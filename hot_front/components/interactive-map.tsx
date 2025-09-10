@@ -264,7 +264,7 @@ export function InteractiveMap({
           104.045,
           1.478, // east, north
         ];
-        console.log("Center Coordinates:", centerCoordinates);
+        // console.log("Center Coordinates:", centerCoordinates);
         map.current = new mapboxgl.Map({
           container: mapContainer.current!,
           style: "mapbox://styles/wzinl/cmf5f4has01rh01pj8ajb1993",
@@ -410,6 +410,7 @@ export function InteractiveMap({
     map.current.fitBounds(bounds, { padding: 80, maxZoom: 15 });
   }, [highlightedSeniorId, mapLoaded, seniors]);
 
+
   // Listen for cross-component focus events
   useEffect(() => {
     if (!mapLoaded) return;
@@ -435,7 +436,7 @@ export function InteractiveMap({
 
     const onFocusVolunteer = (e: any) => {
       if (process.env.NODE_ENV === "development") {
-        console.log("Received focus-volunteer event:", e);
+        // console.log("Received focus-volunteer event:", e);
       }
       const vid = e?.detail?.vid as string | undefined;
       if (!vid) return;
@@ -444,29 +445,44 @@ export function InteractiveMap({
 
       setHighlightedCluster(null);
       setLocallyFocusedSeniorId(null);
-      setLocallyFocusedVolunteerId(null);
+      setLocallyFocusedVolunteerId(vid);
 
       map.current?.flyTo({
         center: [v.coords.lng, v.coords.lat],
         zoom: Math.max(map.current!.getZoom(), 14),
         essential: true,
       });
+      showVolunteerPopup(v);
+    };
+
+    const onFocusDistrict = (e: any) => {
+      if (process.env.NODE_ENV === "development") {
+        console.log("Received district focus event:", e);
+      }
+      const coords = e?.detail?.center as [number, number] | undefined;
+      if (!coords) return;
+      setHighlightedCluster(null);
+      setLocallyFocusedSeniorId(null);
+      setLocallyFocusedVolunteerId(null);
+
+      map.current?.flyTo({
+        center: [coords[0], coords[1]],
+        zoom: e?.detail?.district === "All" ? 10.5 :  Math.max(map.current!.getZoom(), 14),
+        essential: true,
+      });
+      // showVolunteerPopup(v);
     };
 
     window.addEventListener("focus-senior", onFocusSenior as EventListener);
-    window.addEventListener(
-      "focus-volunteer",
-      onFocusVolunteer as EventListener
-    );
+    window.addEventListener("focus-volunteer", onFocusVolunteer as EventListener);
+
+    window.addEventListener("focus-district", onFocusDistrict as EventListener);
+
+
     return () => {
-      window.removeEventListener(
-        "focus-senior",
-        onFocusSenior as EventListener
-      );
-      window.removeEventListener(
-        "focus-volunteer",
-        onFocusVolunteer as EventListener
-      );
+      window.removeEventListener("focus-senior", onFocusSenior as EventListener);
+      window.removeEventListener("focus-volunteer", onFocusVolunteer as EventListener);
+      window.removeEventListener("focus-district", onFocusDistrict as EventListener);
     };
   }, [mapLoaded, seniors, volunteers]);
 

@@ -66,6 +66,7 @@ export function ScheduleInterface({
   assignments,
   selectedDistrict,
 }: ScheduleProps) {
+
   // helper: tell the map to zoom & highlight a volunteer
   const focusVolunteerOnMap = (vid: string) => {
     window.dispatchEvent(

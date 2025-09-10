@@ -104,6 +104,11 @@ export default function VolunteerDashboard() {
   const [constituencyName, setConstituencyName] = useState<string>("Singapore");
   const [hasLoadedUserDetails, setHasLoadedUserDetails] = useState(false);
   const mapSectionRef = useRef<HTMLDivElement>(null);
+  const [districtCoords, setDistrictCoords] = useState([
+        { coords: [103.722, 1.3315], name: "Jurong" },
+        { coords: [103.8184, 1.4491], name: "Sembawang" },
+        { coords: [103.8198, 1.3521], name: "All" }
+      ]);
   const [selectedDistrict, setSelectedDistrict] = useState<
     "" | "All" | "Jurong" | "Sembawang"
   >("");
@@ -200,6 +205,15 @@ export default function VolunteerDashboard() {
     }
   }, [isLoaded, isSignedIn, user, hasLoadedUserDetails]);
 
+  useEffect(() => {
+    console.log("District changed to:", selectedDistrict);
+    const selectedCoords = districtCoords.find(
+      (district) => district.name === selectedDistrict)?.coords; 
+    window.dispatchEvent(
+      new CustomEvent("focus-district", { detail: { district: selectedDistrict, center: selectedCoords } })
+    );
+  }, [selectedDistrict]);
+
 
   async function fetch_dl_details(email: string) {
     try {
@@ -214,20 +228,16 @@ export default function VolunteerDashboard() {
           },
         }).then((res) => res.json());
 
-        console.log(".dl_info[0].coords",res.dl_info[0].coords.lng,res.dl_info[0].coords.lat);
-
         if (res.dl_info[0] != null) {
           if (res.dl_info[0].coords.lat && res.dl_info[0].coords.lng) {
-            console.log("Coordinates found:", res.dl_info[0].coords);
-            const coordinates: [number, number] = [
+              const coordinates: [number, number] = [
               res.dl_info[0].coords.lng,
               res.dl_info[0].coords.lat,
             ];
-            console.log("Coordinates found:", coordinates);
             setUserCoordinates(coordinates);
           }
           if (res.dl_info[0].constituency_name) {
-            console.log("Constituency found:", res.dl_info[0]);
+            // console.log("Constituency found:", res.dl_info[0]);
             setConstituencyName(res.dl_info[0].constituency_name);
             setSelectedDistrict(res.dl_info[0].constituency_name);
           }
@@ -266,8 +276,8 @@ export default function VolunteerDashboard() {
       setHighlightedSeniorId(id);
       setHighlightedVolunteerId(null);
     } else {
-      setHighlightedVolunteerId(id);
       setHighlightedSeniorId(null);
+      setHighlightedVolunteerId(id);
     }
 
     // Expand map if collapsed
@@ -292,7 +302,7 @@ export default function VolunteerDashboard() {
           new CustomEvent("focus-senior", { detail: { uid: id } })
         );
       } else {
-        console.log("Dispatching focus-volunteer event for", id);
+        // console.log("Dispatching focus-volunteer event for", id);
         window.dispatchEvent(
           new CustomEvent("focus-volunteer", { detail: { vid: id } })
         );
@@ -393,6 +403,14 @@ export default function VolunteerDashboard() {
     const bNeedsCare = seniorsNeedingImmediateCare.includes(b);
     return aNeedsCare === bNeedsCare ? 0 : aNeedsCare ? -1 : 1;
   });
+
+  const handleDistrictChange = (newDistrict: any) =>{
+  // Do other things here (e.g., analytics, logging, filtering, etc.)
+    setSelectedDistrict(newDistrict);
+    console.log("District changed to:", selectedDistrict);
+   }
+
+
 
   return (
     <div className="min-h-screen bg-background">
@@ -619,7 +637,7 @@ export default function VolunteerDashboard() {
             </Button>
           </CardHeader>
           {!isMapCollapsed && (
-            console.log("Rendering InteractiveMap with centerCoordinates:", userCoordinates),
+            // console.log("Rendering InteractiveMap with centerCoordinates:", userCoordinates),
             <CardContent>
               <InteractiveMap
                 highlightedSeniorId={highlightedSeniorId}
