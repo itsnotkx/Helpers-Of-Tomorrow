@@ -148,16 +148,14 @@ export function SeniorsReportSheet({
       } else {
         console.error("Failed to update wellbeing:", result);
         alert(
-          `Failed to update wellbeing: ${
-            result.message || result.error || "Unknown error"
+          `Failed to update wellbeing: ${result.message || result.error || "Unknown error"
           }`
         );
       }
     } catch (error) {
       console.error("Error updating wellbeing:", error);
       alert(
-        `Error updating wellbeing: ${
-          error instanceof Error ? error.message : "Unknown error"
+        `Error updating wellbeing: ${error instanceof Error ? error.message : "Unknown error"
         }`
       );
     } finally {
@@ -173,15 +171,10 @@ export function SeniorsReportSheet({
     setShowWellbeingDialog(seniorId);
 
     // Auto-select the first available option that's different from current
-    let firstAvailableOption: number;
-    if (currentWellbeing !== 1) {
-      firstAvailableOption = 1; // Poor (High Risk)
-    } else if (currentWellbeing !== 2) {
-      firstAvailableOption = 2; // Normal (Medium Risk)
-    } else {
-      firstAvailableOption = 3; // Good (Low Risk)
-    }
+    const wellbeingOptions = [1, 2, 3] as const;
 
+    // Auto-select the first option that's not the current one
+    const firstAvailableOption = wellbeingOptions.find(opt => opt !== currentWellbeing)!;
     setSelectedWellbeing(firstAvailableOption);
   };
 
@@ -512,8 +505,8 @@ export function SeniorsReportSheet({
                                     priorityLevel === "HIGH"
                                       ? "destructive"
                                       : priorityLevel === "MEDIUM"
-                                      ? "secondary"
-                                      : "outline"
+                                        ? "secondary"
+                                        : "outline"
                                   }
                                   className={
                                     priorityLevel === "MEDIUM"
@@ -582,7 +575,7 @@ export function SeniorsReportSheet({
                                         <strong>Current wellbeing:</strong>{" "}
                                         {
                                           wellbeingLabels[
-                                            senior.overall_wellbeing
+                                          senior.overall_wellbeing
                                           ]
                                         }
                                       </div>
@@ -653,7 +646,7 @@ export function SeniorsReportSheet({
                                           className="flex-1"
                                         >
                                           {isUpdatingWellbeing ===
-                                          senior.uid ? (
+                                            senior.uid ? (
                                             <>
                                               <Loader2 className="h-4 w-4 mr-2 animate-spin" />
                                               Updating...
@@ -695,7 +688,7 @@ export function SeniorsReportSheet({
                                     {Math.floor(
                                       (new Date().getTime() -
                                         new Date(senior.last_visit).getTime()) /
-                                        (1000 * 60 * 60 * 24)
+                                      (1000 * 60 * 60 * 24)
                                     )}{" "}
                                     days ago
                                   </div>
@@ -739,15 +732,15 @@ export function SeniorsReportSheet({
                             <td className="p-3 text-sm">
                               {senior.making_ends_meet
                                 ? makingEndsMeetLabels[
-                                    senior.making_ends_meet
-                                  ] || senior.making_ends_meet
+                                senior.making_ends_meet
+                                ] || senior.making_ends_meet
                                 : "Not recorded"}
                             </td>
                             <td className="p-3 text-sm">
                               {senior.living_situation
                                 ? livingConditionsLabels[
-                                    senior.living_situation
-                                  ] || senior.living_situation
+                                senior.living_situation
+                                ] || senior.living_situation
                                 : "Not recorded"}
                             </td>
                             <td className="p-3 text-sm">
