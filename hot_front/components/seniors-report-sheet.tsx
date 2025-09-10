@@ -10,7 +10,28 @@ import {
   SheetTitle,
   SheetTrigger,
 } from "@/components/ui/sheet";
-import { Users, X, ArrowUpDown } from "lucide-react";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  Users,
+  X,
+  ArrowUpDown,
+  Edit,
+  Loader2,
+  AlertTriangle,
+} from "lucide-react";
 import { Senior } from "@/app/page";
 
 interface SeniorsReportSheetProps {
@@ -32,11 +53,33 @@ export function SeniorsReportSheet({
   onSeniorClick,
   children,
 }: SeniorsReportSheetProps) {
+  // Debug: Log a sample senior to see what fields are available
+  if (filteredSeniors.length > 0) {
+    console.log("Sample senior data:", filteredSeniors[0]);
+    console.log("Available fields:", Object.keys(filteredSeniors[0]));
+  }
   // Sorting state for the seniors table
   const [sortColumn, setSortColumn] = useState<string | null>(null);
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("asc");
 
+  // Wellbeing update state
+  const [isUpdatingWellbeing, setIsUpdatingWellbeing] = useState<string | null>(
+    null
+  );
+  const [showWellbeingDialog, setShowWellbeingDialog] = useState<string | null>(
+    null
+  );
+  const [selectedWellbeing, setSelectedWellbeing] = useState<number | null>(
+    null
+  );
+
   const wellbeingLabels: Record<number, string> = {
+    1: "Poor", // High Risk
+    2: "Normal", // Medium Risk
+    3: "Good", // Low Risk
+  };
+
+  const healthLabels: Record<number, string> = {
     1: "Very Poor",
     2: "Poor",
     3: "Normal",
@@ -58,6 +101,88 @@ export function SeniorsReportSheet({
     "3": "Managing",
     "4": "Comfortable",
     "5": "Very Comfortable",
+  };
+
+  // Handle wellbeing update confirmation
+  const handleWellbeingUpdate = async (
+    seniorId: string,
+    newWellbeing: number
+  ) => {
+    try {
+      console.log("Updating wellbeing for:", seniorId, "to:", newWellbeing);
+      setIsUpdatingWellbeing(seniorId);
+
+      const BASE_URL =
+        process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8000";
+
+      const requestBody = {
+        sid: seniorId,
+        overall_wellbeing: newWellbeing,
+      };
+
+      console.log("Request body:", requestBody);
+      console.log("Making request to:", `${BASE_URL}/wellbeing`);
+
+      const response = await fetch(`${BASE_URL}/wellbeing`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(requestBody),
+      });
+
+      console.log("Response status:", response.status);
+      console.log("Response ok:", response.ok);
+
+      const result = await response.json();
+      console.log("Response data:", result);
+
+      if (response.ok && result.success) {
+        // Close dialog and show success
+        setShowWellbeingDialog(null);
+        setSelectedWellbeing(null);
+        alert("Wellbeing updated successfully!");
+        // Update the local state instead of refreshing the page
+        // This will keep the user on the sheet
+        window.location.reload();
+      } else {
+        console.error("Failed to update wellbeing:", result);
+        alert(
+          `Failed to update wellbeing: ${
+            result.message || result.error || "Unknown error"
+          }`
+        );
+      }
+    } catch (error) {
+      console.error("Error updating wellbeing:", error);
+      alert(
+        `Error updating wellbeing: ${
+          error instanceof Error ? error.message : "Unknown error"
+        }`
+      );
+    } finally {
+      setIsUpdatingWellbeing(null);
+    }
+  };
+
+  // Handle opening wellbeing dialog
+  const handleOpenWellbeingDialog = (
+    seniorId: string,
+    currentWellbeing: number
+  ) => {
+    setShowWellbeingDialog(seniorId);
+
+    // Auto-select the first available option that's different from current
+    let firstAvailableOption: number;
+    if (currentWellbeing !== 1) {
+      firstAvailableOption = 1; // Poor (High Risk)
+    } else if (currentWellbeing !== 2) {
+      firstAvailableOption = 2; // Normal (Medium Risk)
+    } else {
+      firstAvailableOption = 3; // Good (Low Risk)
+    }
+
+    setSelectedWellbeing(firstAvailableOption);
   };
 
   // Handle column sorting
@@ -381,37 +506,181 @@ export function SeniorsReportSheet({
                                 : "Not recorded"}
                             </td>
                             <td className="p-3">
-                              <Badge
-                                variant={
-                                  priorityLevel === "HIGH"
-                                    ? "destructive"
-                                    : priorityLevel === "MEDIUM"
-                                    ? "secondary"
-                                    : "outline"
-                                }
-                                className={
-                                  priorityLevel === "MEDIUM"
-                                    ? "bg-orange-100 text-orange-800 border-orange-200"
-                                    : ""
-                                }
-                              >
-                                {wellbeingLabels[senior.overall_wellbeing] ||
-                                  "Unknown"}
-                              </Badge>
+                              <div className="flex items-center gap-2">
+                                <Badge
+                                  variant={
+                                    priorityLevel === "HIGH"
+                                      ? "destructive"
+                                      : priorityLevel === "MEDIUM"
+                                      ? "secondary"
+                                      : "outline"
+                                  }
+                                  className={
+                                    priorityLevel === "MEDIUM"
+                                      ? "bg-orange-100 text-orange-800 border-orange-200"
+                                      : ""
+                                  }
+                                >
+                                  {wellbeingLabels[senior.overall_wellbeing] ||
+                                    "Unknown"}
+                                </Badge>
+
+                                <Dialog
+                                  open={showWellbeingDialog === senior.uid}
+                                  onOpenChange={(open) => {
+                                    setShowWellbeingDialog(
+                                      open ? senior.uid : null
+                                    );
+                                    if (!open) setSelectedWellbeing(null);
+                                  }}
+                                >
+                                  <DialogTrigger asChild>
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      className="h-6 w-6 p-0 hover:bg-muted"
+                                      onClick={(e) => {
+                                        e.stopPropagation(); // Prevent row click
+                                        handleOpenWellbeingDialog(
+                                          senior.uid,
+                                          senior.overall_wellbeing
+                                        );
+                                      }}
+                                    >
+                                      <Edit className="h-3 w-3" />
+                                    </Button>
+                                  </DialogTrigger>
+                                  <DialogContent className="sm:max-w-md">
+                                    <DialogHeader>
+                                      <DialogTitle>
+                                        Manual Wellbeing Override
+                                      </DialogTitle>
+                                    </DialogHeader>
+                                    <div className="space-y-4">
+                                      <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+                                        <div className="flex items-center gap-2 mb-2">
+                                          <AlertTriangle className="h-4 w-4 text-yellow-600" />
+                                          <span className="font-medium text-yellow-800">
+                                            Important Notice
+                                          </span>
+                                        </div>
+                                        <p className="text-sm text-yellow-700">
+                                          Manual wellbeing changes are{" "}
+                                          <strong>not recommended</strong> as
+                                          they override the AI assessment
+                                          system. Please ensure you have valid
+                                          reasons for this change.
+                                        </p>
+                                      </div>
+
+                                      <div className="text-sm">
+                                        <strong>Senior:</strong>{" "}
+                                        {senior.name || `Senior ${senior.uid}`}
+                                      </div>
+
+                                      <div className="text-sm">
+                                        <strong>Current wellbeing:</strong>{" "}
+                                        {
+                                          wellbeingLabels[
+                                            senior.overall_wellbeing
+                                          ]
+                                        }
+                                      </div>
+
+                                      <div className="space-y-2">
+                                        <label className="text-sm font-medium">
+                                          New wellbeing level:
+                                        </label>
+                                        <Select
+                                          value={selectedWellbeing?.toString()}
+                                          onValueChange={(value) =>
+                                            setSelectedWellbeing(
+                                              parseInt(value)
+                                            )
+                                          }
+                                          disabled={
+                                            isUpdatingWellbeing === senior.uid
+                                          }
+                                        >
+                                          <SelectTrigger>
+                                            <SelectValue placeholder="Select new wellbeing level" />
+                                          </SelectTrigger>
+                                          <SelectContent>
+                                            {senior.overall_wellbeing !== 1 && (
+                                              <SelectItem value="1">
+                                                Poor (High Risk)
+                                              </SelectItem>
+                                            )}
+                                            {senior.overall_wellbeing !== 2 && (
+                                              <SelectItem value="2">
+                                                Normal (Medium Risk)
+                                              </SelectItem>
+                                            )}
+                                            {senior.overall_wellbeing !== 3 && (
+                                              <SelectItem value="3">
+                                                Good (Low Risk)
+                                              </SelectItem>
+                                            )}
+                                          </SelectContent>
+                                        </Select>
+                                      </div>
+
+                                      <div className="flex gap-2 pt-4">
+                                        <Button
+                                          onClick={() => {
+                                            setShowWellbeingDialog(null);
+                                            setSelectedWellbeing(null);
+                                          }}
+                                          variant="outline"
+                                          className="flex-1"
+                                        >
+                                          Cancel
+                                        </Button>
+                                        <Button
+                                          onClick={() => {
+                                            if (selectedWellbeing !== null) {
+                                              handleWellbeingUpdate(
+                                                senior.uid,
+                                                selectedWellbeing
+                                              );
+                                            }
+                                          }}
+                                          disabled={
+                                            selectedWellbeing === null ||
+                                            isUpdatingWellbeing === senior.uid
+                                          }
+                                          variant="destructive"
+                                          className="flex-1"
+                                        >
+                                          {isUpdatingWellbeing ===
+                                          senior.uid ? (
+                                            <>
+                                              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                                              Updating...
+                                            </>
+                                          ) : (
+                                            "Confirm Update"
+                                          )}
+                                        </Button>
+                                      </div>
+                                    </div>
+                                  </DialogContent>
+                                </Dialog>
+                              </div>
                             </td>
                             <td className="p-3 text-sm">
                               {senior.physical
-                                ? wellbeingLabels[senior.physical]
+                                ? healthLabels[senior.physical]
                                 : "Not assessed"}
                             </td>
                             <td className="p-3 text-sm">
                               {senior.mental
-                                ? wellbeingLabels[senior.mental]
+                                ? healthLabels[senior.mental]
                                 : "Not assessed"}
                             </td>
                             <td className="p-3 text-sm">
                               {senior.community
-                                ? wellbeingLabels[senior.community]
+                                ? healthLabels[senior.community]
                                 : "Not assessed"}
                             </td>
                             <td className="p-3 text-sm">

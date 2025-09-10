@@ -67,6 +67,11 @@ def health():
         "classification_complete": _initialization_done
     }
 
+@app.get("/test-wellbeing")
+def test_wellbeing():
+    """Test endpoint to verify wellbeing route is accessible"""
+    return {"message": "Wellbeing endpoint is accessible", "status": "OK"}
+
 @app.get("/seniors")
 def get_seniors(): 
     response = supabase.table("seniors").select("*").execute()
@@ -101,6 +106,31 @@ def get_clusters():
     logger.info(f"Fetched {len(response.data)} clusters")
     logger.info(f"Clusters data sample: {response.data[:2] if response.data else 'No data'}")
     return {"clusters": response.data}
+
+@app.put("/wellbeing")
+def update_wellbeing(data: dict):
+    try:
+        sid = data.get("sid")
+        overall_wellbeing = data.get("overall_wellbeing")
+        
+        response = supabase.table("seniors").update({
+            "overall_wellbeing": overall_wellbeing
+        }).eq("uid", sid).execute()
+        
+        logger.info(f"Supabase response: {response}")
+        
+        success = response.data is not None and len(response.data) > 0
+        
+        if success:
+            logger.info(f"Successfully updated wellbeing for senior {sid}")
+            return {"success": True, "message": "Wellbeing updated successfully"}
+        else:
+            logger.error(f"Failed to update wellbeing - no rows affected for senior {sid}")
+            return {"success": False, "error": "Senior not found or update failed"}
+            
+    except Exception as e:
+        logger.error(f"Error updating wellbeing: {str(e)}", exc_info=True)
+        return {"success": False, "error": f"Internal server error: {str(e)}"}
 
 @app.put("/acknowledgements")
 def update_acknowledgements(acknowledgements: dict):
