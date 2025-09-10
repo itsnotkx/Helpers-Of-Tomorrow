@@ -14,7 +14,7 @@ def classify_seniors(data: dict):
         seniors = data.get("seniors", [])
 
         if not seniors:
-            return
+            return {}
 
         # Create DataFrame with required features
         df = pd.DataFrame(seniors)
@@ -64,3 +64,4 @@ def classify_seniors(data: dict):
 
     except Exception as e:
         logger.error(f"Error in classify_seniors: {str(e)}", exc_info=True)
+        return {}

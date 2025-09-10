@@ -16,7 +16,7 @@ import {
   DialogHeader,
   DialogTitle,
   DialogTrigger,
-  DialogFooter
+  DialogFooter,
 } from "@/components/ui/dialog";
 import {
   Select,
@@ -32,13 +32,20 @@ import {
   Edit,
   Loader2,
   AlertTriangle,
+  RotateCcw,
+  Shield,
 } from "lucide-react";
 import { Senior } from "@/app/page";
 import { Activity } from "lucide-react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
+
+// Extend Senior interface to include has_dl_intervened if not already present
+interface ExtendedSenior extends Senior {
+  has_dl_intervened?: boolean;
+}
 
 interface SeniorsReportSheetProps {
-  filteredSeniors: Senior[];
+  filteredSeniors: ExtendedSenior[];
   selectedDistrict: string;
   constituencyName: string;
   isOpen: boolean;
@@ -46,7 +53,6 @@ interface SeniorsReportSheetProps {
   onSeniorClick: (seniorId: string) => void;
   children: React.ReactNode;
 }
-
 
 export function SeniorsReportSheet({
   filteredSeniors,
@@ -68,7 +74,9 @@ export function SeniorsReportSheet({
   const [classifyLoading, setClassifyLoading] = useState(false);
   const [classifyComplete, setClassifyComplete] = useState(false);
   const [updateCount, setUpdateCount] = useState(0);
-  const [updateSeniorValues, setUpdateSeniorValues] = useState<any[]>([]);
+  const [updateSeniorValues, setUpdateSeniorValues] = useState<
+    Record<string, [number | null, number, string]>
+  >({});
 
   // Wellbeing update state
   const [isUpdatingWellbeing, setIsUpdatingWellbeing] = useState<string | null>(
@@ -80,6 +88,11 @@ export function SeniorsReportSheet({
   const [selectedWellbeing, setSelectedWellbeing] = useState<number | null>(
     null
   );
+
+  // Reset intervention state
+  const [isResettingIntervention, setIsResettingIntervention] = useState<
+    string | null
+  >(null);
 
   const wellbeingLabels: Record<number, string> = {
     1: "Poor", // High Risk
@@ -117,7 +130,14 @@ export function SeniorsReportSheet({
     newWellbeing: number
   ) => {
     try {
-      console.log("Updating wellbeing for:", seniorId, "to:", newWellbeing);
+      console.log("=== WELLBEING UPDATE DEBUG ===");
+      console.log("Senior ID being updated:", seniorId);
+      console.log("New wellbeing value:", newWellbeing);
+      console.log(
+        "Senior object:",
+        filteredSeniors.find((s) => s.uid === seniorId)
+      );
+
       setIsUpdatingWellbeing(seniorId);
 
       const BASE_URL =
@@ -128,7 +148,7 @@ export function SeniorsReportSheet({
         overall_wellbeing: newWellbeing,
       };
 
-      console.log("Request body:", requestBody);
+      console.log("Request body being sent:", requestBody);
       console.log("Making request to:", `${BASE_URL}/wellbeing`);
 
       const response = await fetch(`${BASE_URL}/wellbeing`, {
@@ -149,25 +169,67 @@ export function SeniorsReportSheet({
         // Close dialog and show success
         setShowWellbeingDialog(null);
         setSelectedWellbeing(null);
-        alert("Wellbeing updated successfully!");
+        alert(`Wellbeing updated successfully for senior ${seniorId}!`);
         // Update the local state instead of refreshing the page
         // This will keep the user on the sheet
         window.location.reload();
       } else {
         console.error("Failed to update wellbeing:", result);
         alert(
-          `Failed to update wellbeing: ${result.message || result.error || "Unknown error"
+          `Failed to update wellbeing: ${
+            result.message || result.error || "Unknown error"
           }`
         );
       }
     } catch (error) {
       console.error("Error updating wellbeing:", error);
       alert(
-        `Error updating wellbeing: ${error instanceof Error ? error.message : "Unknown error"
+        `Error updating wellbeing: ${
+          error instanceof Error ? error.message : "Unknown error"
         }`
       );
     } finally {
       setIsUpdatingWellbeing(null);
+    }
+  };
+
+  // Handle reset DL intervention
+  const handleResetIntervention = async (seniorId: string) => {
+    try {
+      setIsResettingIntervention(seniorId);
+      const BASE_URL =
+        process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8000";
+
+      const response = await fetch(`${BASE_URL}/reset-intervention`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ sid: seniorId }),
+      });
+
+      const result = await response.json();
+
+      if (response.ok && result.success) {
+        alert("DL intervention flag reset successfully!");
+        window.location.reload();
+      } else {
+        console.error("Failed to reset intervention flag:", result);
+        alert(
+          `Failed to reset intervention flag: ${
+            result.message || result.error || "Unknown error"
+          }`
+        );
+      }
+    } catch (error) {
+      console.error("Error resetting intervention flag:", error);
+      alert(
+        `Error resetting intervention flag: ${
+          error instanceof Error ? error.message : "Unknown error"
+        }`
+      );
+    } finally {
+      setIsResettingIntervention(null);
     }
   };
 
@@ -180,12 +242,12 @@ export function SeniorsReportSheet({
 
     // Auto-select the first available option that's different from current
     let firstAvailableOption: number;
-    if (currentWellbeing == 1) {
-      firstAvailableOption = 1; // Poor (High Risk)
-    } else if (currentWellbeing == 2) {
-      firstAvailableOption = 2; // Normal (Medium Risk)
+    if (currentWellbeing === 1) {
+      firstAvailableOption = 2; // Normal (Medium Risk) - different from current
+    } else if (currentWellbeing === 2) {
+      firstAvailableOption = 1; // Poor (High Risk) - different from current
     } else {
-      firstAvailableOption = 3; // Good (Low Risk)
+      firstAvailableOption = 1; // Poor (High Risk) - different from current
     }
 
     setSelectedWellbeing(firstAvailableOption);
@@ -213,28 +275,30 @@ export function SeniorsReportSheet({
     onOpenChange(false);
   };
 
-  const classifySeniors = async() => {
+  const classifySeniors = async () => {
     setClassifyLoading(true);
     const response = await fetch(
-        `${process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8000"}/assess`,
-        {
-          method: "PUT",
-          headers: {
-            "Content-Type": "application/json",
-          },
+      `${
+        process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8000"
+      }/assess`,
+      {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
         },
-      )
+      }
+    );
     if (response.ok) {
       setClassifyLoading(false);
       const result = await response.json();
-      const numEntries = Object.keys(result).length;
+      const numEntries = result ? Object.keys(result).length : 0;
       if (numEntries === 0) {
         setUpdateCount(0);
       } else {
         setUpdateCount(numEntries);
         setUpdateSeniorValues(result);
         // if (Array.isArray(result)) {
-          
+
         // } else {
         //   setUpdateSeniorValues([result]);
         // }
@@ -248,12 +312,12 @@ export function SeniorsReportSheet({
       setClassifyComplete(true);
       // alert(`Successfully classified ${Object.keys(result).length} seniors!`);
     }
-  }
+  };
 
   const closeDialogue = () => {
     setClassifyComplete(false);
     window.location.reload();
-  }
+  };
 
   return (
     <Sheet open={isOpen} onOpenChange={onOpenChange}>
@@ -275,21 +339,23 @@ export function SeniorsReportSheet({
                     : constituencyName}{" "}
                   ({filteredSeniors.length} total)
                 </div>
-                  <Button
-                    onClick={classifySeniors}
-                    className={"text-lg px-6 py-3 rounded-lg shadow-md bg-red-600 hover:bg-red-700 text-white"}
-                  >
-                    <Activity className="h-5 w-5 mr-2" />
-                    {classifyLoading ? "Classifying..." : "Classify Seniors"}
-                  </Button>
+                <Button
+                  onClick={classifySeniors}
+                  className={
+                    "text-lg px-6 py-3 rounded-lg shadow-md bg-red-600 hover:bg-red-700 text-white"
+                  }
+                >
+                  <Activity className="h-5 w-5 mr-2" />
+                  {classifyLoading ? "Classifying..." : "Classify Seniors"}
+                </Button>
 
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => onOpenChange(false)}
-                  >
-                    <X className="h-4 w-4" />
-                  </Button>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => onOpenChange(false)}
+                >
+                  <X className="h-4 w-4" />
+                </Button>
               </SheetTitle>
             </SheetHeader>
           </div>
@@ -297,67 +363,67 @@ export function SeniorsReportSheet({
 
         {/* Diagloug for wellbeing update */}
         <Dialog open={classifyComplete} onOpenChange={setClassifyComplete}>
-            <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
-              <DialogHeader>
-                <DialogTitle className="flex items-center gap-2">
-                  <AlertTriangle className="h-5 w-5 text-destructive" />
-                  Seniors with Updated Wellbeing ({updateCount})
-                </DialogTitle>
-              </DialogHeader>
-              <div className="space-y-4">
-                {updateCount === 0 ? (
-                  <p className="text-muted-foreground text-center py-8">
-                    No seniors had their risk assessments updated.
-                  </p>
-                ) : (
-                  Object.entries(updateSeniorValues).map(([key, values]) => {
-                    return (
-                      <div
-                        key={values[2]}
-                        className="rounded-lg border"
-                      >
-                        <Card className=":border-l-4">
-                          <CardContent className="pt-4">
-                            <div className="flex justify-between items-start mb-3">
-                              <div>
-                                <h3 className="font-semibold text-lg">
-                                  {key || `Senior ${values[2]}`}
-                                </h3>
-                              </div>
+          <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <AlertTriangle className="h-5 w-5 text-destructive" />
+                Seniors with Updated Wellbeing ({updateCount})
+              </DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4">
+              {updateCount === 0 ? (
+                <p className="text-muted-foreground text-center py-8">
+                  No seniors had their risk assessments updated.
+                </p>
+              ) : (
+                Object.entries(updateSeniorValues).map(([key, values]) => {
+                  return (
+                    <div key={values[2]} className="rounded-lg border">
+                      <Card className=":border-l-4">
+                        <CardContent className="pt-4">
+                          <div className="flex justify-between items-start mb-3">
+                            <div>
+                              <h3 className="font-semibold text-lg">
+                                {key || `Senior ${values[2]}`}
+                              </h3>
                             </div>
+                          </div>
 
-                            <div className="grid grid-cols-2 gap-4 mb-3">
-                              <div>
-                                <p className="text-sm font-medium">
-                                  Previous Wellbeing
-                                </p>
-                                <p className="text-sm text-muted-foreground">
-                                  {values[0] || "Not assessed"}
-                                </p>
-                              </div>
-                              <div>
-                                <p className="text-sm font-medium">
-                                  Updated Wellbeing
-                                </p>
-                                <p className="text-sm text-muted-foreground">
-                                  {values[1]}
-                                </p>
-                              </div>
+                          <div className="grid grid-cols-2 gap-4 mb-3">
+                            <div>
+                              <p className="text-sm font-medium">
+                                Previous Wellbeing
+                              </p>
+                              <p className="text-sm text-muted-foreground">
+                                {values[0]
+                                  ? wellbeingLabels[values[0]]
+                                  : "Not assessed"}
+                              </p>
                             </div>
-                          </CardContent>
-                        </Card>
-                      </div>
-                    );
-                  })
-                )}
-              </div>
-              <DialogFooter>
-                <Button onClick={closeDialogue} className="cursor-pointer w-full">
-                  Close
-                </Button>
-              </DialogFooter>
-            </DialogContent>
-          </Dialog>
+                            <div>
+                              <p className="text-sm font-medium">
+                                Updated Wellbeing
+                              </p>
+                              <p className="text-sm text-muted-foreground">
+                                {wellbeingLabels[values[1]] ||
+                                  `Level ${values[1]}`}
+                              </p>
+                            </div>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    </div>
+                  );
+                })
+              )}
+            </div>
+            <DialogFooter>
+              <Button onClick={closeDialogue} className="cursor-pointer w-full">
+                Close
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
 
         {/* Sheet body */}
         <div className="mx-auto w-full px-4 md:px-6 pb-12 pt-4">
@@ -429,6 +495,16 @@ export function SeniorsReportSheet({
                           onClick={() => handleSort("overall_wellbeing")}
                         >
                           Overall Wellbeing
+                          <ArrowUpDown className="h-3 w-3" />
+                        </button>
+                      </th>
+                      <th className="text-left p-3 font-medium">
+                        <button
+                          className="flex items-center gap-1 hover:text-primary cursor-pointer"
+                          onClick={() => handleSort("has_dl_intervened")}
+                        >
+                          <Shield className="h-3 w-3 mr-1" />
+                          Wellbeing Override
                           <ArrowUpDown className="h-3 w-3" />
                         </button>
                       </th>
@@ -519,8 +595,8 @@ export function SeniorsReportSheet({
                     {[...filteredSeniors]
                       .sort((a, b) => {
                         if (sortColumn) {
-                          let aValue: any;
-                          let bValue: any;
+                          let aValue: string | number;
+                          let bValue: string | number;
 
                           switch (sortColumn) {
                             case "name":
@@ -559,6 +635,10 @@ export function SeniorsReportSheet({
                               aValue = a.dl_intervention ? 1 : 0;
                               bValue = b.dl_intervention ? 1 : 0;
                               break;
+                            case "has_dl_intervened":
+                              aValue = a.has_dl_intervened ? 1 : 0;
+                              bValue = b.has_dl_intervened ? 1 : 0;
+                              break;
                             case "rece_gov_sup":
                               aValue = a.rece_gov_sup ? 1 : 0;
                               bValue = b.rece_gov_sup ? 1 : 0;
@@ -580,14 +660,21 @@ export function SeniorsReportSheet({
                               bValue = "";
                           }
 
-                          if (typeof aValue === "string") {
+                          if (
+                            typeof aValue === "string" &&
+                            typeof bValue === "string"
+                          ) {
                             return sortDirection === "asc"
                               ? aValue.localeCompare(bValue)
                               : bValue.localeCompare(aValue);
                           } else {
+                            const numA =
+                              typeof aValue === "number" ? aValue : 0;
+                            const numB =
+                              typeof bValue === "number" ? bValue : 0;
                             return sortDirection === "asc"
-                              ? aValue - bValue
-                              : bValue - aValue;
+                              ? numA - numB
+                              : numB - numA;
                           }
                         } else {
                           // Default sort: wellbeing (high risk first), then by name
@@ -632,8 +719,8 @@ export function SeniorsReportSheet({
                                     priorityLevel === "HIGH"
                                       ? "destructive"
                                       : priorityLevel === "MEDIUM"
-                                        ? "secondary"
-                                        : "outline"
+                                      ? "secondary"
+                                      : "outline"
                                   }
                                   className={
                                     priorityLevel === "MEDIUM"
@@ -702,7 +789,7 @@ export function SeniorsReportSheet({
                                         <strong>Current wellbeing:</strong>{" "}
                                         {
                                           wellbeingLabels[
-                                          senior.overall_wellbeing
+                                            senior.overall_wellbeing
                                           ]
                                         }
                                       </div>
@@ -773,7 +860,7 @@ export function SeniorsReportSheet({
                                           className="flex-1"
                                         >
                                           {isUpdatingWellbeing ===
-                                            senior.uid ? (
+                                          senior.uid ? (
                                             <>
                                               <Loader2 className="h-4 w-4 mr-2 animate-spin" />
                                               Updating...
@@ -786,6 +873,48 @@ export function SeniorsReportSheet({
                                     </div>
                                   </DialogContent>
                                 </Dialog>
+                              </div>
+                            </td>
+                            <td className="p-3 text-sm">
+                              <div className="flex items-center gap-2">
+                                <Badge
+                                  variant={
+                                    senior.has_dl_intervened
+                                      ? "destructive"
+                                      : "secondary"
+                                  }
+                                  className={
+                                    senior.has_dl_intervened
+                                      ? "bg-orange-600 text-white"
+                                      : ""
+                                  }
+                                >
+                                  <Shield className="h-3 w-3 mr-1" />
+                                  {senior.has_dl_intervened
+                                    ? "Manual Override"
+                                    : "Auto"}
+                                </Badge>
+                                {senior.has_dl_intervened && (
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    className="h-6 w-6 p-0 hover:bg-muted"
+                                    onClick={(e) => {
+                                      e.stopPropagation(); // Prevent row click
+                                      handleResetIntervention(senior.uid);
+                                    }}
+                                    disabled={
+                                      isResettingIntervention === senior.uid
+                                    }
+                                    title="Reset to allow AI classification"
+                                  >
+                                    {isResettingIntervention === senior.uid ? (
+                                      <Loader2 className="h-3 w-3 animate-spin" />
+                                    ) : (
+                                      <RotateCcw className="h-3 w-3" />
+                                    )}
+                                  </Button>
+                                )}
                               </div>
                             </td>
                             <td className="p-3 text-sm">
@@ -815,7 +944,7 @@ export function SeniorsReportSheet({
                                     {Math.floor(
                                       (new Date().getTime() -
                                         new Date(senior.last_visit).getTime()) /
-                                      (1000 * 60 * 60 * 24)
+                                        (1000 * 60 * 60 * 24)
                                     )}{" "}
                                     days ago
                                   </div>
@@ -859,15 +988,15 @@ export function SeniorsReportSheet({
                             <td className="p-3 text-sm">
                               {senior.making_ends_meet
                                 ? makingEndsMeetLabels[
-                                senior.making_ends_meet
-                                ] || senior.making_ends_meet
+                                    senior.making_ends_meet
+                                  ] || senior.making_ends_meet
                                 : "Not recorded"}
                             </td>
                             <td className="p-3 text-sm">
                               {senior.living_situation
                                 ? livingConditionsLabels[
-                                senior.living_situation
-                                ] || senior.living_situation
+                                    senior.living_situation
+                                  ] || senior.living_situation
                                 : "Not recorded"}
                             </td>
                             <td className="p-3 text-sm">

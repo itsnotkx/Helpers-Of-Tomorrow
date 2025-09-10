@@ -10,7 +10,8 @@ router = APIRouter(tags=["assignment"])
 @router.put("/assess")
 def assess_seniors():
     response = supabase.table("seniors").select("*").eq("has_dl_intervened", False).execute()
-    return classify_seniors({"seniors": response.data})
+    result = classify_seniors({"seniors": response.data})
+    return result if result is not None else {}
 
 @router.post("/allocate")
 def allocate_volunteers(data: dict):

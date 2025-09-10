@@ -1,6 +1,7 @@
 from routers import availability, schedule, assignment
 from fastapi import FastAPI
-from fastapi.middleware.cors import CORSMiddleware
+from fastapi.middleware.cors import CORSMiddleware            
+
 import uvicorn
 import time
 import asyncio
@@ -73,6 +74,11 @@ def test_wellbeing():
     """Test endpoint to verify wellbeing route is accessible"""
     return {"message": "Wellbeing endpoint is accessible", "status": "OK"}
 
+@app.get("/test-reset")
+def test_reset():
+    """Test endpoint to verify reset intervention route is accessible"""
+    return {"message": "Reset intervention endpoint is accessible", "status": "OK"}
+
 @app.get("/seniors")
 def get_seniors(): 
     response = supabase.table("seniors").select("*").execute()
@@ -118,17 +124,27 @@ def update_wellbeing(data: dict):
         sid = data.get("sid")
         overall_wellbeing = data.get("overall_wellbeing")
         
+        if not sid:
+            return {"success": False, "error": "Senior ID is required"}
+        
+        if overall_wellbeing is None:
+            return {"success": False, "error": "Overall wellbeing value is required"}
+        
+        logger.info(f"Updating wellbeing for senior {sid} to {overall_wellbeing}")
+        
         response = supabase.table("seniors").update({
-            "overall_wellbeing": overall_wellbeing
+            "overall_wellbeing": overall_wellbeing,
+            "has_dl_intervened": True  # Set intervention flag when manually updated
         }).eq("uid", sid).execute()
         
         logger.info(f"Supabase response: {response}")
+        logger.info(f"Updated rows: {len(response.data) if response.data else 0}")
         
         success = response.data is not None and len(response.data) > 0
         
         if success:
-            logger.info(f"Successfully updated wellbeing for senior {sid}")
-            return {"success": True, "message": "Wellbeing updated successfully"}
+            logger.info(f"Successfully updated wellbeing for senior {sid} and set DL intervention flag")
+            return {"success": True, "message": "Wellbeing updated successfully", "senior_id": sid}
         else:
             logger.error(f"Failed to update wellbeing - no rows affected for senior {sid}")
             return {"success": False, "error": "Senior not found or update failed"}
@@ -233,6 +249,40 @@ def confirm_visit(data: dict):
         
     except Exception as e:
         logger.error(f"Error confirming visit: {str(e)}", exc_info=True)
+        return {"success": False, "error": f"Internal server error: {str(e)}"}
+    
+@app.put("/reset-intervention")
+def reset_dl_intervention(data: dict):
+    """
+    Reset the has_dl_intervened flag to allow AI classification again
+    Expected format: {"sid": "senior_id"}
+    """
+    try:
+        sid = data.get("sid")
+        if not sid:
+            return {"success": False, "error": "Senior ID is required"}
+        
+        logger.info(f"Attempting to reset intervention flag for senior {sid}")
+        logger.info(f"Request data: {data}")
+        
+        response = supabase.table("seniors").update({
+            "has_dl_intervened": False
+        }).eq("uid", sid).execute()
+        
+        logger.info(f"Supabase response for reset: {response}")
+        logger.info(f"Reset - Updated rows: {len(response.data) if response.data else 0}")
+        
+        success = response.data is not None and len(response.data) > 0
+        
+        if success:
+            logger.info(f"Successfully reset DL intervention flag for senior {sid}")
+            return {"success": True, "message": "DL intervention flag reset successfully", "senior_id": sid}
+        else:
+            logger.error(f"Failed to reset intervention flag - no rows affected for senior {sid}")
+            return {"success": False, "error": "Senior not found or update failed"}
+            
+    except Exception as e:
+        logger.error(f"Error resetting intervention flag: {str(e)}", exc_info=True)
         return {"success": False, "error": f"Internal server error: {str(e)}"}
 
 # Add a debug endpoint to check all table structures
