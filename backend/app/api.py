@@ -1,4 +1,4 @@
-from routers import availability, schedule
+from routers import availability, schedule, assignment
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 import uvicorn
@@ -41,23 +41,24 @@ def run_classification_background():
     except Exception as e:
         logger.error(f"Error during background classification: {str(e)}", exc_info=True)
 
-@app.on_event("startup")
-async def startup_event():
-    """Schedule classification to run after startup is complete"""
-    def delayed_classification():
-        import time
-        time.sleep(2)  # Wait for app to fully start
-        run_classification_background()
+# @app.on_event("startup")
+# async def startup_event():
+#     """Schedule classification to run after startup is complete"""
+#     def delayed_classification():
+#         import time
+#         time.sleep(2)  # Wait for app to fully start
+#         run_classification_background()
     
-    # Run in background thread after a delay
-    thread = Thread(target=delayed_classification, daemon=True)
-    thread.start()
-    logger.info("Scheduled background classification to run after startup")
+#     # Run in background thread after a delay
+#     thread = Thread(target=delayed_classification, daemon=True)
+#     thread.start()
+#     logger.info("Scheduled background classification to run after startup")
 
 # # Include routers
 
 app.include_router(availability.router)
 app.include_router(schedule.router)
+app.include_router(assignment.router)
 
 @app.get("/")
 def health():
