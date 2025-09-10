@@ -399,9 +399,9 @@ export function ScheduleInterface({
       });
     });
 
-    if (process.env.NODE_ENV === "development") {
-      console.log("Week schedules:", weekData);
-    }
+    // if (process.env.NODE_ENV === "development") {
+    //   console.log("Week schedules:", weekData);
+    // }
 
     return weekData;
   }, [filteredSchedules, weekDays]);

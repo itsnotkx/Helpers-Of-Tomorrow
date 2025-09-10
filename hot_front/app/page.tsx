@@ -132,7 +132,7 @@ export default function VolunteerDashboard() {
       const BASE_URL =
         process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8000";
 
-      console.log(`Loading dashboard data (attempt ${retryCount + 1})`);
+
 
       // Add individual error handling for each fetch
       const fetchWithErrorHandling = async (url: string, name: string) => {
@@ -200,10 +200,6 @@ export default function VolunteerDashboard() {
     }
   }, [isLoaded, isSignedIn, user, hasLoadedUserDetails]);
 
-  // Memoize centerCoordinates to prevent unnecessary re-renders
-  const memoizedCenterCoordinates = useMemo(() => {
-    return userCoordinates ? (userCoordinates as [number, number]) : undefined;
-  }, [userCoordinates]);
 
   async function fetch_dl_details(email: string) {
     try {
@@ -218,14 +214,16 @@ export default function VolunteerDashboard() {
           },
         }).then((res) => res.json());
 
-        console.log(res);
+        console.log(".dl_info[0].coords",res.dl_info[0].coords.lng,res.dl_info[0].coords.lat);
 
         if (res.dl_info[0] != null) {
-          if (res.dl_info[0].coords.lat && res.dl_info[0].coords.long) {
+          if (res.dl_info[0].coords.lat && res.dl_info[0].coords.lng) {
+            console.log("Coordinates found:", res.dl_info[0].coords);
             const coordinates: [number, number] = [
-              res.dl_info[0].coords.long,
+              res.dl_info[0].coords.lng,
               res.dl_info[0].coords.lat,
             ];
+            console.log("Coordinates found:", coordinates);
             setUserCoordinates(coordinates);
           }
           if (res.dl_info[0].constituency_name) {
@@ -243,7 +241,7 @@ export default function VolunteerDashboard() {
     }
   }
 
-  if (dlisLoading && !hasLoadedUserDetails) {
+  if (dlisLoading || !hasLoadedUserDetails) {
     return (
       <div className="flex justify-center items-center min-h-screen">
         <div className="text-center">
@@ -621,6 +619,7 @@ export default function VolunteerDashboard() {
             </Button>
           </CardHeader>
           {!isMapCollapsed && (
+            console.log("Rendering InteractiveMap with centerCoordinates:", userCoordinates),
             <CardContent>
               <InteractiveMap
                 highlightedSeniorId={highlightedSeniorId}
@@ -629,7 +628,7 @@ export default function VolunteerDashboard() {
                   setHighlightedSeniorId(null);
                   setHighlightedVolunteerId(null);
                 }}
-                centerCoordinates={memoizedCenterCoordinates}
+                centerCoordinates={userCoordinates}
                 seniors={seniors}
                 volunteers={volunteers}
                 assignments={assignments}

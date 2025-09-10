@@ -88,7 +88,7 @@ export function InteractiveMap({
   useEffect(() => {
     if (seniorsProp && volunteersProp && assignmentsProp && clustersProp) {
       const filterByDistrict = (item: { constituency_name?: string }) => {
-        console.log(item.constituency_name);
+        // console.log(item.constituency_name);
         return (
           !selectedDistrict ||
           selectedDistrict === "All" ||
@@ -264,6 +264,7 @@ export function InteractiveMap({
           104.045,
           1.478, // east, north
         ];
+        console.log("Center Coordinates:", centerCoordinates);
         map.current = new mapboxgl.Map({
           container: mapContainer.current!,
           style: "mapbox://styles/wzinl/cmf5f4has01rh01pj8ajb1993",
