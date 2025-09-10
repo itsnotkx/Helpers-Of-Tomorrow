@@ -1,4 +1,4 @@
-import { Senior, Volunteer, Assignment } from '../interactive-map'
+import { Senior, Volunteer, Assignment } from '@/app/page'
 
 interface SeniorPopupProps {
   senior: Senior
