@@ -7,9 +7,10 @@ import json  # for safer coords parsing
 
 router = APIRouter(tags=["assignment"])
 
-@router.post("/assess")
-def assess_seniors(data: dict):
-    return classify_seniors(data)
+@router.put("/assess")
+def assess_seniors():
+    response = supabase.table("seniors").select("*").eq("has_dl_intervened", False).execute()
+    return classify_seniors({"seniors": response.data})
 
 @router.post("/allocate")
 def allocate_volunteers(data: dict):

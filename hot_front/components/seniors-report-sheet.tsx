@@ -16,6 +16,7 @@ import {
   DialogHeader,
   DialogTitle,
   DialogTrigger,
+  DialogFooter
 } from "@/components/ui/dialog";
 import {
   Select,
@@ -33,6 +34,8 @@ import {
   AlertTriangle,
 } from "lucide-react";
 import { Senior } from "@/app/page";
+import { Activity } from "lucide-react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
 interface SeniorsReportSheetProps {
   filteredSeniors: Senior[];
@@ -43,6 +46,7 @@ interface SeniorsReportSheetProps {
   onSeniorClick: (seniorId: string) => void;
   children: React.ReactNode;
 }
+
 
 export function SeniorsReportSheet({
   filteredSeniors,
@@ -61,6 +65,10 @@ export function SeniorsReportSheet({
   // Sorting state for the seniors table
   const [sortColumn, setSortColumn] = useState<string | null>(null);
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("asc");
+  const [classifyLoading, setClassifyLoading] = useState(false);
+  const [classifyComplete, setClassifyComplete] = useState(false);
+  const [updateCount, setUpdateCount] = useState(0);
+  const [updateSeniorValues, setUpdateSeniorValues] = useState<any[]>([]);
 
   // Wellbeing update state
   const [isUpdatingWellbeing, setIsUpdatingWellbeing] = useState<string | null>(
@@ -171,10 +179,15 @@ export function SeniorsReportSheet({
     setShowWellbeingDialog(seniorId);
 
     // Auto-select the first available option that's different from current
-    const wellbeingOptions = [1, 2, 3] as const;
+    let firstAvailableOption: number;
+    if (currentWellbeing == 1) {
+      firstAvailableOption = 1; // Poor (High Risk)
+    } else if (currentWellbeing == 2) {
+      firstAvailableOption = 2; // Normal (Medium Risk)
+    } else {
+      firstAvailableOption = 3; // Good (Low Risk)
+    }
 
-    // Auto-select the first option that's not the current one
-    const firstAvailableOption = wellbeingOptions.find(opt => opt !== currentWellbeing)!;
     setSelectedWellbeing(firstAvailableOption);
   };
 
@@ -200,6 +213,48 @@ export function SeniorsReportSheet({
     onOpenChange(false);
   };
 
+  const classifySeniors = async() => {
+    setClassifyLoading(true);
+    const response = await fetch(
+        `${process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8000"}/assess`,
+        {
+          method: "PUT",
+          headers: {
+            "Content-Type": "application/json",
+          },
+        },
+      )
+    if (response.ok) {
+      setClassifyLoading(false);
+      const result = await response.json();
+      const numEntries = Object.keys(result).length;
+      if (numEntries === 0) {
+        setUpdateCount(0);
+      } else {
+        setUpdateCount(numEntries);
+        setUpdateSeniorValues(result);
+        // if (Array.isArray(result)) {
+          
+        // } else {
+        //   setUpdateSeniorValues([result]);
+        // }
+        console.log("Update Count:", updateCount);
+        console.log("Classification result:", result);
+
+        Object.entries(updateSeniorValues).map(([key, values]) => {
+          console.log("Senior:", key, "Values:", values);
+        });
+      }
+      setClassifyComplete(true);
+      // alert(`Successfully classified ${Object.keys(result).length} seniors!`);
+    }
+  }
+
+  const closeDialogue = () => {
+    setClassifyComplete(false);
+    window.location.reload();
+  }
+
   return (
     <Sheet open={isOpen} onOpenChange={onOpenChange}>
       <SheetTrigger asChild>{children}</SheetTrigger>
@@ -220,17 +275,89 @@ export function SeniorsReportSheet({
                     : constituencyName}{" "}
                   ({filteredSeniors.length} total)
                 </div>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={() => onOpenChange(false)}
-                >
-                  <X className="h-4 w-4" />
-                </Button>
+                  <Button
+                    onClick={classifySeniors}
+                    className={"text-lg px-6 py-3 rounded-lg shadow-md bg-red-600 hover:bg-red-700 text-white"}
+                  >
+                    <Activity className="h-5 w-5 mr-2" />
+                    {classifyLoading ? "Classifying..." : "Classify Seniors"}
+                  </Button>
+
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => onOpenChange(false)}
+                  >
+                    <X className="h-4 w-4" />
+                  </Button>
               </SheetTitle>
             </SheetHeader>
           </div>
         </div>
+
+        {/* Diagloug for wellbeing update */}
+        <Dialog open={classifyComplete} onOpenChange={setClassifyComplete}>
+            <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+              <DialogHeader>
+                <DialogTitle className="flex items-center gap-2">
+                  <AlertTriangle className="h-5 w-5 text-destructive" />
+                  Seniors with Updated Wellbeing ({updateCount})
+                </DialogTitle>
+              </DialogHeader>
+              <div className="space-y-4">
+                {updateCount === 0 ? (
+                  <p className="text-muted-foreground text-center py-8">
+                    No seniors had their risk assessments updated.
+                  </p>
+                ) : (
+                  Object.entries(updateSeniorValues).map(([key, values]) => {
+                    return (
+                      <div
+                        key={values[2]}
+                        className="rounded-lg border"
+                      >
+                        <Card className=":border-l-4">
+                          <CardContent className="pt-4">
+                            <div className="flex justify-between items-start mb-3">
+                              <div>
+                                <h3 className="font-semibold text-lg">
+                                  {key || `Senior ${values[2]}`}
+                                </h3>
+                              </div>
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-4 mb-3">
+                              <div>
+                                <p className="text-sm font-medium">
+                                  Previous Wellbeing
+                                </p>
+                                <p className="text-sm text-muted-foreground">
+                                  {values[0] || "Not assessed"}
+                                </p>
+                              </div>
+                              <div>
+                                <p className="text-sm font-medium">
+                                  Updated Wellbeing
+                                </p>
+                                <p className="text-sm text-muted-foreground">
+                                  {values[1]}
+                                </p>
+                              </div>
+                            </div>
+                          </CardContent>
+                        </Card>
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+              <DialogFooter>
+                <Button onClick={closeDialogue} className="cursor-pointer w-full">
+                  Close
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
 
         {/* Sheet body */}
         <div className="mx-auto w-full px-4 md:px-6 pb-12 pt-4">
