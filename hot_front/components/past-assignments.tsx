@@ -54,6 +54,27 @@ interface Senior {
   address?: string;
 }
 
+interface VolunteersApiResponse {
+  volunteers: Volunteer[];
+}
+
+interface SeniorsApiResponse {
+  seniors: Senior[];
+}
+
+interface AssignmentArchiveApiResponse {
+  assignment_archive: ArchivedAssignment[];
+}
+
+interface ConfirmVisitApiResponse {
+  success: boolean;
+  error?: string;
+  message?: string;
+  assignment_id?: string;
+  senior_id?: string;
+  visit_date?: string;
+}
+
 export function PastAssignments() {
   const [assignments, setAssignments] = useState<ArchivedAssignment[]>([]);
   const [loading, setLoading] = useState(true);
@@ -61,7 +82,6 @@ export function PastAssignments() {
   const [isExpanded, setIsExpanded] = useState(false);
   const [sortBy, setSortBy] = useState<"date" | "senior">("date");
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("desc");
-  const [volunteerVid, setVolunteerVid] = useState<string | null>(null);
   const [seniors, setSeniors] = useState<Senior[]>([]);
 
   // Visit confirmation state
@@ -69,6 +89,8 @@ export function PastAssignments() {
     null
   );
   const [confirmingVisit, setConfirmingVisit] = useState<string | null>(null);
+  const [confirmError, setConfirmError] = useState<string | null>(null);
+  const [confirmSuccess, setConfirmSuccess] = useState<string | null>(null);
 
   const { user } = useUser();
 
@@ -94,7 +116,8 @@ export function PastAssignments() {
         throw new Error("Failed to fetch volunteers");
       }
 
-      const volunteerResult = await volunteerResponse.json();
+      const volunteerResult: VolunteersApiResponse =
+        await volunteerResponse.json();
 
       // Debug: Log volunteers data structure
       console.log("📋 Volunteers API Response:", volunteerResult);
@@ -119,7 +142,6 @@ export function PastAssignments() {
       }
 
       const volunteerVid = volunteer.vid;
-      setVolunteerVid(volunteerVid);
 
       // Fetch seniors data for matching names and addresses
       const seniorsResponse = await fetch(`${BASE_URL}/seniors`, {
@@ -133,7 +155,7 @@ export function PastAssignments() {
         throw new Error("Failed to fetch seniors");
       }
 
-      const seniorsResult = await seniorsResponse.json();
+      const seniorsResult: SeniorsApiResponse = await seniorsResponse.json();
       setSeniors(seniorsResult.seniors || []);
 
       // Then fetch archived assignments
@@ -148,7 +170,8 @@ export function PastAssignments() {
         throw new Error("Failed to fetch past assignments");
       }
 
-      const assignmentResult = await assignmentResponse.json();
+      const assignmentResult: AssignmentArchiveApiResponse =
+        await assignmentResponse.json();
 
       // Debug: Log assignments_archive data structure
       console.log("📋 Assignments Archive API Response:", assignmentResult);
@@ -207,6 +230,8 @@ export function PastAssignments() {
   const handleConfirmVisit = async (aid: string) => {
     try {
       setConfirmingVisit(aid);
+      setConfirmError(null);
+      setConfirmSuccess(null);
       const BASE_URL =
         process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8000";
 
@@ -218,7 +243,7 @@ export function PastAssignments() {
         body: JSON.stringify({ aid }),
       });
 
-      const result = await response.json();
+      const result: ConfirmVisitApiResponse = await response.json();
 
       if (response.ok && result.success) {
         // Update the local assignment state
@@ -230,18 +255,19 @@ export function PastAssignments() {
           )
         );
         setShowConfirmDialog(null);
-        alert("Visit confirmed successfully!");
+        setConfirmSuccess("Visit confirmed successfully!");
+
+        // Clear success message after 3 seconds
+        setTimeout(() => setConfirmSuccess(null), 3000);
       } else {
         console.error("Failed to confirm visit:", result);
-        alert(`Failed to confirm visit: ${result.error || "Unknown error"}`);
+        setConfirmError(result.error || "Unknown error");
       }
     } catch (error) {
       console.error("Error confirming visit:", error);
-      alert(
-        `Error confirming visit: ${
-          error instanceof Error ? error.message : "Unknown error"
-        }`
-      );
+      const errorMessage =
+        error instanceof Error ? error.message : "Unknown error";
+      setConfirmError(`Error confirming visit: ${errorMessage}`);
     } finally {
       setConfirmingVisit(null);
     }
@@ -323,6 +349,31 @@ export function PastAssignments() {
   return (
     <>
       <div>
+        {/* Error and Success Messages */}
+        {confirmError && (
+          <div className="mb-4 p-4 rounded-md bg-red-50 border border-red-200 text-red-800">
+            <p className="font-medium">Error:</p>
+            <p>{confirmError}</p>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setConfirmError(null)}
+              className="mt-2"
+            >
+              Dismiss
+            </Button>
+          </div>
+        )}
+
+        {confirmSuccess && (
+          <div className="mb-4 p-4 rounded-md bg-green-50 border border-green-200 text-green-800">
+            <div className="flex items-center gap-2">
+              <CheckCircle2 className="h-4 w-4" />
+              <p className="font-medium">{confirmSuccess}</p>
+            </div>
+          </div>
+        )}
+
         {assignments.length === 0 ? (
           <div className="text-center py-8">
             <History className="h-12 w-12 mx-auto text-gray-400 mb-4" />
