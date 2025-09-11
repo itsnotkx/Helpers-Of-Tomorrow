@@ -1125,7 +1125,7 @@ export function InteractiveMap({
               );
             })()}
             <div className="text-xs text-gray-500 mt-1">
-              Click elsewhere to clear
+              Click another marker to clear
             </div>
           </div>
         )}
