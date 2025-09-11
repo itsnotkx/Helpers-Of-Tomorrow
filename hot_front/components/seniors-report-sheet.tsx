@@ -355,10 +355,10 @@ export function SeniorsReportSheet({
     return wellbeing === 1 ? "HIGH" : wellbeing === 2 ? "MEDIUM" : "LOW";
   };
 
-  const handleSeniorRowClick = (seniorId: string) => {
-    onSeniorClick(seniorId);
-    onOpenChange(false);
-  };
+  // const handleSeniorRowClick = (seniorId: string) => {
+  //   onSeniorClick(seniorId);
+  //   onOpenChange(false);
+  // };
 
   // Filter seniors based on search query
   const searchFilteredSeniors = filteredSeniors.filter((senior) => {
@@ -381,6 +381,7 @@ export function SeniorsReportSheet({
         headers: {
           "Content-Type": "application/json",
         },
+        body: JSON.stringify({ district: selectedDistrict }),
       }
     );
     if (response.ok) {

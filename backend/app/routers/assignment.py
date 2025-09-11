@@ -8,8 +8,14 @@ import json  # for safer coords parsing
 router = APIRouter(tags=["assignment"])
 
 @router.put("/assess")
-def assess_seniors():
-    response = supabase.table("seniors").select("*").eq("has_dl_intervened", False).execute()
+def assess_seniors(data: dict):
+    district = data.get("district", None)
+    #logger.info(f"Received data: {data}")
+    #logger.info(f"Assessing seniors in district: {district}")
+    if district == 'All' or district == '':
+        response = supabase.table("seniors").select("*").eq("has_dl_intervened", False).execute()
+    else:
+        response = supabase.table("seniors").select("*").eq("constituency_name", district).eq("has_dl_intervened", False).execute()
     result = classify_seniors({"seniors": response.data})
     return result if result is not None else {}
 
