@@ -339,15 +339,19 @@ export function SeniorsReportSheet({
                     : constituencyName}{" "}
                   ({filteredSeniors.length} total)
                 </div>
-                <Button
-                  onClick={classifySeniors}
-                  className={
-                    "text-lg px-6 py-3 rounded-lg shadow-md bg-red-600 hover:bg-red-700 text-white"
-                  }
-                >
-                  <Activity className="h-5 w-5 mr-2" />
-                  {classifyLoading ? "Classifying..." : "Classify Seniors"}
-                </Button>
+                <div className="flex flex-col gap-1">
+                  <Button
+                    onClick={classifySeniors}
+                    className={
+                      "text-lg px-6 py-3 cursor-pointer rounded-lg shadow-md bg-red-600 hover:bg-red-700 text-white"
+                    }
+                    title={`AI will reassess the wellbeing of seniors \nOnly those without manual intervention will be reassessed \nReset to allow AI reassessment`}
+                  >
+                    <Activity className="h-5 w-5 mr-2" />
+                    {classifyLoading ? "Classifying..." : "Classify Seniors"}
+                  </Button>
+                  <text className="text-sm text-muted-foreground">Only those without manual intervention will be reassessed</text>
+                </div>
 
                 <Button
                   variant="ghost"
@@ -503,8 +507,7 @@ export function SeniorsReportSheet({
                           className="flex items-center gap-1 hover:text-primary cursor-pointer"
                           onClick={() => handleSort("has_dl_intervened")}
                         >
-                          <Shield className="h-3 w-3 mr-1" />
-                          Wellbeing Override
+                          Has Manual Intervention
                           <ArrowUpDown className="h-3 w-3" />
                         </button>
                       </th>
@@ -889,10 +892,9 @@ export function SeniorsReportSheet({
                                       : ""
                                   }
                                 >
-                                  <Shield className="h-3 w-3 mr-1" />
                                   {senior.has_dl_intervened
-                                    ? "Manual Override"
-                                    : "Auto"}
+                                    ? "True"
+                                    : "False"}
                                 </Badge>
                                 {senior.has_dl_intervened && (
                                   <Button
