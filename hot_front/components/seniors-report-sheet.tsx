@@ -699,8 +699,8 @@ export function SeniorsReportSheet({
                         return (
                           <tr
                             key={senior.uid}
-                            className={`border-b hover:bg-muted/20 transition-colors cursor-pointer border-l-4 ${priorityColors[priorityLevel]}`}
-                            onClick={() => handleSeniorRowClick(senior.uid)}
+                            className={`border-b hover:bg-muted/20 transition-colors border-l-4 ${priorityColors[priorityLevel]}`}
+                            // onClick={() => handleSeniorRowClick(senior.uid)}
                           >
                             <td className="p-3">
                               <div className="font-medium">
