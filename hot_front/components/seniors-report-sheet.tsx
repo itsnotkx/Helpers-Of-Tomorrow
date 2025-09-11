@@ -728,33 +728,6 @@ export function SeniorsReportSheet({
             </p>
           ) : (
             <div className="space-y-4">
-              {/* Search bar */}
-              <div className="mb-4">
-                <div className="relative">
-                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
-                  <input
-                    type="text"
-                    placeholder="Search seniors by name..."
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
-                  />
-                  {searchQuery && (
-                    <button
-                      onClick={() => setSearchQuery("")}
-                      className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
-                    >
-                      <X className="h-4 w-4" />
-                    </button>
-                  )}
-                </div>
-                {searchQuery && (
-                  <div className="mt-2 text-sm text-gray-600">
-                    Found {searchFilteredSeniors.length} of{" "}
-                    {filteredSeniors.length} seniors
-                  </div>
-                )}
-              </div>
 
               {/* Summary stats */}
               <div className="grid grid-cols-3 gap-4 mb-6 p-4 bg-muted/20 rounded-lg">
@@ -787,6 +760,34 @@ export function SeniorsReportSheet({
                   </div>
                   <div className="text-sm text-muted-foreground">Low Risk</div>
                 </div>
+              </div>
+
+              {/* Search bar */}
+              <div className="mb-4">
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+                  <input
+                    type="text"
+                    placeholder="Search seniors by name..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
+                  />
+                  {searchQuery && (
+                    <button
+                      onClick={() => setSearchQuery("")}
+                      className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                    >
+                      <X className="h-4 w-4" />
+                    </button>
+                  )}
+                </div>
+                {searchQuery && (
+                  <div className="mt-2 text-sm text-gray-600">
+                    Found {searchFilteredSeniors.length} of{" "}
+                    {filteredSeniors.length} seniors
+                  </div>
+                )}
               </div>
 
               {/* Seniors table */}
@@ -1073,7 +1074,7 @@ export function SeniorsReportSheet({
                                     <Button
                                       variant="ghost"
                                       size="sm"
-                                      className="h-6 w-6 p-0 hover:bg-muted"
+                                      className="h-6 w-6 p-0 hover:bg-muted cursor-pointer"
                                       onClick={(e) => {
                                         e.stopPropagation(); // Prevent row click
                                         handleOpenWellbeingDialog(
@@ -1253,7 +1254,7 @@ export function SeniorsReportSheet({
                                 <Button
                                   variant="ghost"
                                   size="sm"
-                                  className="h-6 w-6 p-0 hover:bg-muted"
+                                  className="h-6 w-6 p-0 hover:bg-muted cursor-pointer"
                                   onClick={(e) => {
                                     e.stopPropagation();
                                     setShowPhysicalDialog(senior.uid);
@@ -1274,7 +1275,7 @@ export function SeniorsReportSheet({
                                 <Button
                                   variant="ghost"
                                   size="sm"
-                                  className="h-6 w-6 p-0 hover:bg-muted"
+                                  className="h-6 w-6 p-0 hover:bg-muted cursor-pointer"
                                   onClick={(e) => {
                                     e.stopPropagation();
                                     setShowMentalDialog(senior.uid);
@@ -1295,7 +1296,7 @@ export function SeniorsReportSheet({
                                 <Button
                                   variant="ghost"
                                   size="sm"
-                                  className="h-6 w-6 p-0 hover:bg-muted"
+                                  className="h-6 w-6 p-0 hover:bg-muted cursor-pointer"
                                   onClick={(e) => {
                                     e.stopPropagation();
                                     setShowCommunityDialog(senior.uid);
@@ -1348,7 +1349,7 @@ export function SeniorsReportSheet({
                                 <Button
                                   variant="ghost"
                                   size="sm"
-                                  className="h-6 w-6 p-0 hover:bg-muted"
+                                  className="h-6 w-6 p-0 hover:bg-muted cursor-pointer"
                                   onClick={(e) => {
                                     e.stopPropagation();
                                     setShowDlInterventionDialog(senior.uid);
@@ -1380,7 +1381,7 @@ export function SeniorsReportSheet({
                                 <Button
                                   variant="ghost"
                                   size="sm"
-                                  className="h-6 w-6 p-0 hover:bg-muted"
+                                  className="h-6 w-6 p-0 hover:bg-muted cursor-pointer"
                                   onClick={(e) => {
                                     e.stopPropagation();
                                     setShowGovSupportDialog(senior.uid);
@@ -1405,7 +1406,7 @@ export function SeniorsReportSheet({
                                 <Button
                                   variant="ghost"
                                   size="sm"
-                                  className="h-6 w-6 p-0 hover:bg-muted"
+                                  className="h-6 w-6 p-0 hover:bg-muted cursor-pointer"
                                   onClick={(e) => {
                                     e.stopPropagation();
                                     setShowMakingEndsMeetDialog(senior.uid);
@@ -1430,7 +1431,7 @@ export function SeniorsReportSheet({
                                 <Button
                                   variant="ghost"
                                   size="sm"
-                                  className="h-6 w-6 p-0 hover:bg-muted"
+                                  className="h-6 w-6 p-0 hover:bg-muted cursor-pointer"
                                   onClick={(e) => {
                                     e.stopPropagation();
                                     setShowLivingSituationDialog(senior.uid);
@@ -1454,7 +1455,7 @@ export function SeniorsReportSheet({
                                   e.stopPropagation();
                                   handleViewReports(senior.uid);
                                 }}
-                                className="bg-purple-100 hover:bg-purple-200 text-purple-800 border-purple-300"
+                                className="bg-purple-100 hover:bg-purple-200 cursor-pointer text-purple-800 border-purple-300"
                               >
                                 View Reports
                               </Button>
