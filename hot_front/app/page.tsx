@@ -418,6 +418,7 @@ export default function VolunteerDashboard() {
         title="Senior Care Volunteer Dashboard"
         subtitle={`Managing care for ${constituencyName}`}
         selectedDistrict={selectedDistrict}
+        onSelectedDistrict={true}
         onDistrictChange={setSelectedDistrict}
       />
 

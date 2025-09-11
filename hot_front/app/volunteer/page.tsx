@@ -27,6 +27,7 @@ export default function Scheduler() {
           title="Your Past Assignments"
           subtitle="View your assignment history"
           selectedDistrict="Singapore"
+          onSelectedDistrict={false}
           onDistrictChange={() => {}}
         />
 
@@ -50,6 +51,7 @@ export default function Scheduler() {
         title="Your Volunteer Schedule"
         subtitle="Managing care for Singapore"
         selectedDistrict="Singapore"
+        onSelectedDistrict={false}
         onDistrictChange={() => {}} // No-op since this is volunteer view
       />
 

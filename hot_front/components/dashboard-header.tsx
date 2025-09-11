@@ -11,10 +11,11 @@ interface DashboardHeaderProps {
   subtitle: string
   selectedDistrict: string
   onShowHighPriority?: () => void
+  onSelectedDistrict?: boolean
   onDistrictChange: (district: "All" | "Jurong" | "Sembawang") => void
 }
 
-export function DashboardHeader({ title, subtitle, selectedDistrict, onShowHighPriority, onDistrictChange }: DashboardHeaderProps) {
+export function DashboardHeader({ title, subtitle, selectedDistrict, onShowHighPriority, onSelectedDistrict, onDistrictChange}: DashboardHeaderProps) {
   return (
     <header className="border-b bg-card">
       <div className="container mx-auto px-6 py-4">
@@ -29,7 +30,8 @@ export function DashboardHeader({ title, subtitle, selectedDistrict, onShowHighP
           </div>
 
           {/* Right Side Controls */}
-        <div className="flex items-center gap-6">
+        {onSelectedDistrict ? (
+          <div className="flex items-center gap-6">
           <Select value={selectedDistrict} onValueChange={v => onDistrictChange(v as any)}>
             <SelectTrigger className="w-[180px]">
               <SelectValue placeholder="Select Constituency" />
@@ -51,6 +53,19 @@ export function DashboardHeader({ title, subtitle, selectedDistrict, onShowHighP
               }}
             />
           </div>
+        ) : (
+          <div className="flex items-center gap-4">
+            <UserButton
+              showName
+              appearance={{
+                elements: {
+                  userButtonAvatarBox: "w-12 h-12", // bigger avatar
+                  userButtonOuterIdentifier: "text-lg font-semibold", // bigger name
+                },
+              }}
+            />
+          </div>
+        )}
         </div>
 
         {/* Optional High Priority Banner */}

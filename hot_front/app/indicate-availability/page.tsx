@@ -24,6 +24,7 @@ export default function Home() {
           title="Volunteer Availability"
           subtitle={`Managing care for Singapore`}
           selectedDistrict="Singapore"
+          onSelectedDistrict={false}
           onDistrictChange={() => {}} // No-op since this is volunteer view
           />
           {isSunday && (
