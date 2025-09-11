@@ -285,6 +285,83 @@ def reset_dl_intervention(data: dict):
         logger.error(f"Error resetting intervention flag: {str(e)}", exc_info=True)
         return {"success": False, "error": f"Internal server error: {str(e)}"}
 
+@app.put("/submit-report")
+def submit_report(data: dict):
+    """
+    Submit a report for an assignment
+    Expected format: {"aid": "assignment_id", "report": "report_text"}
+    """
+    try:
+        aid = data.get("aid")
+        report = data.get("report")
+        
+        if not aid:
+            return {"success": False, "error": "Assignment ID is required"}
+        
+        if not report or not report.strip():
+            return {"success": False, "error": "Report content is required"}
+        
+        logger.info(f"Submitting report for assignment {aid}")
+        
+        # Update the assignment archive with the report
+        response = supabase.table("assignments_archive").update({
+            "report": report.strip()
+        }).eq("aid", aid).execute()
+        
+        logger.info(f"Supabase response for report submission: {response}")
+        logger.info(f"Report - Updated rows: {len(response.data) if response.data else 0}")
+        
+        success = response.data is not None and len(response.data) > 0
+        
+        if success:
+            logger.info(f"Successfully submitted report for assignment {aid}")
+            return {"success": True, "message": "Report submitted successfully", "assignment_id": aid}
+        else:
+            logger.error(f"Failed to submit report - no rows affected for assignment {aid}")
+            return {"success": False, "error": "Assignment not found or update failed"}
+            
+    except Exception as e:
+        logger.error(f"Error submitting report: {str(e)}", exc_info=True)
+        return {"success": False, "error": f"Internal server error: {str(e)}"}
+
+@app.put("/update-senior-field")
+def update_senior_field(data: dict):
+    """
+    Update a specific field for a senior
+    Expected format: {"sid": "senior_id", "field_name": "field_value"}
+    """
+    try:
+        sid = data.get("sid")
+        if not sid:
+            return {"success": False, "error": "Senior ID is required"}
+        
+        # Remove sid from data to get the fields to update
+        update_data = {k: v for k, v in data.items() if k != "sid"}
+        
+        if not update_data:
+            return {"success": False, "error": "No fields to update"}
+        
+        logger.info(f"Updating senior {sid} with data: {update_data}")
+        
+        response = supabase.table("seniors").update(update_data).eq("uid", sid).execute()
+        
+        logger.info(f"Supabase response: {response}")
+        logger.info(f"Updated rows: {len(response.data) if response.data else 0}")
+        
+        success = response.data is not None and len(response.data) > 0
+        
+        if success:
+            field_names = ", ".join(update_data.keys())
+            logger.info(f"Successfully updated {field_names} for senior {sid}")
+            return {"success": True, "message": f"Fields updated successfully", "senior_id": sid}
+        else:
+            logger.error(f"Failed to update fields - no rows affected for senior {sid}")
+            return {"success": False, "error": "Senior not found or update failed"}
+            
+    except Exception as e:
+        logger.error(f"Error updating senior fields: {str(e)}", exc_info=True)
+        return {"success": False, "error": f"Internal server error: {str(e)}"}
+
 # Add a debug endpoint to check all table structures
 @app.get("/debug/tables")
 def debug_tables():

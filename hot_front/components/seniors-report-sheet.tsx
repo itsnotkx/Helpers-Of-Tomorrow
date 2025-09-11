@@ -44,6 +44,21 @@ interface ExtendedSenior extends Senior {
   has_dl_intervened?: boolean;
 }
 
+interface SeniorReport {
+  aid: string;
+  date: string;
+  report: string;
+}
+
+interface ReportsApiResponse {
+  assignment_archive: {
+    aid: string;
+    sid: string;
+    date: string;
+    report?: string;
+  }[];
+}
+
 interface SeniorsReportSheetProps {
   filteredSeniors: ExtendedSenior[];
   selectedDistrict: string;
@@ -77,7 +92,8 @@ export function SeniorsReportSheet({
   const [updateSeniorValues, setUpdateSeniorValues] = useState<
     Record<string, [number | null, number, string]>
   >({});
-  const [isSuccessfulManualUpdate, setIsSuccessfulManualUpdate] = useState(false);
+  const [isSuccessfulManualUpdate, setIsSuccessfulManualUpdate] =
+    useState(false);
   const [nameOfSeniorUpdated, setNameOfSeniorUpdated] = useState("");
 
   // Wellbeing update state
@@ -95,6 +111,53 @@ export function SeniorsReportSheet({
   const [isResettingIntervention, setIsResettingIntervention] = useState<
     string | null
   >(null);
+
+  // Reports state
+  const [showReportsDialog, setShowReportsDialog] = useState<string | null>(
+    null
+  );
+  const [seniorReports, setSeniorReports] = useState<SeniorReport[]>([]);
+  const [loadingReports, setLoadingReports] = useState(false);
+  const [reportsError, setReportsError] = useState<string | null>(null);
+
+  // Additional field editing states
+  const [showPhysicalDialog, setShowPhysicalDialog] = useState<string | null>(
+    null
+  );
+  const [selectedPhysical, setSelectedPhysical] = useState<number | null>(null);
+  const [showMentalDialog, setShowMentalDialog] = useState<string | null>(null);
+  const [selectedMental, setSelectedMental] = useState<number | null>(null);
+  const [showCommunityDialog, setShowCommunityDialog] = useState<string | null>(
+    null
+  );
+  const [selectedCommunity, setSelectedCommunity] = useState<number | null>(
+    null
+  );
+  const [showDlInterventionDialog, setShowDlInterventionDialog] = useState<
+    string | null
+  >(null);
+  const [selectedDlIntervention, setSelectedDlIntervention] = useState<
+    boolean | null
+  >(null);
+  const [showGovSupportDialog, setShowGovSupportDialog] = useState<
+    string | null
+  >(null);
+  const [selectedGovSupport, setSelectedGovSupport] = useState<boolean | null>(
+    null
+  );
+  const [showMakingEndsMeetDialog, setShowMakingEndsMeetDialog] = useState<
+    string | null
+  >(null);
+  const [selectedMakingEndsMeet, setSelectedMakingEndsMeet] = useState<
+    string | null
+  >(null);
+  const [showLivingSituationDialog, setShowLivingSituationDialog] = useState<
+    string | null
+  >(null);
+  const [selectedLivingSituation, setSelectedLivingSituation] = useState<
+    string | null
+  >(null);
+  const [isUpdatingField, setIsUpdatingField] = useState<string | null>(null);
 
   const wellbeingLabels: Record<number, string> = {
     1: "Poor", // High Risk
@@ -200,7 +263,7 @@ export function SeniorsReportSheet({
   const closeDialogueForUpdate = () => {
     setIsSuccessfulManualUpdate(false);
     window.location.reload();
-  }
+  };
 
   // Handle reset DL intervention
   const handleResetIntervention = async (seniorId: string) => {
@@ -328,6 +391,140 @@ export function SeniorsReportSheet({
     window.location.reload();
   };
 
+  // Fetch reports for a specific senior
+  const fetchSeniorReports = async (seniorId: string) => {
+    try {
+      setLoadingReports(true);
+      setReportsError(null);
+      setSeniorReports([]);
+
+      const BASE_URL =
+        process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8000";
+
+      const response = await fetch(`${BASE_URL}/assignmentarchive`, {
+        method: "GET",
+        headers: {
+          "Content-Type": "application/json",
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to fetch reports");
+      }
+
+      const result: ReportsApiResponse = await response.json();
+
+      // Filter assignments for this senior and extract reports
+      const seniorAssignments = result.assignment_archive.filter(
+        (assignment) => assignment.sid === seniorId && assignment.report
+      );
+
+      // Convert to SeniorReport format and sort by date (newest first)
+      const reports: SeniorReport[] = seniorAssignments
+        .map((assignment) => ({
+          aid: assignment.aid,
+          date: assignment.date,
+          report: assignment.report!,
+        }))
+        .sort(
+          (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()
+        );
+
+      setSeniorReports(reports);
+    } catch (error) {
+      console.error("Error fetching senior reports:", error);
+      setReportsError(error instanceof Error ? error.message : "Unknown error");
+    } finally {
+      setLoadingReports(false);
+    }
+  };
+
+  // Handle opening reports dialog
+  const handleViewReports = async (seniorId: string) => {
+    setShowReportsDialog(seniorId);
+    await fetchSeniorReports(seniorId);
+  };
+
+  // Generic field update function
+  const handleFieldUpdate = async (
+    seniorId: string,
+    seniorName: string,
+    fieldName: string,
+    fieldValue: any
+  ) => {
+    try {
+      setIsUpdatingField(`${seniorId}-${fieldName}`);
+
+      const BASE_URL =
+        process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8000";
+
+      // Convert boolean values to integers for database compatibility
+      let processedValue = fieldValue;
+      if (fieldName === "dl_intervention" || fieldName === "rece_gov_sup") {
+        processedValue = fieldValue ? 1 : 0;
+      }
+
+      const requestBody = {
+        sid: seniorId,
+        [fieldName]: processedValue,
+      };
+
+      console.log(
+        `Updating ${fieldName} for senior ${seniorId}:`,
+        processedValue
+      );
+
+      const response = await fetch(`${BASE_URL}/update-senior-field`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(requestBody),
+      });
+
+      const result = await response.json();
+
+      if (response.ok && result.success) {
+        // Close relevant dialogs
+        setShowPhysicalDialog(null);
+        setShowMentalDialog(null);
+        setShowCommunityDialog(null);
+        setShowDlInterventionDialog(null);
+        setShowGovSupportDialog(null);
+        setShowMakingEndsMeetDialog(null);
+        setShowLivingSituationDialog(null);
+
+        // Reset selections
+        setSelectedPhysical(null);
+        setSelectedMental(null);
+        setSelectedCommunity(null);
+        setSelectedDlIntervention(null);
+        setSelectedGovSupport(null);
+        setSelectedMakingEndsMeet(null);
+        setSelectedLivingSituation(null);
+
+        setNameOfSeniorUpdated(seniorName || `Senior ${seniorId}`);
+        setIsSuccessfulManualUpdate(true);
+      } else {
+        console.error(`Failed to update ${fieldName}:`, result);
+        alert(
+          `Failed to update ${fieldName}: ${
+            result.message || result.error || "Unknown error"
+          }`
+        );
+      }
+    } catch (error) {
+      console.error(`Error updating ${fieldName}:`, error);
+      alert(
+        `Error updating ${fieldName}: ${
+          error instanceof Error ? error.message : "Unknown error"
+        }`
+      );
+    } finally {
+      setIsUpdatingField(null);
+    }
+  };
+
   return (
     <Sheet open={isOpen} onOpenChange={onOpenChange}>
       <SheetTrigger asChild>{children}</SheetTrigger>
@@ -359,7 +556,9 @@ export function SeniorsReportSheet({
                     <Activity className="h-5 w-5 mr-2" />
                     {classifyLoading ? "Classifying..." : "Classify Seniors"}
                   </Button>
-                  <div className="text-sm text-muted-foreground">Only those without manual intervention will be reassessed</div>
+                  <div className="text-sm text-muted-foreground">
+                    Only those without manual intervention will be reassessed
+                  </div>
                 </div>
 
                 <Button
@@ -439,22 +638,26 @@ export function SeniorsReportSheet({
         </Dialog>
 
         {/* Diagloue for successful manual wellbeing update */}
-        <Dialog open={isSuccessfulManualUpdate} onOpenChange={setIsSuccessfulManualUpdate}>
+        <Dialog
+          open={isSuccessfulManualUpdate}
+          onOpenChange={setIsSuccessfulManualUpdate}
+        >
           <DialogTitle>
             <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
               <div className="space-y-4">
-                Wellbeing updated successfully for { nameOfSeniorUpdated }!
+                Wellbeing updated successfully for {nameOfSeniorUpdated}!
               </div>
               <DialogFooter>
-                <Button onClick={closeDialogueForUpdate} className="cursor-pointer w-full">
+                <Button
+                  onClick={closeDialogueForUpdate}
+                  className="cursor-pointer w-full"
+                >
                   Close
                 </Button>
               </DialogFooter>
             </DialogContent>
           </DialogTitle>
         </Dialog>
-
-
 
         {/* Sheet body */}
         <div className="mx-auto w-full px-4 md:px-6 pb-12 pt-4">
@@ -616,6 +819,12 @@ export function SeniorsReportSheet({
                           onClick={() => handleSort("address")}
                         >
                           Address
+                          <ArrowUpDown className="h-3 w-3" />
+                        </button>
+                      </th>
+                      <th className="text-left p-3 font-medium bg-purple-50">
+                        <button className="flex items-center gap-1 hover:text-primary cursor-pointer">
+                          Reports
                           <ArrowUpDown className="h-3 w-3" />
                         </button>
                       </th>
@@ -920,9 +1129,7 @@ export function SeniorsReportSheet({
                                       : ""
                                   }
                                 >
-                                  {senior.has_dl_intervened
-                                    ? "True"
-                                    : "False"}
+                                  {senior.has_dl_intervened ? "True" : "False"}
                                 </Badge>
                                 {senior.has_dl_intervened && (
                                   <Button
@@ -948,19 +1155,67 @@ export function SeniorsReportSheet({
                               </div>
                             </td>
                             <td className="p-3 text-sm">
-                              {senior.physical
-                                ? healthLabels[senior.physical]
-                                : "Not assessed"}
+                              <div className="flex items-center gap-2">
+                                <span>
+                                  {senior.physical
+                                    ? healthLabels[senior.physical]
+                                    : "Not assessed"}
+                                </span>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  className="h-6 w-6 p-0 hover:bg-muted"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setShowPhysicalDialog(senior.uid);
+                                    setSelectedPhysical(senior.physical || 1);
+                                  }}
+                                >
+                                  <Edit className="h-3 w-3" />
+                                </Button>
+                              </div>
                             </td>
                             <td className="p-3 text-sm">
-                              {senior.mental
-                                ? healthLabels[senior.mental]
-                                : "Not assessed"}
+                              <div className="flex items-center gap-2">
+                                <span>
+                                  {senior.mental
+                                    ? healthLabels[senior.mental]
+                                    : "Not assessed"}
+                                </span>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  className="h-6 w-6 p-0 hover:bg-muted"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setShowMentalDialog(senior.uid);
+                                    setSelectedMental(senior.mental || 1);
+                                  }}
+                                >
+                                  <Edit className="h-3 w-3" />
+                                </Button>
+                              </div>
                             </td>
                             <td className="p-3 text-sm">
-                              {senior.community
-                                ? healthLabels[senior.community]
-                                : "Not assessed"}
+                              <div className="flex items-center gap-2">
+                                <span>
+                                  {senior.community
+                                    ? healthLabels[senior.community]
+                                    : "Not assessed"}
+                                </span>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  className="h-6 w-6 p-0 hover:bg-muted"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setShowCommunityDialog(senior.uid);
+                                    setSelectedCommunity(senior.community || 1);
+                                  }}
+                                >
+                                  <Edit className="h-3 w-3" />
+                                </Button>
+                              </div>
                             </td>
                             <td className="p-3 text-sm">
                               {senior.last_visit ? (
@@ -986,51 +1241,134 @@ export function SeniorsReportSheet({
                               )}
                             </td>
                             <td className="p-3 text-sm">
-                              <Badge
-                                variant={
-                                  senior.dl_intervention
-                                    ? "default"
-                                    : "secondary"
-                                }
-                                className={
-                                  senior.dl_intervention
-                                    ? "bg-green-600 text-white"
-                                    : ""
-                                }
-                              >
-                                {senior.dl_intervention ? "Yes" : "No"}
-                              </Badge>
+                              <div className="flex items-center gap-2">
+                                <Badge
+                                  variant={
+                                    senior.dl_intervention
+                                      ? "default"
+                                      : "secondary"
+                                  }
+                                  className={
+                                    senior.dl_intervention
+                                      ? "bg-green-600 text-white"
+                                      : ""
+                                  }
+                                >
+                                  {senior.dl_intervention ? "Yes" : "No"}
+                                </Badge>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  className="h-6 w-6 p-0 hover:bg-muted"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setShowDlInterventionDialog(senior.uid);
+                                    setSelectedDlIntervention(
+                                      senior.dl_intervention || false
+                                    );
+                                  }}
+                                >
+                                  <Edit className="h-3 w-3" />
+                                </Button>
+                              </div>
                             </td>
                             <td className="p-3 text-sm">
-                              <Badge
-                                variant={
-                                  senior.rece_gov_sup ? "default" : "secondary"
-                                }
-                                className={
-                                  senior.rece_gov_sup
-                                    ? "bg-blue-600 text-white"
-                                    : ""
-                                }
-                              >
-                                {senior.rece_gov_sup ? "Yes" : "No"}
-                              </Badge>
+                              <div className="flex items-center gap-2">
+                                <Badge
+                                  variant={
+                                    senior.rece_gov_sup
+                                      ? "default"
+                                      : "secondary"
+                                  }
+                                  className={
+                                    senior.rece_gov_sup
+                                      ? "bg-blue-600 text-white"
+                                      : ""
+                                  }
+                                >
+                                  {senior.rece_gov_sup ? "Yes" : "No"}
+                                </Badge>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  className="h-6 w-6 p-0 hover:bg-muted"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setShowGovSupportDialog(senior.uid);
+                                    setSelectedGovSupport(
+                                      senior.rece_gov_sup || false
+                                    );
+                                  }}
+                                >
+                                  <Edit className="h-3 w-3" />
+                                </Button>
+                              </div>
                             </td>
                             <td className="p-3 text-sm">
-                              {senior.making_ends_meet
-                                ? makingEndsMeetLabels[
-                                    senior.making_ends_meet
-                                  ] || senior.making_ends_meet
-                                : "Not recorded"}
+                              <div className="flex items-center gap-2">
+                                <span>
+                                  {senior.making_ends_meet
+                                    ? makingEndsMeetLabels[
+                                        senior.making_ends_meet
+                                      ] || senior.making_ends_meet
+                                    : "Not recorded"}
+                                </span>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  className="h-6 w-6 p-0 hover:bg-muted"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setShowMakingEndsMeetDialog(senior.uid);
+                                    setSelectedMakingEndsMeet(
+                                      senior.making_ends_meet || "3"
+                                    );
+                                  }}
+                                >
+                                  <Edit className="h-3 w-3" />
+                                </Button>
+                              </div>
                             </td>
                             <td className="p-3 text-sm">
-                              {senior.living_situation
-                                ? livingConditionsLabels[
-                                    senior.living_situation
-                                  ] || senior.living_situation
-                                : "Not recorded"}
+                              <div className="flex items-center gap-2">
+                                <span>
+                                  {senior.living_situation
+                                    ? livingConditionsLabels[
+                                        senior.living_situation
+                                      ] || senior.living_situation
+                                    : "Not recorded"}
+                                </span>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  className="h-6 w-6 p-0 hover:bg-muted"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setShowLivingSituationDialog(senior.uid);
+                                    setSelectedLivingSituation(
+                                      senior.living_situation || "3"
+                                    );
+                                  }}
+                                >
+                                  <Edit className="h-3 w-3" />
+                                </Button>
+                              </div>
                             </td>
                             <td className="p-3 text-sm">
                               {senior.address || "Address not available"}
+                            </td>
+                            <td className="p-3 bg-purple-50">
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleViewReports(senior.uid);
+                                }}
+                                className="bg-purple-100 hover:bg-purple-200 text-purple-800 border-purple-300"
+                              >
+                                View Reports
+                              </Button>
                             </td>
                           </tr>
                         );
@@ -1041,6 +1379,745 @@ export function SeniorsReportSheet({
             </div>
           )}
         </div>
+
+        {/* Reports Dialog */}
+        <Dialog
+          open={!!showReportsDialog}
+          onOpenChange={() => setShowReportsDialog(null)}
+        >
+          <DialogContent className="sm:max-w-4xl max-h-[80vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <Users className="h-5 w-5 text-purple-600" />
+                Reports for{" "}
+                {filteredSeniors.find((s) => s.uid === showReportsDialog)
+                  ?.name || `Senior ${showReportsDialog}`}
+              </DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4">
+              {loadingReports ? (
+                <div className="flex items-center justify-center py-8">
+                  <Loader2 className="h-6 w-6 animate-spin mr-2" />
+                  <span>Loading reports...</span>
+                </div>
+              ) : reportsError ? (
+                <div className="text-center py-8">
+                  <p className="text-red-600 mb-4">
+                    Error loading reports: {reportsError}
+                  </p>
+                  <Button
+                    variant="outline"
+                    onClick={() =>
+                      showReportsDialog && fetchSeniorReports(showReportsDialog)
+                    }
+                  >
+                    Try Again
+                  </Button>
+                </div>
+              ) : seniorReports.length === 0 ? (
+                <div className="text-center py-8">
+                  <Users className="h-12 w-12 mx-auto text-gray-400 mb-4" />
+                  <p className="text-gray-600 text-lg font-medium">
+                    No reports found
+                  </p>
+                  <p className="text-gray-500 mt-2">
+                    This senior has not received any visit reports yet.
+                  </p>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  <div className="text-sm text-gray-600 mb-4">
+                    Found {seniorReports.length} report
+                    {seniorReports.length !== 1 ? "s" : ""}
+                    (sorted by date, newest first)
+                  </div>
+                  {seniorReports.map((report, index) => (
+                    <div
+                      key={report.aid}
+                      className="border rounded-lg p-4 bg-gray-50"
+                    >
+                      <div className="flex items-center justify-between mb-3">
+                        <div className="flex items-center gap-2">
+                          <Badge
+                            variant="outline"
+                            className="bg-purple-100 text-purple-800"
+                          >
+                            Report #{index + 1}
+                          </Badge>
+                          <span className="text-sm font-medium text-gray-700">
+                            {new Date(report.date).toLocaleDateString("en-US", {
+                              year: "numeric",
+                              month: "long",
+                              day: "numeric",
+                            })}
+                          </span>
+                        </div>
+                        <span className="text-xs text-gray-500">
+                          {Math.floor(
+                            (new Date().getTime() -
+                              new Date(report.date).getTime()) /
+                              (1000 * 60 * 60 * 24)
+                          )}{" "}
+                          days ago
+                        </span>
+                      </div>
+                      <div className="bg-white p-3 rounded border">
+                        <p className="text-sm text-gray-800 leading-relaxed whitespace-pre-wrap">
+                          {report.report}
+                        </p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+            <DialogFooter>
+              <Button onClick={() => setShowReportsDialog(null)}>Close</Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Physical Health Edit Dialog */}
+        <Dialog
+          open={!!showPhysicalDialog}
+          onOpenChange={() => setShowPhysicalDialog(null)}
+        >
+          <DialogContent className="sm:max-w-md">
+            <DialogHeader>
+              <DialogTitle>Edit Physical Health</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4">
+              <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                <p className="text-sm text-blue-700">
+                  <strong>Tip:</strong> Please check the reports for this senior
+                  before making any changes to ensure accuracy.
+                </p>
+              </div>
+
+              <div className="text-sm">
+                <strong>Senior:</strong>{" "}
+                {filteredSeniors.find((s) => s.uid === showPhysicalDialog)
+                  ?.name || `Senior ${showPhysicalDialog}`}
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-sm font-medium">
+                  Physical Health Level:
+                </label>
+                <Select
+                  value={selectedPhysical?.toString()}
+                  onValueChange={(value) =>
+                    setSelectedPhysical(parseInt(value))
+                  }
+                  disabled={isUpdatingField?.includes("physical")}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select physical health level" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="1">Very Poor</SelectItem>
+                    <SelectItem value="2">Poor</SelectItem>
+                    <SelectItem value="3">Normal</SelectItem>
+                    <SelectItem value="4">Good</SelectItem>
+                    <SelectItem value="5">Very Good</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="flex gap-2 pt-4">
+                <Button
+                  onClick={() => {
+                    setShowPhysicalDialog(null);
+                    setSelectedPhysical(null);
+                  }}
+                  variant="outline"
+                  className="flex-1"
+                >
+                  Cancel
+                </Button>
+                <Button
+                  onClick={() => {
+                    if (selectedPhysical !== null && showPhysicalDialog) {
+                      const senior = filteredSeniors.find(
+                        (s) => s.uid === showPhysicalDialog
+                      );
+                      handleFieldUpdate(
+                        showPhysicalDialog,
+                        senior?.name || "",
+                        "physical",
+                        selectedPhysical
+                      );
+                    }
+                  }}
+                  disabled={
+                    selectedPhysical === null ||
+                    isUpdatingField?.includes("physical")
+                  }
+                  className="flex-1"
+                >
+                  {isUpdatingField?.includes("physical") ? (
+                    <>
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      Updating...
+                    </>
+                  ) : (
+                    "Update"
+                  )}
+                </Button>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
+
+        {/* Mental Health Edit Dialog */}
+        <Dialog
+          open={!!showMentalDialog}
+          onOpenChange={() => setShowMentalDialog(null)}
+        >
+          <DialogContent className="sm:max-w-md">
+            <DialogHeader>
+              <DialogTitle>Edit Mental Health</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4">
+              <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                <p className="text-sm text-blue-700">
+                  <strong>Tip:</strong> Please check the reports for this senior
+                  before making any changes to ensure accuracy.
+                </p>
+              </div>
+
+              <div className="text-sm">
+                <strong>Senior:</strong>{" "}
+                {filteredSeniors.find((s) => s.uid === showMentalDialog)
+                  ?.name || `Senior ${showMentalDialog}`}
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-sm font-medium">
+                  Mental Health Level:
+                </label>
+                <Select
+                  value={selectedMental?.toString()}
+                  onValueChange={(value) => setSelectedMental(parseInt(value))}
+                  disabled={isUpdatingField?.includes("mental")}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select mental health level" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="1">Very Poor</SelectItem>
+                    <SelectItem value="2">Poor</SelectItem>
+                    <SelectItem value="3">Normal</SelectItem>
+                    <SelectItem value="4">Good</SelectItem>
+                    <SelectItem value="5">Very Good</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="flex gap-2 pt-4">
+                <Button
+                  onClick={() => {
+                    setShowMentalDialog(null);
+                    setSelectedMental(null);
+                  }}
+                  variant="outline"
+                  className="flex-1"
+                >
+                  Cancel
+                </Button>
+                <Button
+                  onClick={() => {
+                    if (selectedMental !== null && showMentalDialog) {
+                      const senior = filteredSeniors.find(
+                        (s) => s.uid === showMentalDialog
+                      );
+                      handleFieldUpdate(
+                        showMentalDialog,
+                        senior?.name || "",
+                        "mental",
+                        selectedMental
+                      );
+                    }
+                  }}
+                  disabled={
+                    selectedMental === null ||
+                    isUpdatingField?.includes("mental")
+                  }
+                  className="flex-1"
+                >
+                  {isUpdatingField?.includes("mental") ? (
+                    <>
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      Updating...
+                    </>
+                  ) : (
+                    "Update"
+                  )}
+                </Button>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
+
+        {/* Community Support Edit Dialog */}
+        <Dialog
+          open={!!showCommunityDialog}
+          onOpenChange={() => setShowCommunityDialog(null)}
+        >
+          <DialogContent className="sm:max-w-md">
+            <DialogHeader>
+              <DialogTitle>Edit Community Support</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4">
+              <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                <p className="text-sm text-blue-700">
+                  <strong>Tip:</strong> Please check the reports for this senior
+                  before making any changes to ensure accuracy.
+                </p>
+              </div>
+
+              <div className="text-sm">
+                <strong>Senior:</strong>{" "}
+                {filteredSeniors.find((s) => s.uid === showCommunityDialog)
+                  ?.name || `Senior ${showCommunityDialog}`}
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-sm font-medium">
+                  Community Support Level:
+                </label>
+                <Select
+                  value={selectedCommunity?.toString()}
+                  onValueChange={(value) =>
+                    setSelectedCommunity(parseInt(value))
+                  }
+                  disabled={isUpdatingField?.includes("community")}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select community support level" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="1">Very Poor</SelectItem>
+                    <SelectItem value="2">Poor</SelectItem>
+                    <SelectItem value="3">Normal</SelectItem>
+                    <SelectItem value="4">Good</SelectItem>
+                    <SelectItem value="5">Very Good</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="flex gap-2 pt-4">
+                <Button
+                  onClick={() => {
+                    setShowCommunityDialog(null);
+                    setSelectedCommunity(null);
+                  }}
+                  variant="outline"
+                  className="flex-1"
+                >
+                  Cancel
+                </Button>
+                <Button
+                  onClick={() => {
+                    if (selectedCommunity !== null && showCommunityDialog) {
+                      const senior = filteredSeniors.find(
+                        (s) => s.uid === showCommunityDialog
+                      );
+                      handleFieldUpdate(
+                        showCommunityDialog,
+                        senior?.name || "",
+                        "community",
+                        selectedCommunity
+                      );
+                    }
+                  }}
+                  disabled={
+                    selectedCommunity === null ||
+                    isUpdatingField?.includes("community")
+                  }
+                  className="flex-1"
+                >
+                  {isUpdatingField?.includes("community") ? (
+                    <>
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      Updating...
+                    </>
+                  ) : (
+                    "Update"
+                  )}
+                </Button>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
+
+        {/* DL Intervention Edit Dialog */}
+        <Dialog
+          open={!!showDlInterventionDialog}
+          onOpenChange={() => setShowDlInterventionDialog(null)}
+        >
+          <DialogContent className="sm:max-w-md">
+            <DialogHeader>
+              <DialogTitle>Edit DL Intervention</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4">
+              <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                <p className="text-sm text-blue-700">
+                  <strong>Tip:</strong> Please check the reports for this senior
+                  before making any changes to ensure accuracy.
+                </p>
+              </div>
+
+              <div className="text-sm">
+                <strong>Senior:</strong>{" "}
+                {filteredSeniors.find((s) => s.uid === showDlInterventionDialog)
+                  ?.name || `Senior ${showDlInterventionDialog}`}
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-sm font-medium">
+                  DL Intervention Status:
+                </label>
+                <Select
+                  value={selectedDlIntervention?.toString()}
+                  onValueChange={(value) =>
+                    setSelectedDlIntervention(value === "true")
+                  }
+                  disabled={isUpdatingField?.includes("dl_intervention")}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select DL intervention status" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="true">Yes</SelectItem>
+                    <SelectItem value="false">No</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="flex gap-2 pt-4">
+                <Button
+                  onClick={() => {
+                    setShowDlInterventionDialog(null);
+                    setSelectedDlIntervention(null);
+                  }}
+                  variant="outline"
+                  className="flex-1"
+                >
+                  Cancel
+                </Button>
+                <Button
+                  onClick={() => {
+                    if (
+                      selectedDlIntervention !== null &&
+                      showDlInterventionDialog
+                    ) {
+                      const senior = filteredSeniors.find(
+                        (s) => s.uid === showDlInterventionDialog
+                      );
+                      handleFieldUpdate(
+                        showDlInterventionDialog,
+                        senior?.name || "",
+                        "dl_intervention",
+                        selectedDlIntervention
+                      );
+                    }
+                  }}
+                  disabled={
+                    selectedDlIntervention === null ||
+                    isUpdatingField?.includes("dl_intervention")
+                  }
+                  className="flex-1"
+                >
+                  {isUpdatingField?.includes("dl_intervention") ? (
+                    <>
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      Updating...
+                    </>
+                  ) : (
+                    "Update"
+                  )}
+                </Button>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
+
+        {/* Government Support Edit Dialog */}
+        <Dialog
+          open={!!showGovSupportDialog}
+          onOpenChange={() => setShowGovSupportDialog(null)}
+        >
+          <DialogContent className="sm:max-w-md">
+            <DialogHeader>
+              <DialogTitle>Edit Government Support</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4">
+              <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                <p className="text-sm text-blue-700">
+                  <strong>Tip:</strong> Please check the reports for this senior
+                  before making any changes to ensure accuracy.
+                </p>
+              </div>
+
+              <div className="text-sm">
+                <strong>Senior:</strong>{" "}
+                {filteredSeniors.find((s) => s.uid === showGovSupportDialog)
+                  ?.name || `Senior ${showGovSupportDialog}`}
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-sm font-medium">
+                  Government Support Status:
+                </label>
+                <Select
+                  value={selectedGovSupport?.toString()}
+                  onValueChange={(value) =>
+                    setSelectedGovSupport(value === "true")
+                  }
+                  disabled={isUpdatingField?.includes("rece_gov_sup")}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select government support status" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="true">Yes</SelectItem>
+                    <SelectItem value="false">No</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="flex gap-2 pt-4">
+                <Button
+                  onClick={() => {
+                    setShowGovSupportDialog(null);
+                    setSelectedGovSupport(null);
+                  }}
+                  variant="outline"
+                  className="flex-1"
+                >
+                  Cancel
+                </Button>
+                <Button
+                  onClick={() => {
+                    if (selectedGovSupport !== null && showGovSupportDialog) {
+                      const senior = filteredSeniors.find(
+                        (s) => s.uid === showGovSupportDialog
+                      );
+                      handleFieldUpdate(
+                        showGovSupportDialog,
+                        senior?.name || "",
+                        "rece_gov_sup",
+                        selectedGovSupport
+                      );
+                    }
+                  }}
+                  disabled={
+                    selectedGovSupport === null ||
+                    isUpdatingField?.includes("rece_gov_sup")
+                  }
+                  className="flex-1"
+                >
+                  {isUpdatingField?.includes("rece_gov_sup") ? (
+                    <>
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      Updating...
+                    </>
+                  ) : (
+                    "Update"
+                  )}
+                </Button>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
+
+        {/* Making Ends Meet Edit Dialog */}
+        <Dialog
+          open={!!showMakingEndsMeetDialog}
+          onOpenChange={() => setShowMakingEndsMeetDialog(null)}
+        >
+          <DialogContent className="sm:max-w-md">
+            <DialogHeader>
+              <DialogTitle>Edit Making Ends Meet</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4">
+              <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                <p className="text-sm text-blue-700">
+                  <strong>Tip:</strong> Please check the reports for this senior
+                  before making any changes to ensure accuracy.
+                </p>
+              </div>
+
+              <div className="text-sm">
+                <strong>Senior:</strong>{" "}
+                {filteredSeniors.find((s) => s.uid === showMakingEndsMeetDialog)
+                  ?.name || `Senior ${showMakingEndsMeetDialog}`}
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-sm font-medium">
+                  Making Ends Meet Level:
+                </label>
+                <Select
+                  value={selectedMakingEndsMeet || undefined}
+                  onValueChange={(value) => setSelectedMakingEndsMeet(value)}
+                  disabled={isUpdatingField?.includes("making_ends_meet")}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select making ends meet level" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="1">Very Difficult</SelectItem>
+                    <SelectItem value="2">Difficult</SelectItem>
+                    <SelectItem value="3">Managing</SelectItem>
+                    <SelectItem value="4">Comfortable</SelectItem>
+                    <SelectItem value="5">Very Comfortable</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="flex gap-2 pt-4">
+                <Button
+                  onClick={() => {
+                    setShowMakingEndsMeetDialog(null);
+                    setSelectedMakingEndsMeet(null);
+                  }}
+                  variant="outline"
+                  className="flex-1"
+                >
+                  Cancel
+                </Button>
+                <Button
+                  onClick={() => {
+                    if (
+                      selectedMakingEndsMeet !== null &&
+                      showMakingEndsMeetDialog
+                    ) {
+                      const senior = filteredSeniors.find(
+                        (s) => s.uid === showMakingEndsMeetDialog
+                      );
+                      handleFieldUpdate(
+                        showMakingEndsMeetDialog,
+                        senior?.name || "",
+                        "making_ends_meet",
+                        selectedMakingEndsMeet
+                      );
+                    }
+                  }}
+                  disabled={
+                    selectedMakingEndsMeet === null ||
+                    isUpdatingField?.includes("making_ends_meet")
+                  }
+                  className="flex-1"
+                >
+                  {isUpdatingField?.includes("making_ends_meet") ? (
+                    <>
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      Updating...
+                    </>
+                  ) : (
+                    "Update"
+                  )}
+                </Button>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
+
+        {/* Living Situation Edit Dialog */}
+        <Dialog
+          open={!!showLivingSituationDialog}
+          onOpenChange={() => setShowLivingSituationDialog(null)}
+        >
+          <DialogContent className="sm:max-w-md">
+            <DialogHeader>
+              <DialogTitle>Edit Living Situation</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4">
+              <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                <p className="text-sm text-blue-700">
+                  <strong>Tip:</strong> Please check the reports for this senior
+                  before making any changes to ensure accuracy.
+                </p>
+              </div>
+
+              <div className="text-sm">
+                <strong>Senior:</strong>{" "}
+                {filteredSeniors.find(
+                  (s) => s.uid === showLivingSituationDialog
+                )?.name || `Senior ${showLivingSituationDialog}`}
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-sm font-medium">
+                  Living Situation Level:
+                </label>
+                <Select
+                  value={selectedLivingSituation || undefined}
+                  onValueChange={(value) => setSelectedLivingSituation(value)}
+                  disabled={isUpdatingField?.includes("living_situation")}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select living situation level" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="1">Very Poor</SelectItem>
+                    <SelectItem value="2">Poor</SelectItem>
+                    <SelectItem value="3">Adequate</SelectItem>
+                    <SelectItem value="4">Good</SelectItem>
+                    <SelectItem value="5">Excellent</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="flex gap-2 pt-4">
+                <Button
+                  onClick={() => {
+                    setShowLivingSituationDialog(null);
+                    setSelectedLivingSituation(null);
+                  }}
+                  variant="outline"
+                  className="flex-1"
+                >
+                  Cancel
+                </Button>
+                <Button
+                  onClick={() => {
+                    if (
+                      selectedLivingSituation !== null &&
+                      showLivingSituationDialog
+                    ) {
+                      const senior = filteredSeniors.find(
+                        (s) => s.uid === showLivingSituationDialog
+                      );
+                      handleFieldUpdate(
+                        showLivingSituationDialog,
+                        senior?.name || "",
+                        "living_situation",
+                        selectedLivingSituation
+                      );
+                    }
+                  }}
+                  disabled={
+                    selectedLivingSituation === null ||
+                    isUpdatingField?.includes("living_situation")
+                  }
+                  className="flex-1"
+                >
+                  {isUpdatingField?.includes("living_situation") ? (
+                    <>
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      Updating...
+                    </>
+                  ) : (
+                    "Update"
+                  )}
+                </Button>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
       </SheetContent>
     </Sheet>
   );

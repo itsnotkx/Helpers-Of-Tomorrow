@@ -22,6 +22,8 @@ import {
   History,
   CheckCircle2,
   Loader2,
+  FileText,
+  Edit3,
 } from "lucide-react";
 import { useUser } from "@clerk/nextjs";
 
@@ -40,6 +42,7 @@ interface ArchivedAssignment {
   completion_notes?: string;
   completed_at?: string;
   has_visited?: boolean;
+  report?: string; // Add report field
 }
 
 interface Volunteer {
@@ -75,6 +78,13 @@ interface ConfirmVisitApiResponse {
   visit_date?: string;
 }
 
+interface SubmitReportApiResponse {
+  success: boolean;
+  error?: string;
+  message?: string;
+  assignment_id?: string;
+}
+
 export function PastAssignments() {
   const [assignments, setAssignments] = useState<ArchivedAssignment[]>([]);
   const [loading, setLoading] = useState(true);
@@ -91,6 +101,16 @@ export function PastAssignments() {
   const [confirmingVisit, setConfirmingVisit] = useState<string | null>(null);
   const [confirmError, setConfirmError] = useState<string | null>(null);
   const [confirmSuccess, setConfirmSuccess] = useState<string | null>(null);
+
+  // Guidelines dialog state
+  const [showGuidelines, setShowGuidelines] = useState(false);
+
+  // Report submission state
+  const [showReportDialog, setShowReportDialog] = useState<string | null>(null);
+  const [reportText, setReportText] = useState("");
+  const [submittingReport, setSubmittingReport] = useState<string | null>(null);
+  const [reportError, setReportError] = useState<string | null>(null);
+  const [reportSuccess, setReportSuccess] = useState<string | null>(null);
 
   const { user } = useUser();
 
@@ -211,7 +231,7 @@ export function PastAssignments() {
     } finally {
       setLoading(false);
     }
-  }, [user]);
+  }, [user?.primaryEmailAddress?.emailAddress]);
 
   useEffect(() => {
     fetchVolunteerAndAssignments();
@@ -271,6 +291,79 @@ export function PastAssignments() {
     } finally {
       setConfirmingVisit(null);
     }
+  };
+
+  // Handle report submission
+  const handleSubmitReport = async (aid: string) => {
+    try {
+      setSubmittingReport(aid);
+      setReportError(null);
+      setReportSuccess(null);
+      const BASE_URL =
+        process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8000";
+
+      const response = await fetch(`${BASE_URL}/submit-report`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ aid, report: reportText }),
+      });
+
+      const result: SubmitReportApiResponse = await response.json();
+
+      if (response.ok && result.success) {
+        // Update the local assignment state
+        setAssignments((prev) =>
+          prev.map((assignment) =>
+            assignment.aid === aid
+              ? { ...assignment, report: reportText }
+              : assignment
+          )
+        );
+        setShowReportDialog(null);
+        setReportText("");
+        setReportSuccess("Report submitted successfully!");
+
+        // Clear success message after 3 seconds
+        setTimeout(() => setReportSuccess(null), 3000);
+      } else {
+        console.error("Failed to submit report:", result);
+        setReportError(result.error || "Unknown error");
+      }
+    } catch (error) {
+      console.error("Error submitting report:", error);
+      const errorMessage =
+        error instanceof Error ? error.message : "Unknown error";
+      setReportError(`Error submitting report: ${errorMessage}`);
+    } finally {
+      setSubmittingReport(null);
+    }
+  };
+
+  // Helper function to check if assignment is eligible for report
+  const isEligibleForReport = (assignment: ArchivedAssignment) => {
+    if (!assignment.has_visited) {
+      console.log(`Assignment ${assignment.aid}: Not visited`);
+      return false;
+    }
+
+    const assignmentDate = new Date(assignment.date);
+    const oneMonthAgo = new Date();
+    oneMonthAgo.setMonth(oneMonthAgo.getMonth() - 1); // 1 month window for reporting
+
+    console.log(`Assignment ${assignment.aid}:`, {
+      date: assignment.date,
+      assignmentDate: assignmentDate.toDateString(),
+      oneMonthAgo: oneMonthAgo.toDateString(),
+      isEligible: assignmentDate >= oneMonthAgo,
+      daysDifference: Math.floor(
+        (new Date().getTime() - assignmentDate.getTime()) /
+          (1000 * 60 * 60 * 24)
+      ),
+    });
+
+    return assignmentDate >= oneMonthAgo;
   };
 
   const handleSort = (column: "date" | "senior") => {
@@ -349,6 +442,27 @@ export function PastAssignments() {
   return (
     <>
       <div>
+        {/* Header with Report Guidelines button */}
+        <div className="flex justify-between items-center mb-6">
+          <div>
+            <h2 className="text-xl font-semibold text-gray-900">
+              Past Assignments
+            </h2>
+            <p className="text-sm text-gray-600 mt-1">
+              View your completed assignments and confirm visits
+            </p>
+          </div>
+          <Button
+            variant="destructive"
+            size="sm"
+            onClick={() => setShowGuidelines(true)}
+            className="bg-red-600 hover:bg-red-700 text-white"
+          >
+            <FileText className="h-4 w-4 mr-2" />
+            Report Guidelines
+          </Button>
+        </div>
+
         {/* Error and Success Messages */}
         {confirmError && (
           <div className="mb-4 p-4 rounded-md bg-red-50 border border-red-200 text-red-800">
@@ -370,6 +484,30 @@ export function PastAssignments() {
             <div className="flex items-center gap-2">
               <CheckCircle2 className="h-4 w-4" />
               <p className="font-medium">{confirmSuccess}</p>
+            </div>
+          </div>
+        )}
+
+        {reportError && (
+          <div className="mb-4 p-4 rounded-md bg-red-50 border border-red-200 text-red-800">
+            <p className="font-medium">Report Error:</p>
+            <p>{reportError}</p>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setReportError(null)}
+              className="mt-2"
+            >
+              Dismiss
+            </Button>
+          </div>
+        )}
+
+        {reportSuccess && (
+          <div className="mb-4 p-4 rounded-md bg-green-50 border border-green-200 text-green-800">
+            <div className="flex items-center gap-2">
+              <CheckCircle2 className="h-4 w-4" />
+              <p className="font-medium">{reportSuccess}</p>
             </div>
           </div>
         )}
@@ -493,7 +631,8 @@ export function PastAssignments() {
                     </CardContent>
                     {(assignment.completion_notes ||
                       assignment.completed_at ||
-                      !assignment.has_visited) && (
+                      !assignment.has_visited ||
+                      assignment.has_visited) && (
                       <div className="px-6 pb-4 space-y-2">
                         {assignment.completion_notes && (
                           <div className="p-3 bg-gray-50 rounded text-sm">
@@ -537,13 +676,69 @@ export function PastAssignments() {
                           </div>
                         )}
                         {assignment.has_visited && (
-                          <div className="pt-3 border-t border-gray-100">
+                          <div className="pt-3 border-t border-gray-100 space-y-3">
                             <div className="flex items-center gap-2 text-green-600">
                               <CheckCircle2 className="h-4 w-4" />
                               <span className="text-sm font-medium">
                                 Visit completed
                               </span>
                             </div>
+
+                            {/* Report section - Always show for visited assignments */}
+                            {(() => {
+                              const isEligible =
+                                isEligibleForReport(assignment);
+                              console.log(
+                                `🔍 Assignment ${assignment.aid} visited=${assignment.has_visited}, eligible=${isEligible}`
+                              );
+                              return isEligible;
+                            })() && (
+                              <div className="space-y-2">
+                                {assignment.report ? (
+                                  <div className="p-3 bg-blue-50 border border-blue-200 rounded text-sm">
+                                    <div className="flex items-center justify-between mb-2">
+                                      <strong className="text-blue-800">
+                                        Your Report:
+                                      </strong>
+                                      <Button
+                                        size="sm"
+                                        variant="outline"
+                                        onClick={() => {
+                                          setReportText(
+                                            assignment.report || ""
+                                          );
+                                          setShowReportDialog(assignment.aid);
+                                        }}
+                                        className="h-6 px-2 text-xs"
+                                      >
+                                        <Edit3 className="h-3 w-3 mr-1" />
+                                        Edit
+                                      </Button>
+                                    </div>
+                                    <p className="text-blue-700">
+                                      {assignment.report}
+                                    </p>
+                                  </div>
+                                ) : (
+                                  <div className="flex items-center justify-between">
+                                    <span className="text-sm text-gray-600">
+                                      Submit a report for this visit
+                                    </span>
+                                    <Button
+                                      size="sm"
+                                      onClick={() => {
+                                        setReportText("");
+                                        setShowReportDialog(assignment.aid);
+                                      }}
+                                      className="bg-blue-600 hover:bg-blue-700 text-white h-7 px-3 text-xs"
+                                    >
+                                      <FileText className="h-3 w-3 mr-1" />
+                                      Write Report
+                                    </Button>
+                                  </div>
+                                )}
+                              </div>
+                            )}
                           </div>
                         )}
                       </div>
@@ -600,6 +795,142 @@ export function PastAssignments() {
                 <>
                   <CheckCircle2 className="h-3 w-3 mr-1" />
                   Confirm Visit
+                </>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Report Guidelines Dialog */}
+      <Dialog open={showGuidelines} onOpenChange={setShowGuidelines}>
+        <DialogContent className="sm:max-w-2xl">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <FileText className="h-5 w-5 text-red-600" />
+              Report Guidelines
+            </DialogTitle>
+            <DialogDescription className="text-base">
+              Important guidelines for submitting reports to the District
+              Leaders
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-4">
+            <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+              <h4 className="font-semibold text-red-800 mb-3">
+                When sending in a report for the DLs to view, please describe
+                the following:
+              </h4>
+              <div className="text-red-700 leading-relaxed">
+                <p>
+                  - The physical state of the senior (according to the 6
+                  Activities of Daily Living:
+                  <strong>
+                    {" "}
+                    washing, toileting, dressing, feeding, mobility, and
+                    transferring
+                  </strong>
+                  (in and out of a bed or a chair))
+                  <br /> - The mental health of the senior (whether he/she can
+                  converse well/remember things etc) <br /> - How bonded he/she
+                  currently is to the community <br /> - Whether the senior has
+                  received support from government schemes <br /> - The extent
+                  to which the senior is making ends meet <br /> - What his/her
+                  living conditions are like.
+                </p>
+              </div>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button onClick={() => setShowGuidelines(false)}>Got it</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Report Submission Dialog */}
+      <Dialog
+        open={!!showReportDialog}
+        onOpenChange={() => setShowReportDialog(null)}
+      >
+        <DialogContent className="sm:max-w-2xl">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <FileText className="h-5 w-5 text-blue-600" />
+              {assignments.find((a) => a.aid === showReportDialog)?.report
+                ? "Edit Report"
+                : "Write Report"}
+            </DialogTitle>
+            <DialogDescription>
+              {showReportDialog &&
+                (() => {
+                  const assignment = assignments.find(
+                    (a) => a.aid === showReportDialog
+                  );
+                  const seniorDetails = assignment
+                    ? getSeniorDetails(assignment.sid)
+                    : null;
+                  return `Report for visit to ${
+                    seniorDetails?.name || "Senior"
+                  } on ${
+                    assignment
+                      ? new Date(assignment.date).toLocaleDateString()
+                      : ""
+                  }`;
+                })()}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-4">
+            <div className="space-y-4">
+              <div className="p-3 bg-yellow-50 border border-yellow-200 rounded text-sm">
+                <p className="text-yellow-800">
+                  <strong>Tip:</strong> Use the Report Guidelines for
+                  comprehensive reporting. Include physical state, mental
+                  health, community connection, government support, financial
+                  situation, and living conditions.
+                </p>
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-gray-700">
+                  Report Content
+                </label>
+                <textarea
+                  value={reportText}
+                  onChange={(e) => setReportText(e.target.value)}
+                  placeholder="Describe your visit and observations about the senior's wellbeing..."
+                  className="w-full min-h-[200px] p-3 border border-gray-300 rounded-md resize-y focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  disabled={submittingReport === showReportDialog}
+                />
+              </div>
+            </div>
+          </div>
+          <DialogFooter className="flex gap-2">
+            <Button
+              variant="outline"
+              onClick={() => {
+                setShowReportDialog(null);
+                setReportText("");
+              }}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={() =>
+                showReportDialog && handleSubmitReport(showReportDialog)
+              }
+              disabled={
+                !reportText.trim() || submittingReport === showReportDialog
+              }
+              className="bg-blue-600 hover:bg-blue-700 text-white"
+            >
+              {submittingReport === showReportDialog ? (
+                <>
+                  <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                  Submitting...
+                </>
+              ) : (
+                <>
+                  <FileText className="h-3 w-3 mr-1" />
+                  Submit Report
                 </>
               )}
             </Button>
