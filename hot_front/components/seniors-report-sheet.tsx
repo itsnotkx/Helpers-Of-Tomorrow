@@ -34,6 +34,7 @@ import {
   AlertTriangle,
   RotateCcw,
   Shield,
+  Search,
 } from "lucide-react";
 import { Senior } from "@/app/page";
 import { Activity } from "lucide-react";
@@ -48,14 +49,23 @@ interface SeniorReport {
   aid: string;
   date: string;
   report: string;
+  volunteer_name?: string;
 }
 
 interface ReportsApiResponse {
   assignment_archive: {
     aid: string;
     sid: string;
+    vid: string;
     date: string;
     report?: string;
+  }[];
+}
+
+interface VolunteersApiResponse {
+  volunteers: {
+    vid: string;
+    name: string;
   }[];
 }
 
@@ -158,6 +168,9 @@ export function SeniorsReportSheet({
     string | null
   >(null);
   const [isUpdatingField, setIsUpdatingField] = useState<string | null>(null);
+
+  // Search state
+  const [searchQuery, setSearchQuery] = useState("");
 
   const wellbeingLabels: Record<number, string> = {
     1: "Poor", // High Risk
@@ -347,6 +360,16 @@ export function SeniorsReportSheet({
     onOpenChange(false);
   };
 
+  // Filter seniors based on search query
+  const searchFilteredSeniors = filteredSeniors.filter((senior) => {
+    if (!searchQuery.trim()) return true;
+
+    const query = searchQuery.toLowerCase();
+    const name = (senior.name || "").toLowerCase();
+
+    return name.includes(query);
+  });
+
   const classifySeniors = async () => {
     setClassifyLoading(true);
     const response = await fetch(
@@ -401,23 +424,57 @@ export function SeniorsReportSheet({
       const BASE_URL =
         process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8000";
 
-      const response = await fetch(`${BASE_URL}/assignmentarchive`, {
-        method: "GET",
-        headers: {
-          "Content-Type": "application/json",
-        },
-      });
+      // Fetch assignments and volunteers in parallel
+      const [assignmentsResponse, volunteersResponse] = await Promise.all([
+        fetch(`${BASE_URL}/assignmentarchive`, {
+          method: "GET",
+          headers: {
+            "Content-Type": "application/json",
+          },
+        }),
+        fetch(`${BASE_URL}/volunteers`, {
+          method: "GET",
+          headers: {
+            "Content-Type": "application/json",
+          },
+        }),
+      ]);
 
-      if (!response.ok) {
-        throw new Error("Failed to fetch reports");
+      if (!assignmentsResponse.ok) {
+        throw new Error("Failed to fetch assignment reports");
+      }
+      if (!volunteersResponse.ok) {
+        throw new Error("Failed to fetch volunteers");
       }
 
-      const result: ReportsApiResponse = await response.json();
+      const assignmentsResult: ReportsApiResponse =
+        await assignmentsResponse.json();
+      const volunteersResult: VolunteersApiResponse =
+        await volunteersResponse.json();
+
+      // Debug: Log the API responses
+      console.log("Assignment archive API response:", assignmentsResult);
+      console.log(
+        "Sample assignment:",
+        assignmentsResult.assignment_archive[0]
+      );
+      console.log("Volunteers API response:", volunteersResult);
+      console.log("Sample volunteer:", volunteersResult.volunteers[0]);
+
+      // Create a map of volunteer IDs to names for quick lookup
+      const volunteerMap = new Map<string, string>();
+      volunteersResult.volunteers.forEach((volunteer) => {
+        volunteerMap.set(volunteer.vid, volunteer.name);
+      });
+
+      console.log("Volunteer mapping:", volunteerMap);
 
       // Filter assignments for this senior and extract reports
-      const seniorAssignments = result.assignment_archive.filter(
+      const seniorAssignments = assignmentsResult.assignment_archive.filter(
         (assignment) => assignment.sid === seniorId && assignment.report
       );
+
+      console.log("Filtered assignments for senior:", seniorAssignments);
 
       // Convert to SeniorReport format and sort by date (newest first)
       const reports: SeniorReport[] = seniorAssignments
@@ -425,10 +482,13 @@ export function SeniorsReportSheet({
           aid: assignment.aid,
           date: assignment.date,
           report: assignment.report!,
+          volunteer_name: volunteerMap.get(assignment.vid) || undefined,
         }))
         .sort(
           (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()
         );
+
+      console.log("Final reports with volunteer names:", reports);
 
       setSeniorReports(reports);
     } catch (error) {
@@ -667,6 +727,34 @@ export function SeniorsReportSheet({
             </p>
           ) : (
             <div className="space-y-4">
+              {/* Search bar */}
+              <div className="mb-4">
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+                  <input
+                    type="text"
+                    placeholder="Search seniors by name..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
+                  />
+                  {searchQuery && (
+                    <button
+                      onClick={() => setSearchQuery("")}
+                      className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                    >
+                      <X className="h-4 w-4" />
+                    </button>
+                  )}
+                </div>
+                {searchQuery && (
+                  <div className="mt-2 text-sm text-gray-600">
+                    Found {searchFilteredSeniors.length} of{" "}
+                    {filteredSeniors.length} seniors
+                  </div>
+                )}
+              </div>
+
               {/* Summary stats */}
               <div className="grid grid-cols-3 gap-4 mb-6 p-4 bg-muted/20 rounded-lg">
                 <div className="text-center">
@@ -831,7 +919,7 @@ export function SeniorsReportSheet({
                     </tr>
                   </thead>
                   <tbody>
-                    {[...filteredSeniors]
+                    {[...searchFilteredSeniors]
                       .sort((a, b) => {
                         if (sortColumn) {
                           let aValue: string | number;
@@ -1129,7 +1217,7 @@ export function SeniorsReportSheet({
                                       : ""
                                   }
                                 >
-                                  {senior.has_dl_intervened ? "True" : "False"}
+                                  {senior.has_dl_intervened ? "Yes" : "No"}
                                 </Badge>
                                 {senior.has_dl_intervened && (
                                   <Button
@@ -1444,13 +1532,31 @@ export function SeniorsReportSheet({
                           >
                             Report #{index + 1}
                           </Badge>
-                          <span className="text-sm font-medium text-gray-700">
+                          <Badge
+                            variant="outline"
+                            className="bg-green-100 text-green-800 border-green-300"
+                          >
                             {new Date(report.date).toLocaleDateString("en-US", {
                               year: "numeric",
                               month: "long",
                               day: "numeric",
                             })}
-                          </span>
+                          </Badge>
+                          {report.volunteer_name ? (
+                            <Badge
+                              variant="outline"
+                              className="bg-blue-100 text-blue-800 border-blue-300"
+                            >
+                              Volunteer: {report.volunteer_name}
+                            </Badge>
+                          ) : (
+                            <Badge
+                              variant="outline"
+                              className="bg-gray-100 text-gray-600 border-gray-300"
+                            >
+                              Volunteer: Unknown
+                            </Badge>
+                          )}
                         </div>
                         <span className="text-xs text-gray-500">
                           {Math.floor(
