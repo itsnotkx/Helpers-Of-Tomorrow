@@ -77,6 +77,8 @@ export function SeniorsReportSheet({
   const [updateSeniorValues, setUpdateSeniorValues] = useState<
     Record<string, [number | null, number, string]>
   >({});
+  const [isSuccessfulManualUpdate, setIsSuccessfulManualUpdate] = useState(false);
+  const [nameOfSeniorUpdated, setNameOfSeniorUpdated] = useState("");
 
   // Wellbeing update state
   const [isUpdatingWellbeing, setIsUpdatingWellbeing] = useState<string | null>(
@@ -127,6 +129,7 @@ export function SeniorsReportSheet({
   // Handle wellbeing update confirmation
   const handleWellbeingUpdate = async (
     seniorId: string,
+    seniorName: string,
     newWellbeing: number
   ) => {
     try {
@@ -169,10 +172,11 @@ export function SeniorsReportSheet({
         // Close dialog and show success
         setShowWellbeingDialog(null);
         setSelectedWellbeing(null);
-        alert(`Wellbeing updated successfully for senior ${seniorId}!`);
+        setNameOfSeniorUpdated(seniorName || `Senior ${seniorId}`);
+        setIsSuccessfulManualUpdate(true);
+        // alert(`Wellbeing updated successfully for senior ${seniorId}!`);
         // Update the local state instead of refreshing the page
         // This will keep the user on the sheet
-        window.location.reload();
       } else {
         console.error("Failed to update wellbeing:", result);
         alert(
@@ -192,6 +196,11 @@ export function SeniorsReportSheet({
       setIsUpdatingWellbeing(null);
     }
   };
+
+  const closeDialogueForUpdate = () => {
+    setIsSuccessfulManualUpdate(false);
+    window.location.reload();
+  }
 
   // Handle reset DL intervention
   const handleResetIntervention = async (seniorId: string) => {
@@ -350,7 +359,7 @@ export function SeniorsReportSheet({
                     <Activity className="h-5 w-5 mr-2" />
                     {classifyLoading ? "Classifying..." : "Classify Seniors"}
                   </Button>
-                  <text className="text-sm text-muted-foreground">Only those without manual intervention will be reassessed</text>
+                  <div className="text-sm text-muted-foreground">Only those without manual intervention will be reassessed</div>
                 </div>
 
                 <Button
@@ -428,6 +437,24 @@ export function SeniorsReportSheet({
             </DialogFooter>
           </DialogContent>
         </Dialog>
+
+        {/* Diagloue for successful manual wellbeing update */}
+        <Dialog open={isSuccessfulManualUpdate} onOpenChange={setIsSuccessfulManualUpdate}>
+          <DialogTitle>
+            <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+              <div className="space-y-4">
+                Wellbeing updated successfully for { nameOfSeniorUpdated }!
+              </div>
+              <DialogFooter>
+                <Button onClick={closeDialogueForUpdate} className="cursor-pointer w-full">
+                  Close
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </DialogTitle>
+        </Dialog>
+
+
 
         {/* Sheet body */}
         <div className="mx-auto w-full px-4 md:px-6 pb-12 pt-4">
@@ -851,6 +878,7 @@ export function SeniorsReportSheet({
                                             if (selectedWellbeing !== null) {
                                               handleWellbeingUpdate(
                                                 senior.uid,
+                                                senior.name,
                                                 selectedWellbeing
                                               );
                                             }
@@ -900,7 +928,7 @@ export function SeniorsReportSheet({
                                   <Button
                                     variant="ghost"
                                     size="sm"
-                                    className="h-6 w-6 p-0 hover:bg-muted"
+                                    className="h-6 w-6 p-0 hover:bg-muted cursor-pointer"
                                     onClick={(e) => {
                                       e.stopPropagation(); // Prevent row click
                                       handleResetIntervention(senior.uid);
