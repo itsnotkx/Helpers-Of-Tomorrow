@@ -2,6 +2,9 @@
 
 *A Volunteer Management System for Efficient, Inclusive, and Scalable Senior Care*
 
+[![Watch the video](https://img.youtube.com/vi/MZco7oNwd1I/0.jpg)](https://www.youtube.com/watch?v=MZco7oNwd1I)
+
+
 ## 🌍 Problem Statement
 
 Volunteer organisations often coordinate using WhatsApp groups, leading to:
